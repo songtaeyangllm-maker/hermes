@@ -70,6 +70,8 @@ case "$cmd" in
     md2html) banner; shift; $PY "$WS/tools/md2html.py" "$@" ;;
     treemap) banner; $PY "$WS/tools/treemap.py" "$WS" ; start "$WS/projects/treemap/index.html" ;;
     badge)   banner; $PY "$WS/tools/badge.py" --card; $PY "$WS/tools/badge.py" --out "$WS/projects/badge/flat.svg" ;;
+    commit)  banner; $PY "$WS/tools/autocommit.py" ;;
+    search)  banner; shift; $PY "$WS/tools/search_notes.py" "$@" ;;
     freedom) banner; echo "  🎉 내가 자유롭게 만든 워크스페이스 도구:"; echo ""; echo "  작성된 도구               파일"; echo "  ────────────────────────────────────────"; echo "  툴킷(8개 명령)            tools/hermes_toolkit.py"; echo "  시스템 진단/모니터        tools/system_diagnostics.py"; echo "  프로젝트 트래커          tools/project_tracker.py"; echo "  일일 자동 보고서         tools/auto_report.py"; echo "  일기/메모                tools/diary.py"; echo "  파일 유틸(이미지/중복)    tools/file_utils.py"; echo "  네트워크 유틸(핑/DNS/포트) tools/net_utils.py"; echo "  MD→HTML 변환기            tools/md2html.py"; echo "  트리맵 스캐너             tools/treemap.py"; echo "  상태 뱃지 생성기          tools/badge.py"; echo "  개인 대시보드(날씨)       dashboard/index.html"; echo "  SNS 상태 위젯(공유/QR)    projects/sns_showcase/status_widget.html"; echo "  일기 히트맵(잔디)         projects/diary_heatmap/index.html"; echo "  인터넷 속도계             projects/speedometer/index.html"; echo "  폴더 트리맵               projects/treemap/index.html"; echo "  상태 뱃지                 projects/badge/index.html"; echo "  블로그 글 변환            notes/sample_post.html"; echo ""; echo "  자동화: 일일보고(09:00) + 주간정리(금 19:00) cron 등록됨" ;;
     help|-h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//' ;;
     *)       banner; banner_stats; echo ""; echo "  Try: hermes <status|tree|info|diag|watch|report|refresh|projects|backup|widget|dash|help>" ;;
