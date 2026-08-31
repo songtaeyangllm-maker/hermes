@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Regex Tester</title>
+<style>
+:root { --bg:#0b0b12; --card:#13131c; --text:#ececf5; --muted:#6b6f82; --border:#23233a; --accent:#7c5cff; --match:#ffd166; --ok:#5ce6a8; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Courier New',monospace,'Noto Sans KR'; background:var(--bg); color:var(--text); min-height:100vh; padding:32px; }
+.wrap { max-width:860px; margin:0 auto; }
+h1 { font-size:1.4rem; font-weight:800; margin-bottom:6px; }
+h1 span { color:var(--accent); }
+.sub { color:var(--muted); font-size:0.8rem; margin-bottom:24px; letter-spacing:1px; }
+
+.card { background:var(--card); border:1px solid var(--border); border-radius:18px; padding:24px; margin-bottom:18px; }
+.card label { display:block; font-size:0.72rem; color:var(--muted); margin-bottom:10px; text-transform:uppercase; letter-spacing:1px; }
+
+.pattern-row { display:flex; gap:10px; align-items:center; }
+.pattern-row .slash { font-size:1.3rem; color:var(--accent); }
+input[type=text] { flex:1; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:10px; padding:13px 16px; font-family:inherit; font-size:0.95rem; outline:none; }
+input[type=text]:focus { border-color:var(--accent); }
+.flags { display:flex; gap:6px; margin-top:12px; }
+.flag-chip { padding:7px 14px; border-radius:9px; background:var(--bg); border:1px solid var(--border); font-size:0.8rem; cursor:pointer; color:var(--muted); font-family:inherit; }
+.flag-chip.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+textarea { width:100%; min-height:160px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:12px; padding:16px; font-family:inherit; font-size:0.95rem; resize:vertical; outline:none; }
+textarea:focus { border-color:var(--accent); }
+
+.matches-preview { background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:16px; min-height:60px; font-size:0.92rem; line-height:2; white-space:pre-wrap; word-break:break-all; }
+mark { background:var(--match); color:#1a1520; border-radius:3px; padding:0 1px; }
+.error { color:#ff6b6b; }
+
+.stats { display:flex; gap:16px; margin-top:14px; font-size:0.8rem; color:var(--muted); flex-wrap:wrap; }
+.stats b { color:var(--ok); }
+
+.results { margin-top:14px; }
+.res-title { font-size:0.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
+.match-list { display:flex; flex-direction:column; gap:8px; }
+.match-item { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:10px 14px; font-size:0.85rem; display:flex; justify-content:space-between; gap:14px; }
+.match-item .idx { color:var(--muted); font-size:0.75rem; white-space:nowrap; }
+.match-item .grp { color:var(--accent); font-size:0.72rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <h1>🔍 <span>REGEX</span> TESTER</h1>
+    <div class="sub">실시간 정규식 매칭 시각화</div>
+
+    <div class="card">
+        <label>패턴</label>
+        <div class="pattern-row">
+            <span class="slash">/</span>
+            <input type="text" id="pattern" value="\d{3}-\d{4}-\d{4}" placeholder="예: \d{3}-\d{4}-\d{4}">
+            <span class="slash">/</span>
+        </div>
+        <div class="flags">
+            <button class="flag-chip" data-f="g" onclick="toggleFlag('g')">g</button>
+            <button class="flag-chip" data-f="i" onclick="toggleFlag('i')">i</button>
+            <button class="flag-chip" data-f="m" onclick="toggleFlag('m')">m</button>
+            <button class="flag-chip" data-f="s" onclick="toggleFlag('s')">s</button>
+            <button class="flag-chip" data-f="u" onclick="toggleFlag('u')">u</button>
+            <button class="flag-chip" data-f="y" onclick="toggleFlag('y')">y</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <label>테스트 텍스트</label>
+        <textarea id="textArea" placeholder="여기에 텍스트를 입력하세요...">연락처: 010-1234-5678, 02-123-4567
+이메일: hello@hermes.com, test@gmail.com
+전화: 010-9876-5432
+날짜: 2026-08-31 17:45
+지연: 010-5555-6666</textarea>
+        <div class="stats">
+            <span>매칭 <b id="count">0</b>건</span>
+            <span>글자수 <b id="charcount">0</b></span>
+        </div>
+    </div>
+
+    <div class="card">
+        <label>매칭 미리보기</label>
+        <div class="matches-preview" id="preview"></div>
+        <div class="results">
+            <div class="res-title">매칭 결과 상세</div>
+            <div class="match-list" id="matchList"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+const patternInput = document.getElementById('pattern');
+const textArea = document.getElementById('textArea');
+const preview = document.getElementById('preview');
+const matchList = document.getElementById('matchList');
+let flags = ['g', 'm'];
+
+function toggleFlag(f) {
+    const chip = document.querySelector(`.flag-chip[data-f="${f}"]`);
+    if (flags.includes(f)) { flags = flags.filter(x => x !== f); chip.classList.remove('active'); }
+    else { flags.push(f); chip.classList.add('active'); }
+    // 'g' removed? add back for highlighting multiple
+    update();
+}
+
+function update() {
+    const patStr = patternInput.value;
+    const text = textArea.value;
+    document.getElementById('charcount').textContent = text.length;
+
+    if (!patStr.trim()) {
+        preview.innerHTML = '<span style="color:var(--muted)">패턴을 입력하세요.</span>';
+        matchList.innerHTML = '';
+        document.getElementById('count').textContent = '0';
+        return;
+    }
+
+    let regex, matches = [];
+    try {
+        let fs = flags.includes('g') ? flags.join('') : flags.join('') + 'g';
+        regex = new RegExp(patStr, fs);
+        // collect without g for groups display
+        const gRegex = flags.includes('g') ? regex : new RegExp(patStr, flags.join('') + 'g');
+        let m;
+        while ((m = gRegex.exec(text)) !== null) {
+            matches.push({ idx: m.index, all: m[0], groups: m.slice(1), len: m[0].length });
+            if (m.index === gRegex.lastIndex) gRegex.lastIndex++;
+        }
+    } catch (e) {
+        preview.innerHTML = `<span class="error">⚠ ${e.message}</span>`;
+        matchList.innerHTML = '';
+        document.getElementById('count').textContent = '0';
+        return;
+    }
+
+    document.getElementById('count').textContent = matches.length;
+
+    // Highlight
+    if (matches.length === 0) {
+        preview.innerHTML = '<span style="color:var(--muted)">매칭 없음</span>';
+    } else {
+        let html = '';
+        let lastIdx = 0;
+        matches.forEach(m => {
+            html += escapeHtml(text.slice(lastIdx, m.idx));
+            html += `<mark>${escapeHtml(m.all)}</mark>`;
+            lastIdx = m.idx + m.len;
+        });
+        html += escapeHtml(text.slice(lastIdx));
+        preview.innerHTML = html;
+    }
+
+    // Match list
+    if (matches.length === 0) {
+        matchList.innerHTML = '<div style="color:var(--muted);font-size:0.82rem">매칭 없음</div>';
+    } else {
+        matchList.innerHTML = matches.map((m, i) => {
+            const grp = m.groups.length ? `<span class="grp">그룹: ${m.groups.join(', ')}</span>` : '';
+            return `<div class="match-item"><span><b>${i+1}.</b> "${escapeHtml(m.all)}" ${grp}</span><span class="idx">pos ${m.idx} (len ${m.len})</span></div>`;
+        }).join('');
+    }
+}
+
+function escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+
+// init flags
+document.querySelectorAll('.flag-chip').forEach(c => { if (flags.includes(c.dataset.f)) c.classList.add('active'); });
+patternInput.addEventListener('input', update);
+textArea.addEventListener('input', update);
+update();
+</script>
+</body>
+</html>

@@ -126,5 +126,29 @@
     "path": "C:/hermes/projects/command_center",
     "created": "2026-08-31",
     "updated": "2026-08-31 18:08"
+  },
+  {
+    "name": "Pomodoro",
+    "status": "active",
+    "description": "포모도로 타이머",
+    "path": "C:/hermes/projects/pomodoro",
+    "created": "2026-08-31",
+    "updated": "2026-08-31 18:16"
+  },
+  {
+    "name": "DevCalc",
+    "status": "active",
+    "description": "개발자 계산기",
+    "path": "C:/hermes/projects/devcalc",
+    "created": "2026-08-31",
+    "updated": "2026-08-31 18:16"
+  },
+  {
+    "name": "Regex",
+    "status": "active",
+    "description": "정규식 테스터",
+    "path": "C:/hermes/projects/regex",
+    "created": "2026-08-31",
+    "updated": "2026-08-31 18:16"
   }
 ]

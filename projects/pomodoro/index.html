@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Pomodoro</title>
+<style>
+:root { --bg:#0b0b12; --card:#13131c; --text:#ececf5; --muted:#6b6f82; --border:#23233a; --accent:#7c5cff; --work:#ff6b6b; --break:#5ce6a8; --long:#5c8aff; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; }
+.wrap { width:420px; padding:40px; }
+.header { display:flex; align-items:center; justify-content:space-between; margin-bottom:32px; }
+.header h1 { font-size:1.3rem; font-weight:800; }
+.header h1 span { color:var(--accent); }
+.tabs { display:flex; gap:6px; background:var(--card); border:1px solid var(--border); border-radius:14px; padding:4px; }
+.tab { padding:8px 16px; border-radius:10px; font-size:0.82rem; font-weight:600; cursor:pointer; transition:all .2s; color:var(--muted); border:none; background:none; }
+.tab.active { background:var(--accent); color:#fff; }
+.tab:hover:not(.active) { color:var(--text); }
+.timer-box { display:flex; flex-direction:column; align-items:center; margin-bottom:36px; }
+.ring-wrap { position:relative; width:260px; height:260px; }
+.ring-bg { fill:none; stroke:var(--border); stroke-width:8; }
+.ring-fg { fill:none; stroke:var(--work); stroke-width:8; stroke-linecap:round; transition:stroke-dashoffset .3s ease; transform:rotate(-90deg); transform-origin:center; }
+.timer-label { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; }
+.timer-label .time { font-size:3.2rem; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:2px; }
+.timer-label .mode { font-size:0.82rem; color:var(--muted); margin-top:4px; font-weight:600; text-transform:uppercase; }
+.quote { text-align:center; font-size:0.85rem; color:var(--muted); font-style:italic; margin-bottom:32px; line-height:1.5; min-height:40px; }
+.controls { display:flex; justify-content:center; gap:14px; margin-bottom:32px; }
+.btn { padding:14px 30px; border-radius:14px; font-size:0.95rem; font-weight:700; cursor:pointer; border:none; transition:all .2s; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-primary:hover { filter:brightness(1.15); }
+.btn-secondary { background:var(--card); border:1px solid var(--border); color:var(--text); }
+.btn-secondary:hover { background:#1e1e2e; }
+.btn-sm { padding:10px 18px; font-size:0.82rem; border-radius:10px; }
+.stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+.stat { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:18px; text-align:center; }
+.stat .num { font-size:1.8rem; font-weight:800; color:var(--accent); }
+.stat .lbl { font-size:0.72rem; color:var(--muted); margin-top:4px; }
+.settings { margin-top:24px; background:var(--card); border:1px solid var(--border); border-radius:16px; padding:20px; display:none; }
+.settings.show { display:block; }
+.settings h3 { font-size:0.9rem; margin-bottom:14px; color:var(--accent); }
+.set-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.set-row label { font-size:0.82rem; color:var(--muted); }
+.set-row input { width:70px; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text); font-size:0.85rem; text-align:center; }
+.history { margin-top:24px; }
+.history h3 { font-size:0.9rem; margin-bottom:12px; color:var(--accent); }
+.hist-list { max-height:200px; overflow-y:auto; }
+.hist-item { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--border); font-size:0.82rem; }
+.hist-item .dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.hist-item .dt { color:var(--muted); min-width:120px; }
+.hist-item .dur { color:var(--text); font-weight:600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <div class="header">
+        <h1>🍅 <span>POMODORO</span></h1>
+        <div class="tabs">
+            <button class="tab active" onclick="setMode('work')">작업</button>
+            <button class="tab" onclick="setMode('break')">휴식</button>
+            <button class="tab" onclick="setMode('long')">긴휴식</button>
+        </div>
+    </div>
+
+    <div class="timer-box">
+        <div class="ring-wrap">
+            <svg viewBox="0 0 260 260" width="260" height="260">
+                <circle class="ring-bg" cx="130" cy="130" r="118"/>
+                <circle class="ring-fg" id="ringFg" cx="130" cy="130" r="118"/>
+            </svg>
+            <div class="timer-label">
+                <div class="time" id="timeDisplay">25:00</div>
+                <div class="mode" id="modeDisplay">집중 시간</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="quote" id="quote"></div>
+
+    <div class="controls">
+        <button class="btn btn-primary" id="btnStart" onclick="toggleTimer()">▶ 시작</button>
+        <button class="btn btn-secondary" onclick="resetTimer()">↺ 초기화</button>
+        <button class="btn btn-secondary btn-sm" onclick="toggleSettings()">⚙</button>
+    </div>
+
+    <div class="stats">
+        <div class="stat"><div class="num" id="statSessions">0</div><div class="lbl">완료 세션</div></div>
+        <div class="stat"><div class="num" id="statTotal">0</div><div class="lbl">총 집중 (분)</div></div>
+        <div class="stat"><div class="num" id="statStreak">0</div><div class="lbl">연속 세션</div></div>
+    </div>
+
+    <div class="settings" id="settings">
+        <h3>⚙ 설정</h3>
+        <div class="set-row"><label>작업 시간 (분)</label><input type="number" id="setWork" value="25" min="1" max="120" onchange="saveSettings()"></div>
+        <div class="set-row"><label>휴식 시간 (분)</label><input type="number" id="setBreak" value="5" min="1" max="30" onchange="saveSettings()"></div>
+        <div class="set-row"><label>긴 휴식 (분)</label><input type="number" id="setLong" value="15" min="5" max="60" onchange="saveSettings()"></div>
+        <div class="set-row"><label>알림 소리</label><input type="checkbox" id="setSound" checked onchange="saveSettings()"></div>
+    </div>
+
+    <div class="history">
+        <h3>📋 최근 기록</h3>
+        <div class="hist-list" id="histList"><div style="padding:20px;color:var(--muted);text-align:center;font-size:0.85rem">기록 없음</div></div>
+    </div>
+</div>
+
+<script>
+const CIRC = 2 * Math.PI * 118;
+const ring = document.getElementById('ringFg');
+ring.style.strokeDasharray = CIRC;
+ring.style.strokeDashoffset = 0;
+
+const quotes = [
+    "집중은 습관이다. 매일 연습하면 된다.",
+    "작은 성공이 모여 큰 결과를 만든다.",
+    "지금 이 순간이 가장 중요한 시간이다.",
+    "쉬는 것도 생산성의 일부다.",
+    "완벽보다는 꾸준함이 이긴다.",
+    "피곤할 때 쉬어라. 다시 돌아오면 된다.",
+    "목표를 잊지 마라. 오늘의 노력은 내일의 결과다.",
+    "하나씩, 천천히, 하지만 확실하게.",
+    "번아웃보다는 균형을 택하라.",
+    "25분은 세상을 바꿀 수 있다.",
+];
+
+const colors = { work:'var(--work)', break:'var(--break)', long:'var(--long)' };
+const labels = { work:'집중 시간', break:'짧은 휴식', long:'긴 휴식' };
+const tabBtns = document.querySelectorAll('.tab');
+const modeMap = { work:0, break:1, long:2 };
+
+let mode = 'work';
+let running = false;
+let remaining = 25 * 60;
+let total = 25 * 60;
+let timer = null;
+
+// Settings & state
+function loadSettings() {
+    const s = JSON.parse(localStorage.getItem('pomo_settings') || '{}');
+    return { work: s.work||25, brk: s.brk||5, long: s.long||15, sound: s.sound!==false };
+}
+function saveSettings() {
+    const s = { work:+document.getElementById('setWork').value, brk:+document.getElementById('setBreak').value, long:+document.getElementById('setLong').value, sound:document.getElementById('setSound').checked };
+    localStorage.setItem('pomo_settings', JSON.stringify(s));
+    if (!running) { total = getDuration(mode)*60; remaining = total; updateDisplay(); }
+}
+function getDuration(m) { const s=loadSettings(); return m==='work'?s.work:m==='break'?s.brk:s.long; }
+function loadState() {
+    const s = JSON.parse(localStorage.getItem('pomo_state') || '{}');
+    return { sessions: s.sessions||0, totalMin: s.totalMin||0, streak: s.streak||0, history: s.history||[] };
+}
+function saveState(st) { localStorage.setItem('pomo_state', JSON.stringify(st)); }
+
+function toggleSettings() {
+    const el = document.getElementById('settings');
+    el.classList.toggle('show');
+    const s = loadSettings();
+    document.getElementById('setWork').value = s.work;
+    document.getElementById('setBreak').value = s.brk;
+    document.getElementById('setLong').value = s.long;
+    document.getElementById('setSound').checked = s.sound;
+}
+
+function setMode(m) {
+    if (running) return;
+    mode = m;
+    tabBtns.forEach((b,i) => b.classList.toggle('active', [mode==='work', mode==='break', mode==='long'][i]));
+    total = getDuration(m) * 60;
+    remaining = total;
+    updateDisplay();
+}
+
+function updateDisplay() {
+    const min = Math.floor(remaining/60);
+    const sec = remaining%60;
+    document.getElementById('timeDisplay').textContent = String(min).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+    document.getElementById('modeDisplay').textContent = labels[mode];
+    document.title = `${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')} - Pomodoro`;
+    const pct = total > 0 ? (total-remaining)/total : 0;
+    ring.style.strokeDashoffset = CIRC * (1-pct);
+    ring.style.stroke = colors[mode];
+
+    const st = loadState();
+    document.getElementById('statSessions').textContent = st.sessions;
+    document.getElementById('statTotal').textContent = st.totalMin;
+    document.getElementById('statStreak').textContent = st.streak;
+    renderHistory(st.history);
+}
+
+function renderHistory(hist) {
+    const el = document.getElementById('histList');
+    if (!hist.length) { el.innerHTML = '<div style="padding:20px;color:var(--muted);text-align:center;font-size:0.85rem">기록 없음</div>'; return; }
+    el.innerHTML = hist.slice(-10).reverse().map(h => {
+        const dotColor = h.mode==='work'?'var(--work)':h.mode==='break'?'var(--break)':'var(--long)';
+        return `<div class="hist-item"><div class="dot" style="background:${dotColor}"></div><span class="dt">${h.time}</span><span class="dur">${labels[h.mode]} ${h.dur}분</span></div>`;
+    }).join('');
+}
+
+function beep() {
+    if (!loadSettings().sound) return;
+    try {
+        const ctx = new (window.AudioContext||window.webkitAudioContext)();
+        [0, 300, 600].forEach(delay => {
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = 'sine';
+            o.frequency.value = 800;
+            g.gain.value = 0.3;
+            g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + delay/1000 + 0.3);
+            o.connect(g); g.connect(ctx.destination);
+            o.start(ctx.currentTime + delay/1000);
+            o.stop(ctx.currentTime + delay/1000 + 0.3);
+        });
+    } catch(e) {}
+}
+
+function toggleTimer() {
+    if (running) { pauseTimer(); } else { startTimer(); }
+}
+
+function startTimer() {
+    running = true;
+    document.getElementById('btnStart').textContent = '⏸ 일시정지';
+    timer = setInterval(() => {
+        remaining--;
+        updateDisplay();
+        if (remaining <= 0) {
+            clearInterval(timer);
+            running = false;
+            document.getElementById('btnStart').textContent = '▶ 시작';
+            beep();
+            completeSession();
+        }
+    }, 1000);
+}
+
+function pauseTimer() {
+    clearInterval(timer);
+    running = false;
+    document.getElementById('btnStart').textContent = '▶ 재개';
+}
+
+function resetTimer() {
+    clearInterval(timer);
+    running = false;
+    total = getDuration(mode) * 60;
+    remaining = total;
+    document.getElementById('btnStart').textContent = '▶ 시작';
+    updateDisplay();
+}
+
+function completeSession() {
+    const st = loadState();
+    const dur = getDuration(mode);
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'});
+    const dateStr = now.toLocaleDateString('ko-KR', {month:'short',day:'numeric'});
+    st.history.push({ mode, dur, time: dateStr+' '+timeStr });
+    if (mode === 'work') {
+        st.sessions++;
+        st.totalMin += dur;
+        st.streak++;
+    } else {
+        st.streak = 0; // break resets streak? No — streak counts work sessions
+    }
+    // Auto-switch: work -> break, break/long -> work
+    if (mode === 'work') {
+        st.sessions % 4 === 0 ? setMode('long') : setMode('break');
+    } else {
+        setMode('work');
+    }
+    saveState(st);
+    updateDisplay();
+}
+
+// Init
+document.getElementById('quote').textContent = quotes[Math.floor(Math.random()*quotes.length)];
+const st = loadState();
+const s = loadSettings();
+document.getElementById('setWork').value = s.work;
+document.getElementById('setBreak').value = s.brk;
+document.getElementById('setLong').value = s.long;
+document.getElementById('setSound').checked = s.sound;
+total = getDuration('work') * 60;
+remaining = total;
+updateDisplay();
+</script>
+</body>
+</html>
