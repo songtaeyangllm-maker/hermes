@@ -154,14 +154,55 @@ python tools/file_utils.py clean <dir> --ext .tmp --dry-run
 | ⚡ 인터넷 속도계 | `projects/speedometer/index.html` | Cloudflare 실측 다운/업로드 속도 |
 | 🗂️ 폴더 트리맵 | `projects/treemap/index.html` | 폴더 크기 트리맵 (slice-and-dice) |
 | 🏅 상태 뱃지 | `projects/badge/index.html` | flat.svg + card.svg 상태 배지 |
+| ⏱️ 활동 타임라인 | `projects/timeline/index.html` | git+일기+보고서 활동 로그 |
+| ☁️ 워드클라우드 | `projects/wordcloud/wc.png` | 노트 단어 빈도 이미지 |
+| 🧊 커맨드 센터 | `projects/command_center/index.html` | KPI+프로젝트+도구+실시간 시스템 |
+| ◈ Hermes OS | `projects/hermes_os/index.html` | 미니 OS 바탕화면 런처 (앱 아이콘) |
+| 📊 감정 리포트 | `projects/sentiment/report.html` | 일기 감정 분석 월간 리포트 |
+
+## 🕹️ 게임 / 재미
+
+| 프로젝트 | 경로 | 특징 |
+|----------|------|------|
+| 🐍 스네이크 | `projects/snake/index.html` | 점수판+속도+테마 |
+| 🧱 벽돌깨기 | `projects/breakout/index.html` | 패들/공/벽돌+레벨+터치 |
+| ⌨️ 타이핑 | `projects/typing/index.html` | WPM+정확도 |
+| 🍀 운세/명언 | `projects/fortune/index.html` | 별 배경 + 랜덤 운세/명언 |
+| 🍅 포모도로 | `projects/pomodoro/index.html` | 원형 타이머+기록+소리 |
+| 🧮 Dev 계산기 | `projects/devcalc/index.html` | Base64/URL/Escape/HEX/SHA/MD5 |
+| 🔍 정규식 테스터 | `projects/regex/index.html` | 실시간 매칭 하이라이트 |
+| 🛍️ 공유 갤러리 | `projects/showcase/index.html` | SNS 공유 키트 전시관 |
 
 ```bash
 # 데이터 갱신 후 위젯 열기
 hermes treemap       # 트리맵 스캔 + 열기
 hermes badge         # 상태 뱃지 재생성
+hermes poster neon   # SNS 포스터 생성 (4테마)
+hermes sentiment     # 일기 감정 분석
+hermes summary       # 워크스페이스 요약 리포트
 python tools/treemap.py C:/hermes   # 트리맵 데이터 스캔
 python tools/diary.py export        # 일기 히트맵 JSON
 ```
+
+## 🚀 로컬 API 서버 (실시간)
+
+`tools/api_server.py` — stdlib http.server 기반 JSON API (포트 8765). 커맨드 센터가 시스템 상태를 실시간으로 가져옵니다.
+
+```bash
+hermes api           # 서버 시작
+hermes api-status    # 현재 시스템 상태 (JSON)
+```
+
+- `GET /api/status` — CPU/메모리/디스크/프로세스 (PowerShell CIM)
+- `GET /api/projects`, `GET /api/tools`, `GET /api/notes`, `GET /api/health`
+
+## 📊 SNS 포스터 (공유용)
+
+```bash
+python tools/poster.py --theme dark|neon|ocean|sunset
+hermes poster neon
+```
+→ `projects/poster/poster_<theme>.png`  (실시간 코드 줄/프로젝트/도구/파일 수 반영)
 
 ## 🖥️ hermes CLI 단축
 
