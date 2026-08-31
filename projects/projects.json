@@ -166,5 +166,13 @@
     "path": "C:/hermes/projects/hermes_os",
     "created": "2026-08-31",
     "updated": "2026-08-31 18:23"
+  },
+  {
+    "name": "Sentiment",
+    "status": "active",
+    "description": "일기 감정 분석 리포트",
+    "path": "C:/hermes/projects/sentiment",
+    "created": "2026-08-31",
+    "updated": "2026-08-31 18:25"
   }
 ]

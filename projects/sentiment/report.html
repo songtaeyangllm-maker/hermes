@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><title>월간 감정 리포트</title>
+<style>
+:root { --bg:#0b0b12; --card:#13131c; --text:#ececf5; --muted:#6b6f82; --border:#23233a; --accent:#7c5cff; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; background:var(--bg); color:var(--text); padding:40px 24px; }
+.wrap { max-width:680px; margin:0 auto; }
+h1 { font-size:1.5rem; font-weight:800; margin-bottom:6px; } h1 span { color:var(--accent); }
+.sub { color:var(--muted); font-size:0.82rem; margin-bottom:26px; }
+.kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin-bottom:28px; }
+.kpi { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:18px; text-align:center; }
+.kpi .n { font-size:0.72rem; color:var(--muted); } .kpi .v { font-size:1.6rem; font-weight:800; color:var(--accent); margin-top:4px; }
+.rows { background:var(--card); border:1px solid var(--border); border-radius:18px; padding:10px 18px; }
+.row { display:grid; grid-template-columns:90px 50px 1fr 50px; gap:12px; align-items:center; padding:9px 0; border-bottom:1px solid var(--border); font-size:0.85rem; }
+.row:last-child { border:none; }
+.date { color:var(--muted); } .label { font-size:0.72rem; } .score { text-align:right; font-weight:700; }
+.bar { height:12px; background:#1c1c28; border-radius:8px; overflow:hidden; }
+.bar .fill { height:100%; border-radius:8px; } .fill.pos { background:linear-gradient(90deg,#5ce6a8,#5c8aff); } .fill.neg { background:linear-gradient(90deg,#ff6b6b,#ff9d6b); }
+.sum { margin-top:16px; text-align:center; color:var(--muted); font-size:0.8rem; }
+</style></head><body>
+<div class="wrap">
+  <h1>📔 월간 <span>감정</span> 리포트</h1>
+  <div class="sub">2026-08 · Hermes 일기 자동 분석</div>
+  
+<div class="kpis">
+  <div class="kpi"><div class="n">분석 일기</div><div class="v">9</div></div>
+  <div class="kpi"><div class="n">긍정 일수</div><div class="v" style="color:#5ce6a8">1</div></div>
+  <div class="kpi"><div class="n">부정 일수</div><div class="v" style="color:#ff6b6b">1</div></div>
+  <div class="kpi"><div class="n">평균 감성</div><div class="v">+0.00</div></div>
+</div>
+
+  <div class="rows"><div class="row"><div class="date">2026-08-20</div><div class="label">긍정</div><div class="bar"><div class="fill pos" style="width:48%"></div></div><div class="score">+6</div></div><div class="row"><div class="date">2026-08-21</div><div class="label">부정</div><div class="bar"><div class="fill neg" style="width:64%"></div></div><div class="score">-8</div></div><div class="row"><div class="date">2026-08-25</div><div class="label">중립</div><div class="bar"><div class="fill pos" style="width:0%"></div></div><div class="score">+0</div></div><div class="row"><div class="date">2026-08-26</div><div class="label">중립</div><div class="bar"><div class="fill pos" style="width:0%"></div></div><div class="score">+0</div></div><div class="row"><div class="date">2026-08-27</div><div class="label">중립</div><div class="bar"><div class="fill pos" style="width:0%"></div></div><div class="score">+0</div></div><div class="row"><div class="date">2026-08-28</div><div class="label">중립</div><div class="bar"><div class="fill pos" style="width:0%"></div></div><div class="score">+0</div></div><div class="row"><div class="date">2026-08-29</div><div class="label">중립</div><div class="bar"><div class="fill pos" style="width:0%"></div></div><div class="score">+0</div></div><div class="row"><div class="date">2026-08-30</div><div class="label">중립</div><div class="bar"><div class="fill pos" style="width:0%"></div></div><div class="score">+0</div></div><div class="row"><div class="date">2026-08-31</div><div class="label">중립</div><div class="bar"><div class="fill pos" style="width:0%"></div></div><div class="score">+0</div></div></div>
+  <div class="sum">긍정 단어 6 · 부정 단어 8 · 총 감정 점수 -2</div>
+</div>
+</body></html>
