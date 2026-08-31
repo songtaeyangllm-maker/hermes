@@ -78,5 +78,29 @@
     "path": "C:/hermes/projects/timeline",
     "created": "2026-08-31",
     "updated": "2026-08-31 17:57"
+  },
+  {
+    "name": "Snake",
+    "status": "active",
+    "description": "스네이크 게임",
+    "path": "C:/hermes/projects/snake",
+    "created": "2026-08-31",
+    "updated": "2026-08-31 18:03"
+  },
+  {
+    "name": "Typing",
+    "status": "active",
+    "description": "타이핑 속도 측정",
+    "path": "C:/hermes/projects/typing",
+    "created": "2026-08-31",
+    "updated": "2026-08-31 18:03"
+  },
+  {
+    "name": "Showcase",
+    "status": "active",
+    "description": "SNS 공유 갤러리",
+    "path": "C:/hermes/projects/showcase",
+    "created": "2026-08-31",
+    "updated": "2026-08-31 18:03"
   }
 ]
