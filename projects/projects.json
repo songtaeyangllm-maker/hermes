@@ -198,5 +198,13 @@
     "path": "C:/hermes/tools/smoke.py",
     "created": "2026-08-31",
     "updated": "2026-08-31 18:35"
+  },
+  {
+    "name": "Breath",
+    "status": "active",
+    "description": "호흡 가이드 위젯",
+    "path": "C:/hermes/projects/breath",
+    "created": "2026-08-31",
+    "updated": "2026-08-31 18:37"
   }
 ]

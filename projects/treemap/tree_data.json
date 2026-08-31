@@ -1,18 +1,18 @@
 {
   "name": "hermes",
-  "size": 958364,
+  "size": 974323,
   "children": [
     {
       "name": "projects",
-      "size": 480574,
+      "size": 476125,
       "children": [
         {
           "name": "poster",
-          "size": 158095,
+          "size": 158771,
           "children": [
             {
               "name": "poster_dark.png",
-              "size": 40064,
+              "size": 40740,
               "children": []
             },
             {
@@ -50,27 +50,27 @@
         },
         {
           "name": "wordcloud",
-          "size": 62391,
+          "size": 51782,
           "children": [
             {
               "name": "wc.png",
-              "size": 62391,
+              "size": 51782,
               "children": []
             }
           ]
         },
         {
           "name": "treemap",
-          "size": 38243,
+          "size": 38422,
           "children": [
             {
               "name": "tree_data.json",
-              "size": 20931,
+              "size": 21057,
               "children": []
             },
             {
               "name": "tree_data.js",
-              "size": 9348,
+              "size": 9401,
               "children": []
             },
             {
@@ -286,8 +286,19 @@
         },
         {
           "name": "projects.json",
-          "size": 4989,
+          "size": 5418,
           "children": []
+        },
+        {
+          "name": "gauges",
+          "size": 4876,
+          "children": [
+            {
+              "name": "index.html",
+              "size": 4876,
+              "children": []
+            }
+          ]
         },
         {
           "name": "sentiment",
@@ -304,11 +315,11 @@
     },
     {
       "name": ".git",
-      "size": 253375,
+      "size": 273609,
       "children": [
         {
           "name": "objects",
-          "size": 213690,
+          "size": 233236,
           "children": [
             {
               "name": "2e",
@@ -341,13 +352,18 @@
               "children": []
             },
             {
-              "name": "3e",
-              "size": 4667,
+              "name": "66",
+              "size": 4949,
               "children": []
             },
             {
               "name": "eb",
-              "size": 4589,
+              "size": 4712,
+              "children": []
+            },
+            {
+              "name": "3e",
+              "size": 4667,
               "children": []
             },
             {
@@ -358,6 +374,11 @@
             {
               "name": "0a",
               "size": 4255,
+              "children": []
+            },
+            {
+              "name": "6b",
+              "size": 4111,
               "children": []
             },
             {
@@ -401,11 +422,6 @@
               "children": []
             },
             {
-              "name": "6b",
-              "size": 3404,
-              "children": []
-            },
-            {
               "name": "05",
               "size": 3355,
               "children": []
@@ -441,11 +457,6 @@
               "children": []
             },
             {
-              "name": "66",
-              "size": 2996,
-              "children": []
-            },
-            {
               "name": "44",
               "size": 2853,
               "children": []
@@ -457,12 +468,17 @@
             },
             {
               "name": "4b",
-              "size": 2538,
+              "size": 2655,
               "children": []
             },
             {
               "name": "1d",
               "size": 2414,
+              "children": []
+            },
+            {
+              "name": "9a",
+              "size": 2404,
               "children": []
             },
             {
@@ -486,28 +502,23 @@
               "children": []
             },
             {
+              "name": "83",
+              "size": 2305,
+              "children": []
+            },
+            {
               "name": "d2",
               "size": 2260,
               "children": []
             },
             {
+              "name": "14",
+              "size": 2249,
+              "children": []
+            },
+            {
               "name": "86",
               "size": 2234,
-              "children": []
-            },
-            {
-              "name": "22",
-              "size": 2202,
-              "children": []
-            },
-            {
-              "name": "6f",
-              "size": 2170,
-              "children": []
-            },
-            {
-              "name": "5f",
-              "size": 2102,
               "children": []
             }
           ]
@@ -590,21 +601,21 @@
         },
         {
           "name": "index",
-          "size": 7474,
+          "size": 7769,
           "children": []
         },
         {
           "name": "logs",
-          "size": 4842,
+          "size": 5246,
           "children": [
             {
               "name": "HEAD",
-              "size": 2421,
+              "size": 2623,
               "children": []
             },
             {
               "name": "refs",
-              "size": 2421,
+              "size": 2623,
               "children": []
             }
           ]
@@ -626,13 +637,13 @@
           "children": []
         },
         {
-          "name": "COMMIT_EDITMSG",
-          "size": 74,
+          "name": "description",
+          "size": 73,
           "children": []
         },
         {
-          "name": "description",
-          "size": 73,
+          "name": "COMMIT_EDITMSG",
+          "size": 63,
           "children": []
         },
         {
@@ -766,7 +777,7 @@
     },
     {
       "name": "dashboard",
-      "size": 51485,
+      "size": 51556,
       "children": [
         {
           "name": "index.html",
@@ -790,7 +801,7 @@
         },
         {
           "name": "history.json",
-          "size": 900,
+          "size": 971,
           "children": []
         }
       ]
@@ -900,11 +911,11 @@
     },
     {
       "name": "scripts",
-      "size": 5505,
+      "size": 5608,
       "children": [
         {
           "name": "hermes",
-          "size": 5505,
+          "size": 5608,
           "children": []
         }
       ]

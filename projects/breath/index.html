@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Breath</title>
+<style>
+:root { --bg:#0a1428; --accent:#5ecbff; --text:#eaf4ff; --muted:#8aa8c8; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; background:radial-gradient(800px 600px at 50% 40%, #163a5e, var(--bg)); color:var(--text); min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:30px; transition:background 2s; overflow:hidden; }
+h1 { font-size:1.2rem; font-weight:800; letter-spacing:1px; opacity:0.9; }
+h1 span { color:var(--accent); }
+.sub { font-size:0.8rem; color:var(--muted); margin:6px 0 30px; }
+
+.scene { position:relative; width:280px; height:280px; display:flex; align-items:center; justify-content:center; margin-bottom:26px; }
+.orbit { position:absolute; width:280px; height:280px; border-radius:50%; border:1.5px solid rgba(94,203,255,0.12); }
+.orbit.o2 { width:320px; height:320px; }
+.breath { width:150px; height:150px; border-radius:50%; background:radial-gradient(circle at 35% 30%, rgba(120,220,255,0.95), rgba(60,150,255,0.85)); box-shadow:0 0 50px rgba(94,203,255,0.5), inset 0 0 40px rgba(255,255,255,0.15); transition:transform 4s ease, opacity 1s; display:flex; align-items:center; justify-content:center; }
+.breath .label { font-size:1.05rem; font-weight:700; color:#04243a; letter-spacing:1px; }
+
+.controls { display:flex; gap:12px; margin-bottom:22px; flex-wrap:wrap; justify-content:center; }
+.btn { padding:12px 26px; border-radius:30px; border:none; font-size:0.92rem; font-weight:700; cursor:pointer; transition:all .2s; }
+.btn-start { background:var(--accent); color:#04243a; }
+.btn-start:hover { filter:brightness(1.1); transform:translateY(-1px); }
+.btn-ghost { background:transparent; border:1.5px solid rgba(94,203,255,0.4); color:var(--text); }
+.btn-ghost:hover { border-color:var(--accent); }
+
+.modes { display:flex; gap:8px; margin-bottom:28px; }
+.mode-chip { padding:9px 18px; border-radius:20px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:var(--muted); font-size:0.8rem; font-weight:600; cursor:pointer; transition:all .2s; }
+.mode-chip.active { background:var(--accent); color:#04243a; border-color:var(--accent); }
+
+.timer { font-size:2.3rem; font-weight:800; font-variant-numeric:tabular-nums; margin-bottom:10px; }
+.cycle { font-size:0.85rem; color:var(--muted); }
+.session { margin-top:24px; font-size:0.8rem; color:var(--muted); }
+.session b { color:var(--text); }
+</style>
+</head>
+<body>
+    <h1>🌿 <span>BREATH</span> GUIDE</h1>
+    <div class="sub">4-7-8 호흡법으로 마음의 평온을 찾아요</div>
+
+    <div class="modes">
+        <button class="mode-chip active" onclick="setMode('478')">4-7-8</button>
+        <button class="mode-chip" onclick="setMode('box')">박스 호흡</button>
+        <button class="mode-chip" onclick="setMode('cohere')">일관 호흡</button>
+    </div>
+
+    <div class="scene">
+        <div class="orbit"></div>
+        <div class="orbit o2"></div>
+        <div class="breath" id="breath"><div class="label" id="label">들이쉬기</div></div>
+    </div>
+
+    <div class="controls">
+        <button class="btn btn-start" id="btnMain" onclick="toggle()">▶ 시작</button>
+        <button class="btn btn-ghost" onclick="reset()">↺ 초기화</button>
+    </div>
+
+    <div class="timer" id="timer">00:00</div>
+    <div class="cycle" id="cycle">사이클 0</div>
+    <div class="session">이번 회기 <b id="sess">0</b>회 · 총 집중 <b id="breaths">0</b>회</div>
+
+<script>
+const MODES = {
+    '478':   { name:'4-7-8', inhale:4, hold:7, exhale:8 },
+    'box':   { name:'박스 호흡', inhale:4, hold:4, exhale:4 },
+    'cohere':{ name:'일관 호흡', inhale:5, hold:0, exhale:5 },
+};
+let mode = '478';
+let running = false;
+let phase = 'inhale';
+let phaseStart = 0;
+let animId = null;
+let rafId = null;
+let totalSec = 0;
+let sessionCount = 0;
+let totalBreaths = 0;
+
+const breath = document.getElementById('breath');
+const label = document.getElementById('label');
+const timerEl = document.getElementById('timer');
+
+function setMode(m) {
+    mode = m;
+    document.querySelectorAll('.mode-chip').forEach(c => c.classList.toggle('active', c.textContent === MODES[m].name));
+    if (!running) { phase = 'inhale'; phaseStart = performance.now(); }
+}
+function setPhase(p) {
+    phase = p;
+    phaseStart = performance.now();
+    const sc = MODES[mode];
+    const names = { inhale:'들이쉬기', hold:'멈춤', exhale:'내쉬기' };
+    label.textContent = names[p];
+    // background shift by phase
+    const bg = { inhale:['#0a1428','#1a3a5c'], hold:['#1a3a5c','#203a52'], exhale:['#1a3a5c','#0a1428'] }[p];
+    document.body.style.background = `radial-gradient(800px 600px at 50% 40%, ${bg[1]}, ${bg[0]})`;
+}
+function phaseDuration() {
+    return MODES[mode][phase] * 1000;
+}
+function animate(now) {
+    const elapsed = now - phaseStart;
+    const dur = phaseDuration();
+    const t = Math.min(1, elapsed / dur);
+    const inOut = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t+2, 2)/2;
+    if (phase === 'hold') {
+        breath.style.transform = `scale(1)`;
+    } else if (phase === 'inhale') {
+        breath.style.transform = `scale(${0.6 + 0.4 * inOut})`;
+    } else {
+        breath.style.transform = `scale(${1.0 - 0.4 * inOut})`;
+    }
+    if (t >= 1) {
+        // move to next phase
+        if (phase === 'inhale') {
+            if (MODES[mode].hold > 0) setPhase('hold');
+            else setPhase('exhale');
+        } else if (phase === 'hold') {
+            setPhase('exhale');
+        } else {
+            totalBreaths++;
+            sessionCount++;
+            document.getElementById('breaths').textContent = totalBreaths;
+            document.getElementById('sess').textContent = sessionCount;
+            const c = parseInt(document.getElementById('cycle').textContent.replace(/[^0-9]/g,'')) + 1;
+            document.getElementById('cycle').textContent = `사이클 ${c}`;
+            setPhase('inhale');
+        }
+    }
+    rafId = requestAnimationFrame(animate);
+}
+function toggle() {
+    if (!running) {
+        running = true;
+        document.getElementById('btnMain').textContent = '⏸ 중지';
+        phaseStart = performance.now();
+        animId = setInterval(() => {
+            totalSec++;
+            const m = String(Math.floor(totalSec/60)).padStart(2,'0');
+            const s = String(totalSec%60).padStart(2,'0');
+            timerEl.textContent = `${m}:${s}`;
+        }, 1000);
+        rafId = requestAnimationFrame(animate);
+    } else {
+        running = false;
+        clearInterval(animId);
+        cancelAnimationFrame(rafId);
+        document.getElementById('btnMain').textContent = '▶ 재개';
+    }
+}
+function reset() {
+    running = false; clearInterval(animId); cancelAnimationFrame(rafId);
+    totalSec = 0; sessionCount = 0;
+    timerEl.textContent = '00:00';
+    document.getElementById('btnMain').textContent = '▶ 시작';
+    document.getElementById('cycle').textContent = '사이클 0';
+    phase = 'inhale'; setPhase('inhale');
+    breath.style.transform = 'scale(0.6)';
+}
+
+setPhase('inhale');
+</script>
+</body>
+</html>
