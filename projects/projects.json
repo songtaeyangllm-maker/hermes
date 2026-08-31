@@ -174,5 +174,13 @@
     "path": "C:/hermes/projects/sentiment",
     "created": "2026-08-31",
     "updated": "2026-08-31 18:25"
+  },
+  {
+    "name": "Poster",
+    "status": "active",
+    "description": "SNS 공유 포스터 생성기",
+    "path": "C:/hermes/projects/poster",
+    "created": "2026-08-31",
+    "updated": "2026-08-31 18:27"
   }
 ]
