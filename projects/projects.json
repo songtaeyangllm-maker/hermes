@@ -150,5 +150,13 @@
     "path": "C:/hermes/projects/regex",
     "created": "2026-08-31",
     "updated": "2026-08-31 18:16"
+  },
+  {
+    "name": "Local API Server",
+    "status": "active",
+    "description": "워크스페이스 JSON API (stdlib)",
+    "path": "C:/hermes/tools/api_server.py",
+    "created": "2026-08-31",
+    "updated": "2026-08-31 18:21"
   }
 ]

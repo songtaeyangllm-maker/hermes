@@ -97,33 +97,53 @@
     const widgetFolders = ['sns_showcase','diary_heatmap','speedometer','treemap','badge','timeline','wordcloud','snake','typing','showcase','breakout','fortune'];
     document.getElementById('kpiWidgets').textContent = widgetFolders.length;
 
-    // System bars
+    // System bars — extract to reusable fn
     const sys = document.getElementById('sysGrid');
-    const memPct = SYS.memory && SYS.memory.percent;
-    const diskPct = SYS.disk && SYS.disk.percent;
-    const metrics = [
-        ['CPU', SYS.cpu_percent || 0, '#7c5cff'],
-        ['메모리', memPct || 0, '#5c8aff'],
-        ['디스크', diskPct || 0, '#5ce6a8'],
-    ];
-    metrics.forEach(([n, v, c]) => {
-        const el = document.createElement('div');
-        el.className = 'sys';
-        el.innerHTML = `<div class="n">${n}</div><div class="bar"><div class="bar-fill" style="width:${Math.min(100,v)}%;background:${c}"></div></div><div class="val">${(v||0).toFixed(0)}%</div>`;
-        sys.appendChild(el);
-    });
-    if (SYS.memory && SYS.memory.total_gb) {
-        const el = document.createElement('div');
-        el.className = 'sys';
-        el.innerHTML = `<div class="n">메모리 사용량</div><div class="val" style="margin-top:20px;font-size:1rem">${SYS.memory.used_gb} / ${SYS.memory.total_gb} GB</div>`;
-        sys.appendChild(el);
+    function renderSys(data) {
+        sys.innerHTML = '';
+        const memPct = data.memory && data.memory.percent;
+        const diskPct = data.disk && data.disk.percent;
+        const metrics = [
+            ['CPU', data.cpu_percent != null ? data.cpu_percent : data.cpu, '#7c5cff'],
+            ['메모리', memPct, '#5c8aff'],
+            ['디스크', diskPct, '#5ce6a8'],
+        ];
+        metrics.forEach(([n, v, c]) => {
+            const el = document.createElement('div');
+            el.className = 'sys';
+            el.innerHTML = `<div class="n">${n}</div><div class="bar"><div class="bar-fill" style="width:${Math.min(100,v||0)}%;background:${c}"></div></div><div class="val">${(v||0).toFixed(0)}%</div>`;
+            sys.appendChild(el);
+        });
+        if (data.memory && data.memory.total_gb) {
+            const el = document.createElement('div');
+            el.className = 'sys';
+            el.innerHTML = `<div class="n">메모리 사용량</div><div class="val" style="margin-top:20px;font-size:1rem">${data.memory.used_gb} / ${data.memory.total_gb} GB</div>`;
+            sys.appendChild(el);
+        }
+        if (data.disk && data.disk.total_gb) {
+            const el = document.createElement('div');
+            el.className = 'sys';
+            el.innerHTML = `<div class="n">디스크 여유</div><div class="val" style="margin-top:20px;font-size:1rem">${data.disk.free_gb} GB 남음</div>`;
+            sys.appendChild(el);
+        }
+        if (data.processes != null) {
+            const el = document.createElement('div');
+            el.className = 'sys';
+            el.innerHTML = `<div class="n">프로세스</div><div class="val" style="margin-top:20px;font-size:1.6rem;font-weight:800;color:var(--accent)">${data.processes}</div>`;
+            sys.appendChild(el);
+        }
     }
-    if (SYS.disk && SYS.disk.total_gb) {
-        const el = document.createElement('div');
-        el.className = 'sys';
-        el.innerHTML = `<div class="n">디스크 여유</div><div class="val" style="margin-top:20px;font-size:1rem">${SYS.disk.free_gb}` + ` GB 남음</div>`;
-        sys.appendChild(el);
+    renderSys(SYS);
+
+    // Live refresh from local API server (falls back to bundled data)
+    async function refreshLive() {
+        try {
+            const r = await fetch('http://127.0.0.1:8765/api/status');
+            if (r.ok) renderSys(await r.json());
+        } catch (e) { /* server off — keep bundled data */ }
     }
+    refreshLive();
+    setInterval(refreshLive, 5000);
 
     // Projects
     const pl = document.getElementById('projList');

@@ -81,6 +81,10 @@ case "$cmd" in
     pomodoro) start "$WS/projects/pomodoro/index.html" ;;
     devcalc)  start "$WS/projects/devcalc/index.html" ;;
     regex)    start "$WS/projects/regex/index.html" ;;
+    api-status) curl -s http://127.0.0.1:8765/api/status | python -m json.tool 2>/dev/null || echo "서버 꺼짐 — 'hermes api'로 시작" ;;
+    api)      banner; (cd "$WS" && $PY tools/api_server.py --port "${PORT:-8765}") &
+echo "API 서버 기동 중... http://127.0.0.1:8765/"
+sleep 2; curl -s http://127.0.0.1:8765/api/health || echo "  (curl로 상태 확인)" ;;
     fortune) start "$WS/projects/fortune/index.html" ;;
     cc)      start "$WS/projects/command_center/index.html" ;;
     freedom) banner; echo "  내가 자유롭게 만든 워크스페이스 도구:"
