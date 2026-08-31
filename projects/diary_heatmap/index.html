@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes 일기 히트맵</title>
+<style>
+    :root {
+        --bg: #0b0b12;
+        --card: #13131c;
+        --text: #ececf5;
+        --muted: #6b6f82;
+        --border: #23233a;
+        --accent: #7c5cff;
+        --level0: #1c1c28;
+        --level1: #2e2a5e;
+        --level2: #4b3f9e;
+        --level3: #7c5cff;
+        --level4: #b39cff;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: -apple-system, 'Segoe UI', 'Noto Sans KR', sans-serif;
+        background: var(--bg); color: var(--text);
+        min-height: 100vh; display: flex; align-items: center; justify-content: center;
+        padding: 30px 20px;
+    }
+    .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        padding: 32px 36px;
+        max-width: 820px;
+        width: 100%;
+    }
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 26px; }
+    .title { font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .title .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+    .stats {
+        display: inline-flex; gap: 8px; background: rgba(124,92,255,0.1);
+        border: 1px solid var(--border); padding: 8px 14px; border-radius: 20px;
+        font-size: 0.85rem; color: var(--muted);
+    }
+    .stats b { color: var(--text); font-weight: 700; }
+
+    .legend { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--muted); justify-content: flex-end; margin-bottom: 12px; }
+    .legend .cell { width: 11px; height: 11px; border-radius: 3px; }
+    .l0 { background: var(--level0); }
+    .l1 { background: var(--level1); }
+    .l2 { background: var(--level2); }
+    .l3 { background: var(--level3); }
+    .l4 { background: var(--level4); }
+
+    .heatmap-wrap { overflow-x: auto; padding-bottom: 8px; }
+    .heatmap { display: flex; flex-direction: column; gap: 3px; width: max-content; }
+    .row { display: flex; gap: 3px; align-items: center; }
+    .cell {
+        width: 13px; height: 13px; border-radius: 3.5px;
+        background: var(--level0);
+        cursor: pointer;
+        transition: transform 0.15s, box-shadow 0.15s;
+        position: relative;
+    }
+    .cell:hover {
+        transform: scale(1.35);
+        box-shadow: 0 0 10px rgba(124,92,255,0.5);
+        z-index: 5;
+    }
+    .cell[data-level="1"] { background: var(--level1); }
+    .cell[data-level="2"] { background: var(--level2); }
+    .cell[data-level="3"] { background: var(--level3); }
+    .cell[data-level="4"] { background: var(--level4); }
+    .cell.today { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+    .tooltip {
+        position: fixed; pointer-events: none; z-index: 999;
+        background: #1e1e2e; color: #fff; border: 1px solid #3a3a55;
+        padding: 7px 11px; border-radius: 8px; font-size: 0.75rem;
+        white-space: nowrap; box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+        opacity: 0; transition: opacity 0.15s;
+    }
+
+    .months { display: flex; justify-content: space-between; padding-left: 0; margin-top: 4px; font-size: 0.7rem; color: var(--muted); }
+
+    .hint { margin-top: 18px; text-align: center; font-size: 0.75rem; color: var(--muted); }
+    .btn {
+        background: var(--accent); color: #fff; border: none; cursor: pointer;
+        padding: 9px 18px; border-radius: 12px; font-size: 0.85rem; font-weight: 600;
+        transition: opacity 0.2s; margin-top: 18px; display: block; margin-left: auto; margin-right: auto;
+    }
+    .btn:hover { opacity: 0.85; }
+</style>
+</head>
+<body>
+<div class="card">
+    <div class="header">
+        <div class="title"><span class="dot"></span> 일기 히트맵</div>
+        <div class="stats"><span>📖 <b id="total">0</b>편</span><span>✍️ <b id="chars">0</b>자</span></div>
+    </div>
+
+    <div class="legend">
+        적음
+        <span class="cell l0"></span><span class="cell l1"></span>
+        <span class="cell l2"></span><span class="cell l3"></span>
+        <span class="cell l4"></span>
+        많음
+    </div>
+
+    <div class="heatmap-wrap">
+        <div class="heatmap" id="heatmap"></div>
+        <div class="months" id="months"></div>
+    </div>
+
+    <div class="hint">매일 일기를 쓰면 잔디가 자랍니다 🌱</div>
+    <button class="btn" onclick="downloadPNG()">💾 Save as PNG</button>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script src="diary_data.js"></script>
+<script>
+    // ====== Render heatmap (GitHub-style, 53 weeks x 7 days) ======
+    const data = window.HERMES_DIARY || { entries: [], heatmap: {} };
+    const heat = data.heatmap || {};
+
+    document.getElementById('total').textContent = data.total || data.entries.length;
+    document.getElementById('chars').textContent = (data.total_chars || 0).toLocaleString();
+
+    function render() {
+        const map = document.getElementById('heatmap');
+        const today = new Date();
+        // End of week (Saturday) containing today
+        const end = new Date(today);
+        end.setDate(end.getDate() + (6 - end.getDay()));  // Saturday
+        // Start = 52 weeks before the Sunday of that week
+        const startSunday = new Date(end);
+        startSunday.setDate(startSunday.getDate() - (52 * 7) + 6); // Sunday 52 weeks back
+
+        const cells = new Map(); // key 'YYYY-MM-DD' -> cell
+        let col = [];
+        const grid = [];
+        const cur = new Date(startSunday);
+        let week = [];
+        // Build 7 rules (we'll transpose: rows = weekday, cols = week)
+        // First build day-key -> week/row
+        const dayIndex = {};
+        let wk = 0;
+        const keyOf = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        const d0 = new Date(startSunday);
+        // Compute weeks
+        const weeks = [];
+        let cursor = new Date(startSunday);
+        while (cursor <= end) {
+            const w = [];
+            for (let r = 0; r < 7; r++) {
+                w.push(new Date(cursor));
+                cursor.setDate(cursor.getDate() + 1);
+            }
+            weeks.push(w);
+            if (cursor > end) break;
+        }
+
+        const monthLabels = {};
+        weeks.forEach((w, wi) => {
+            w.forEach((day, r) => {
+                const k = keyOf(day);
+                dayIndex[k] = { wi, r };
+            });
+            // first day of month that is a Sunday-ish in this week -> label
+            const d = w[0];
+            if (d.getDate() <= 7) {
+                monthLabels[wi] = `${d.getMonth()+1}월`;
+            }
+        });
+
+        // Build rows (Monday-first)
+        const rowOrder = [1,2,3,4,5,6,0]; // Mon..Sun
+        map.innerHTML = '';
+        rowOrder.forEach(r => {
+            const row = document.createElement('div');
+            row.className = 'row';
+            weeks.forEach((w, wi) => {
+                const day = w[r];
+                const k = keyOf(day);
+                const lvl = heat[k] ? 3 : 0;
+                // decide level by heat value; simulate a bit more range when present
+                const c = document.createElement('div');
+                c.className = 'cell';
+                c.dataset.level = lvl;
+                const isToday = k === keyOf(today);
+                if (isToday) c.classList.add('today');
+                c.dataset.date = k;
+                const eff = document.createElement('span');
+                c.addEventListener('click', () => showTip(c, k));
+                row.appendChild(c);
+                // store for label
+                cells.set(k, c);
+            });
+            map.appendChild(row);
+        });
+
+        // Month labels row
+        const ml = document.getElementById('months');
+        ml.innerHTML = '';
+        // Place labels aligned to week columns via spacing
+        // Simpler: create a flex row with week-width placeholders
+        const labelRow = document.createElement('div');
+        labelRow.style.cssText = 'display:flex; gap:3px;';
+        // widths: each week is 13px + 3px gap
+        let colPos = 0;
+        weeks.forEach((w, wi) => {
+            const sp = document.createElement('span');
+            sp.style.cssText = `width:13px; text-align:center; position:relative;`;
+            if (monthLabels[wi]) {
+                sp.textContent = monthLabels[wi];
+            }
+            labelRow.appendChild(sp);
+        });
+        ml.appendChild(labelRow);
+
+        // Tooltip events via delegation
+        document.addEventListener('mousemove', e => {
+            const t = document.getElementById('tooltip');
+            const cell = document.elementFromPoint(e.clientX, e.clientY).closest?.('.cell');
+            if (cell) {
+                const k = cell.dataset.date;
+                const has = heat[k];
+                t.textContent = `${k} · ${has ? '📖 일기 작성' : '작성 없음'}`;
+                t.style.opacity = 1;
+                t.style.left = (e.clientX + 14) + 'px';
+                t.style.top = (e.clientY + 14) + 'px';
+            } else {
+                t.style.opacity = 0;
+            }
+        });
+    }
+
+    function showTip(cell, k) {
+        const t = document.getElementById('tooltip');
+        t.textContent = `${k} · ${heat[k] ? '📖 일기 작성됨' : '작성 없음'}`;
+    }
+
+    // ====== PNG export ======
+    function downloadPNG() {
+        const card = document.querySelector('.card');
+        if (window.html2canvas) {
+            html2canvas(card, { backgroundColor: '#13131c', scale: 2 })
+                .then(canvas => {
+                    const a = document.createElement('a');
+                    a.download = 'hermes-diary-heatmap.png';
+                    a.href = canvas.toDataURL('image/png');
+                    a.click();
+                });
+        } else {
+            alert('html2canvas 로드 필요');
+        }
+    }
+
+    render();
+</script>
+</body>
+</html>

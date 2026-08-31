@@ -1,0 +1,181 @@
+{
+  "name": "hermes",
+  "size": 261947,
+  "children": [
+    {
+      "name": "projects",
+      "size": 117085,
+      "children": [
+        {
+          "name": "sns_showcase",
+          "size": 70814,
+          "children": []
+        },
+        {
+          "name": "treemap",
+          "size": 15741,
+          "children": []
+        },
+        {
+          "name": "diary_heatmap",
+          "size": 11530,
+          "children": []
+        },
+        {
+          "name": "badge",
+          "size": 8846,
+          "children": []
+        },
+        {
+          "name": "speedometer",
+          "size": 8445,
+          "children": []
+        },
+        {
+          "name": "projects.json",
+          "size": 1709,
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "tools",
+      "size": 68524,
+      "children": [
+        {
+          "name": "file_utils.py",
+          "size": 9588,
+          "children": []
+        },
+        {
+          "name": "system_diagnostics.py",
+          "size": 9249,
+          "children": []
+        },
+        {
+          "name": "md2html.py",
+          "size": 9238,
+          "children": []
+        },
+        {
+          "name": "hermes_toolkit.py",
+          "size": 8938,
+          "children": []
+        },
+        {
+          "name": "net_utils.py",
+          "size": 7474,
+          "children": []
+        },
+        {
+          "name": "diary.py",
+          "size": 5962,
+          "children": []
+        },
+        {
+          "name": "project_tracker.py",
+          "size": 5753,
+          "children": []
+        },
+        {
+          "name": "badge.py",
+          "size": 5164,
+          "children": []
+        },
+        {
+          "name": "auto_report.py",
+          "size": 4060,
+          "children": []
+        },
+        {
+          "name": "treemap.py",
+          "size": 3098,
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "dashboard",
+      "size": 50392,
+      "children": [
+        {
+          "name": "index.html",
+          "size": 45850,
+          "children": []
+        },
+        {
+          "name": "projects.js",
+          "size": 1735,
+          "children": []
+        },
+        {
+          "name": "data.js",
+          "size": 1143,
+          "children": []
+        },
+        {
+          "name": "data.json",
+          "size": 1121,
+          "children": []
+        },
+        {
+          "name": "history.json",
+          "size": 543,
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "notes",
+      "size": 13519,
+      "children": [
+        {
+          "name": "sample_post_light.html",
+          "size": 3586,
+          "children": []
+        },
+        {
+          "name": "sample_post_sepia.html",
+          "size": 3586,
+          "children": []
+        },
+        {
+          "name": "sample_post.html",
+          "size": 3585,
+          "children": []
+        },
+        {
+          "name": "sample_post.md",
+          "size": 1145,
+          "children": []
+        },
+        {
+          "name": "reports",
+          "size": 828,
+          "children": []
+        },
+        {
+          "name": "diary",
+          "size": 789,
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "README.md",
+      "size": 7494,
+      "children": []
+    },
+    {
+      "name": "scripts",
+      "size": 4933,
+      "children": [
+        {
+          "name": "hermes",
+          "size": 4933,
+          "children": []
+        }
+      ]
+    }
+  ]
+}

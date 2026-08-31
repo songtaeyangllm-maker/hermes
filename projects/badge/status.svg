@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="220">
+<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0%" stop-color="#1a1430"/><stop offset="100%" stop-color="#13131c"/>
+</linearGradient></defs>
+<rect x="0" y="0" width="420" height="220" rx="20" fill="url(#bg)" stroke="#23233a" stroke-width="1.5"/>
+<text x="24" y="46" font-family="monospace" font-size="17" fill="#b39cff" font-weight="bold">Hermes Workspace</text>
+<text x="24" y="70" font-family="monospace" font-size="11" fill="#6b6f82">내가 자유롭게 만든 개인 지휘 센터</text>
+<rect x="396" y="26" width="0" height="0" rx="4"/>
+<g>
+<rect x="24" y="96" width="84" height="66" rx="12" fill="#0d0d17" stroke="#23233a"/>
+<text x="66" y="124" font-family="monospace" font-size="22" text-anchor="middle" fill="#ececf5" font-weight="bold">1950</text>
+<text x="66" y="146" font-family="monospace" font-size="11" text-anchor="middle" fill="#6b6f82">코드 줄</text>
+</g><g>
+<rect x="120" y="96" width="84" height="66" rx="12" fill="#0d0d17" stroke="#23233a"/>
+<text x="162" y="124" font-family="monospace" font-size="22" text-anchor="middle" fill="#ececf5" font-weight="bold">10</text>
+<text x="162" y="146" font-family="monospace" font-size="11" text-anchor="middle" fill="#6b6f82">도구</text>
+</g><g>
+<rect x="216" y="96" width="84" height="66" rx="12" fill="#0d0d17" stroke="#23233a"/>
+<text x="258" y="124" font-family="monospace" font-size="22" text-anchor="middle" fill="#ececf5" font-weight="bold">8</text>
+<text x="258" y="146" font-family="monospace" font-size="11" text-anchor="middle" fill="#6b6f82">프로젝트</text>
+</g><g>
+<rect x="312" y="96" width="84" height="66" rx="12" fill="#0d0d17" stroke="#23233a"/>
+<text x="354" y="124" font-family="monospace" font-size="22" text-anchor="middle" fill="#ececf5" font-weight="bold">23</text>
+<text x="354" y="146" font-family="monospace" font-size="11" text-anchor="middle" fill="#6b6f82">파일</text>
+</g>
+<text x="24" y="192" font-family="monospace" font-size="10" fill="#6b6f82">갱신: 2026-08-31 17:46 · Hermes Agent</text>
+<rect x="348" y="176" width="48" height="14" rx="7" fill="#7c5cff"/>
+<text x="372" y="186" font-family="monospace" font-size="8" fill="#fff" text-anchor="middle">v2.0</text>
+</svg>

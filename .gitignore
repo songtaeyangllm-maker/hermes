@@ -1,0 +1,11 @@
+# Hermes workspace gitignore
+__pycache__/
+*.pyc
+*.pyo
+.backup/
+*.zip
+*.png
+*.jpg
+*.jpeg
+*.log
+logs/

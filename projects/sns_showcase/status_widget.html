@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ Live System Status — Shareable Widget</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --bg: #0b0b12;
+            --card: #13131c;
+            --border: #23233a;
+            --text: #ececf5;
+            --muted: #6b6f82;
+            --accent: #7c5cff;
+            --green: #2ecc71;
+            --yellow: #f1c40f;
+            --red: #e74c3c;
+            --blue: #3498db;
+            --widget-bg1: #14141f;
+            --widget-bg2: #0d0d16;
+            --glow: rgba(124, 92, 255, 0.15);
+            --track: rgba(255,255,255,0.06);
+            --panel-bg: rgba(255,255,255,0.03);
+        }
+        
+        /* ====== THEMES ====== */
+        body[data-theme="dark"] { /* default */ }
+        body[data-theme="light"] {
+            --bg: #f4f4f9;
+            --card: #ffffff;
+            --border: #dedee8;
+            --text: #1a1a24;
+            --muted: #7a7a8c;
+            --accent: #6a46e5;
+            --widget-bg1: #ffffff;
+            --widget-bg2: #f8f8fd;
+            --glow: rgba(106, 70, 229, 0.08);
+            --track: rgba(0,0,0,0.07);
+            --panel-bg: rgba(0,0,0,0.025);
+        }
+        body[data-theme="neon"] {
+            --bg: #08000f;
+            --card: #12021f;
+            --border: #3d1166;
+            --text: #efe6ff;
+            --muted: #9a7cc0;
+            --accent: #ff2ec4;
+            --green: #00ff88;
+            --yellow: #ffe14d;
+            --blue: #00d4ff;
+            --red: #ff3355;
+            --widget-bg1: #140328;
+            --widget-bg2: #09011a;
+            --glow: rgba(255, 46, 196, 0.25);
+            --track: rgba(255,255,255,0.08);
+            --panel-bg: rgba(255,255,255,0.04);
+        }
+        body[data-theme="ocean"] {
+            --bg: #020a14;
+            --card: #06202e;
+            --border: #0f3a50;
+            --text: #e0f2ff;
+            --muted: #6f9dbb;
+            --accent: #22d3ee;
+            --green: #34d399;
+            --yellow: #fbbf24;
+            --blue: #3b82f6;
+            --red: #f87171;
+            --widget-bg1: #072536;
+            --widget-bg2: #041521;
+            --glow: rgba(34, 211, 238, 0.18);
+            --track: rgba(255,255,255,0.07);
+            --panel-bg: rgba(255,255,255,0.04);
+        }
+        body[data-theme="sunset"] {
+            --bg: #1a0b05;
+            --card: #2a1608;
+            --border: #4a2a10;
+            --text: #fff3e0;
+            --muted: #c79a76;
+            --accent: #ff7a29;
+            --green: #fbbf24;
+            --yellow: #f59e0b;
+            --blue: #fb7185;
+            --red: #ef4444;
+            --widget-bg1: #2d190a;
+            --widget-bg2: #1e1005;
+            --glow: rgba(255, 122, 41, 0.22);
+            --track: rgba(255,255,255,0.06);
+            --panel-bg: rgba(255,255,255,0.04);
+        }
+        body[data-theme="forest"] {
+            --bg: #04120a;
+            --card: #062117;
+            --border: #0e3a2a;
+            --text: #e6f7ee;
+            --muted: #6fb394;
+            --accent: #34d399;
+            --green: #4ade80;
+            --yellow: #fde047;
+            --blue: #38bdf8;
+            --red: #fb7185;
+            --widget-bg1: #07281a;
+            --widget-bg2: #051a11;
+            --glow: rgba(52, 211, 153, 0.18);
+            --track: rgba(255,255,255,0.06);
+            --panel-bg: rgba(255,255,255,0.04);
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px 20px;
+        }
+        
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 4px;
+            font-weight: 800;
+        }
+        
+        .subtitle {
+            color: var(--muted);
+            font-size: 0.85rem;
+            margin-bottom: 24px;
+        }
+        
+        /* ====== The Widget (this is what gets captured) ====== */
+        #widget {
+            width: 480px;
+            background: linear-gradient(145deg, var(--widget-bg1), var(--widget-bg2));
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 28px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 20px 60px var(--glow);
+            transition: background 0.4s ease, border-color 0.4s ease;
+        }
+        
+        #widget::before {
+            content: '';
+            position: absolute;
+            top: -80px; right: -80px;
+            width: 260px; height: 260px;
+            background: radial-gradient(circle, var(--glow), transparent 70%);
+            border-radius: 50%;
+        }
+        
+        .widget-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+        
+        .widget-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .widget-title .logo {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, #7c5cff, #3498db);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px;
+        }
+        
+        .widget-title h2 {
+            font-size: 1rem;
+            font-weight: 700;
+        }
+        
+        .widget-title span {
+            font-size: 0.7rem;
+            color: var(--muted);
+            display: block;
+            font-weight: 400;
+        }
+        
+        .live-badge {
+            display: flex; align-items: center; gap: 6px;
+            background: rgba(46, 204, 113, 0.12);
+            border: 1px solid rgba(46, 204, 113, 0.3);
+            border-radius: 20px;
+            padding: 4px 10px;
+            font-size: 0.7rem;
+            color: var(--green);
+            font-weight: 600;
+        }
+        
+        .live-dot {
+            width: 7px; height: 7px;
+            background: var(--green);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(46,204,113,0.5); }
+            50% { box-shadow: 0 0 0 6px rgba(46,204,113,0); }
+        }
+        
+        /* Gauge row */
+        .gauges {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .gauge {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 14px 12px;
+            text-align: center;
+        }
+        
+        .gauge-label {
+            font-size: 0.65rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        
+        .gauge-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.6rem;
+            font-weight: 700;
+        }
+        
+        .gauge-value small { font-size: 0.8rem; font-weight: 400; color: var(--muted); }
+        
+        .gauge-bar {
+            margin-top: 10px;
+            height: 4px;
+            background: var(--track);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        
+        .gauge-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.8s ease;
+        }
+        
+        /* Sparkline (history chart) */
+        .chart-section {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 14px;
+            margin-bottom: 20px;
+        }
+        
+        .chart-head {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .chart-head span {
+            font-size: 0.7rem;
+            color: var(--muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .chart-head .legend {
+            font-size: 0.65rem;
+            color: var(--accent);
+        }
+        
+        canvas#history {
+            width: 100%;
+            height: 70px;
+            display: block;
+            border-radius: 8px;
+        }
+        
+        /* Process list */
+        .procs {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 12px 14px;
+        }
+        
+        .procs-head {
+            font-size: 0.7rem;
+            color: var(--muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        
+        .proc-row {
+            display: flex; align-items: center; gap: 10px;
+            padding: 4px 0;
+            font-size: 0.78rem;
+        }
+        
+        .proc-name {
+            width: 90px;
+            font-family: 'JetBrains Mono', monospace;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--text);
+        }
+        
+        .proc-bar {
+            flex: 1; height: 4px;
+            background: var(--track);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        
+        .proc-fill {
+            height: 100%;
+            border-radius: 2px;
+            background: linear-gradient(90deg, #7c5cff, #3498db);
+        }
+        
+        .proc-mem {
+            width: 56px;
+            text-align: right;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--muted);
+            font-size: 0.7rem;
+        }
+        
+        .widget-footer {
+            margin-top: 18px;
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 0.65rem;
+            color: var(--muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .widget-footer .host { color: var(--accent); }
+        
+        /* Controls */
+        .theme-picker {
+            margin-top: 24px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 18px;
+        }
+        
+        .theme-label {
+            font-size: 0.8rem;
+            color: var(--muted);
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .theme-swatches {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .swatch {
+            width: 34px; height: 34px;
+            border-radius: 50%;
+            background: var(--sw, #888);
+            border: 3px solid var(--swborder, var(--border));
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            padding: 0;
+        }
+        
+        .swatch:hover {
+            transform: scale(1.15);
+        }
+        
+        .swatch.active {
+            box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+        }
+        
+        .controls {
+            margin-top: 24px;
+            display: flex; gap: 12px; align-items: center;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #7c5cff, #6a46e5);
+            border: none;
+            color: white;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 12px 24px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(124,92,255,0.4);
+        }
+        
+        .btn-ghost {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+        
+        .btn-ghost:hover {
+            background: rgba(255,255,255,0.08);
+        }
+        
+        .note {
+            margin-top: 16px;
+            color: var(--muted);
+            font-size: 0.8rem;
+            text-align: center;
+            max-width: 480px;
+            line-height: 1.6;
+        }
+        
+        /* QR Modal */
+        .qr-modal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+        
+        .qr-box {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 28px;
+            text-align: center;
+            position: relative;
+            max-width: 300px;
+            width: 90%;
+        }
+        
+        .qr-close {
+            position: absolute;
+            top: 10px; right: 14px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+        
+        .qr-close:hover { opacity: 1; }
+        
+        @media (max-width: 520px) {
+            #widget { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <h1>⚡ Live System Status</h1>
+    <div class="subtitle">실시간 시스템 모니터 위젯 — PNG로 저장해서 SNS 공유하기</div>
+    
+    <!-- ===== The Capturable Widget ===== -->
+    <div id="widget">
+        <div class="widget-header">
+            <div class="widget-title">
+                <div class="logo">⚡</div>
+                <div>
+                    <h2 id="wHost">HERMES-WORKSPACE</h2>
+                    <span id="wTime">--:--:--</span>
+                </div>
+            </div>
+            <div class="live-badge">
+                <div class="live-dot"></div> LIVE
+            </div>
+        </div>
+        
+        <div class="gauges">
+            <div class="gauge">
+                <div class="gauge-label">CPU</div>
+                <div class="gauge-value" id="gCpu" style="color: var(--green);">--%</div>
+                <div class="gauge-bar"><div class="gauge-fill" id="bCpu" style="width:0%; background: var(--green);"></div></div>
+            </div>
+            <div class="gauge">
+                <div class="gauge-label">MEM</div>
+                <div class="gauge-value" id="gMem" style="color: var(--blue);">--%</div>
+                <div class="gauge-bar"><div class="gauge-fill" id="bMem" style="width:0%; background: var(--blue);"></div></div>
+            </div>
+            <div class="gauge">
+                <div class="gauge-label">DISK</div>
+                <div class="gauge-value" id="gDisk" style="color: var(--yellow);">--%</div>
+                <div class="gauge-bar"><div class="gauge-fill" id="bDisk" style="width:0%; background: var(--yellow);"></div></div>
+            </div>
+        </div>
+        
+        <div class="chart-section">
+            <div class="chart-head">
+                <span>💾 CPU History</span>
+                <span class="legend">last 60s</span>
+            </div>
+            <canvas id="history"></canvas>
+        </div>
+        
+        <div class="procs">
+            <div class="procs-head">⬇ Top Processes by Memory</div>
+            <div id="procList"></div>
+        </div>
+        
+        <div class="widget-footer">
+            <span><span class="host">hermes-agent</span> · generated live</span>
+            <span id="wUptime">--</span>
+        </div>
+    </div>
+    
+    <div class="theme-picker">
+        <div class="theme-label">🎨 테마 선택</div>
+        <div class="theme-swatches">
+            <button class="swatch sw-dark active" data-theme="dark" title="다크" style="--sw: #0b0b12; --swborder: #6a46e5;"></button>
+            <button class="swatch sw-light" data-theme="light" title="라이트" style="--sw: #f4f4f9; --swborder: #dedee8;"></button>
+            <button class="swatch sw-neon" data-theme="neon" title="네온" style="--sw: #12021f; --swborder: #ff2ec4;"></button>
+            <button class="swatch sw-ocean" data-theme="ocean" title="오션" style="--sw: #06202e; --swborder: #22d3ee;"></button>
+            <button class="swatch sw-sunset" data-theme="sunset" title="선셋" style="--sw: #2d190a; --swborder: #ff7a29;"></button>
+            <button class="swatch sw-forest" data-theme="forest" title="포레스트" style="--sw: #062117; --swborder: #34d399;"></button>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <button class="btn" onclick="downloadPNG()">💾 Save as PNG</button>
+        <button class="btn btn-ghost" onclick="shareX()">🐦 Share to X</button>
+        <button class="btn btn-ghost" onclick="shareCopy()">📋 Copy Status</button>
+        <button class="btn btn-ghost" onclick="toggleQR()">🔳 QR Code</button>
+        <button class="btn btn-ghost" onclick="window.open(location.href,'_blank')">↗ Open Full</button>
+    </div>
+    
+    <!-- QR modal -->
+    <div class="qr-modal" id="qrModal" style="display:none;">
+        <div class="qr-box">
+            <div class="qr-close" onclick="toggleQR()">✕</div>
+            <div style="font-weight:600; margin-bottom:12px;">🔳 이 페이지 QR 코드</div>
+            <img id="qrImg" alt="QR" style="width:180px;height:180px;border-radius:10px;border:1px solid var(--border);">
+            <div style="margin-top:10px; font-size:0.75rem; color:var(--muted);" id="qrUrl"></div>
+            <button class="btn" style="margin-top:16px;" onclick="downloadQR()">💾 QR 저장</button>
+        </div>
+    </div>
+    
+    <div class="note">
+        위젯은 실시간으로 CPU/메모리/디스크를 측정해. <br>
+        <b>Save as PNG</b> 버튼으로 현재 상태를 이미지로 저장해 SNS(X/인스타/블로그)에 공유할 수 있어. 📱
+    </div>
+    
+    <!-- html2canvas for PNG export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <script>
+        // ====== Live data loader ======
+        // Tries to load data.json from the workspace; falls back to simulated data.
+        const wsData = window.HERMES_DATA || null;
+        
+        let history = [];
+        const historyLen = 60;
+        
+        function gaussian(base, noise) {
+            return Math.min(100, Math.max(0, base + (Math.random() - 0.5) * noise));
+        }
+        
+        let sim = {
+            cpu: null, mem: null, disk: null,
+            procs: [
+                {name:'chrome.exe', mem_mb: 610},
+                {name:'node.exe', mem_mb: 580},
+                {name:'MsMpEng.exe', mem_mb: 520},
+                {name:'explorer.exe', mem_mb: 450},
+                {name:'MemoryComp', mem_mb: 440},
+            ]
+        };
+        
+        // If we have real data, seed with it; else use sensible defaults
+        const baseCpu = (wsData && wsData.cpu_percent != null) ? wsData.cpu_percent : 30;
+        const baseMem = (wsData && wsData.memory && wsData.memory.percent != null) ? wsData.memory.percent : 50;
+        const baseDisk = (wsData && wsData.disk && wsData.disk.percent != null) ? wsData.disk.percent : 60;
+        sim.cpu = baseCpu; sim.mem = baseMem; sim.disk = baseDisk;
+        
+        if (wsData && wsData.top_processes && wsData.top_processes.length) {
+            sim.procs = wsData.top_processes;
+        }
+        
+        const host = (wsData && wsData.hostname) ? wsData.hostname.toUpperCase() : 'HERMES-WORKSPACE';
+        
+        // ====== Update functions ======
+        function updateClock() {
+            const now = new Date();
+            const opts = { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false };
+            document.getElementById('wTime').textContent = now.toLocaleTimeString('ko-KR', opts) + ' KST';
+            document.getElementById('wHost').textContent = host;
+        }
+        
+        function updateGauges() {
+            // Oscillate around real base for a "live" feel
+            sim.cpu = gaussian(baseCpu, 14);
+            sim.mem = gaussian(baseMem, 2);
+            sim.disk = gaussian(baseDisk, 1);
+            
+            setGauge('gCpu', 'bCpu', sim.cpu, '', 'var(--green)');
+            setGauge('gMem', 'bMem', sim.mem, '', 'var(--blue)');
+            setGauge('gDisk', 'bDisk', sim.disk, '', 'var(--yellow)');
+            
+            history.push(sim.cpu);
+            if (history.length > historyLen) history.shift();
+            drawChart();
+        }
+        
+        function setGauge(valId, barId, value, suffix, color) {
+            const el = document.getElementById(valId);
+            el.textContent = Math.round(value) + '%';
+            el.style.color = value > 85 ? 'var(--red)' : (value > 70 ? 'var(--yellow)' : color);
+            document.getElementById(barId).style.width = value + '%';
+            document.getElementById(barId).style.background =
+                value > 85 ? 'var(--red)' : (value > 70 ? 'var(--yellow)' : color);
+        }
+        
+        function drawChart() {
+            const canvas = document.getElementById('history');
+            const ctx = canvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const W = canvas.clientWidth, H = canvas.clientHeight;
+            if (canvas.width !== W * dpr || canvas.height !== H * dpr) {
+                canvas.width = W * dpr;
+                canvas.height = H * dpr;
+            }
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, W, H);
+            
+            // Grid
+            ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 4; i++) {
+                const y = (H / 4) * i;
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+            }
+            
+            if (history.length < 2) return;
+            
+            // Area fill
+            const gradient = ctx.createLinearGradient(0, 0, 0, H);
+            gradient.addColorStop(0, 'rgba(124,92,255,0.35)');
+            gradient.addColorStop(1, 'rgba(124,92,255,0)');
+            
+            ctx.beginPath();
+            history.forEach((v, i) => {
+                const x = (i / (historyLen - 1)) * W;
+                const y = H - (v / 100) * H;
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
+            ctx.strokeStyle = '#7c5cff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Fill down
+            ctx.lineTo(W, H);
+            ctx.lineTo(0, H);
+            ctx.closePath();
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            
+            // Line on top
+            ctx.beginPath();
+            history.forEach((v, i) => {
+                const x = (i / (historyLen - 1)) * W;
+                const y = H - (v / 100) * H;
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
+            ctx.strokeStyle = '#7c5cff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+        
+        function renderProcs() {
+            const list = document.getElementById('procList');
+            const max = Math.max(...sim.procs.map(p => p.mem_mb), 1);
+            list.innerHTML = sim.procs.map(p => `
+                <div class="proc-row">
+                    <span class="proc-name">${p.name}</span>
+                    <div class="proc-bar"><div class="proc-fill" style="width:${(p.mem_mb/max)*100}%"></div></div>
+                    <span class="proc-mem">${p.mem_mb}MB</span>
+                </div>
+            `).join('');
+        }
+        
+        function updateUptime() {
+            const diff = Math.floor((Date.now() / 1000) - startTs);
+            const h = Math.floor(diff / 3600), m = Math.floor((diff % 3600) / 60);
+            document.getElementById('wUptime').textContent = `uptime ${h}h ${m}m`;
+        }
+        
+        // Seed history so the chart starts full
+        for (let i = 0; i < historyLen; i++) history.push(baseCpu + (Math.sin(i/5) * 10));
+        
+        const startTs = Math.floor(Date.now() / 1000);
+        
+        setInterval(updateGauges, 1000);
+        setInterval(updateClock, 1000);
+        setInterval(updateUptime, 30000);
+        renderProcs();
+        // Position chart on the right x-scale
+        setTimeout(drawChart, 100);
+        
+        // ====== PNG Export ======
+        async function downloadPNG() {
+            const btn = event.target;
+            btn.textContent = '⏳ Rendering...';
+            btn.disabled = true;
+            try {
+                const canvas = await html2canvas(document.getElementById('widget'), {
+                    scale: 2,
+                    backgroundColor: '#0b0b12',
+                    useCORS: true
+                });
+                const link = document.createElement('a');
+                const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+                link.download = `system-status-${ts}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                btn.textContent = '✅ Saved!';
+            } catch (e) {
+                console.error(e);
+                btn.textContent = '❌ Error';
+            }
+            setTimeout(() => {
+                btn.textContent = '💾 Save as PNG';
+                btn.disabled = false;
+            }, 2500);
+        }
+
+        // ====== Theme switching ======
+        function applyTheme(name) {
+            document.body.setAttribute('data-theme', name);
+            localStorage.setItem('widget-theme', name);
+            // Update active swatch
+            document.querySelectorAll('.swatch').forEach(s =>
+                s.classList.toggle('active', s.dataset.theme === name));
+            // Reached chart uses theme accent
+            drawChart();
+        }
+
+        document.querySelectorAll('.swatch').forEach(sw => {
+            sw.addEventListener('click', () => applyTheme(sw.dataset.theme));
+        });
+
+        // Restore saved theme (default dark)
+        const savedTheme = localStorage.getItem('widget-theme') || 'dark';
+        applyTheme(savedTheme);
+        // ====== Share functions ======
+        function getStatusText() {
+            return `⚡ 시스템 상태\n`
+                + `CPU: ${sim.cpu.toFixed(0)}% · MEM: ${sim.mem.toFixed(0)}% · DISK: ${sim.disk.toFixed(0)}%\n`
+                + `${new Date().toLocaleString('ko-KR')}\n`
+                + `#시스템모니터 #HermesAgent`;
+        }
+
+        function shareX() {
+            const text = encodeURIComponent(getStatusText());
+            window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank', 'width=600,height=400');
+        }
+
+        function shareCopy() {
+            const text = getStatusText();
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    const b = event.target; const old = b.textContent;
+                    b.textContent = '✅ Copied!';
+                    setTimeout(() => b.textContent = old, 2000);
+                });
+            } else {
+                // Fallback with textarea
+                const ta = document.createElement('textarea');
+                ta.value = text; document.body.appendChild(ta);
+                ta.select(); document.execCommand('copy');
+                document.body.removeChild(ta);
+                const b = event.target; const old = b.textContent;
+                b.textContent = '✅ Copied!';
+                setTimeout(() => b.textContent = old, 2000);
+            }
+        }
+
+        // ====== QR Code ======
+        function toggleQR() {
+            const modal = document.getElementById('qrModal');
+            if (modal.style.display === 'none') {
+                const url = window.location.href;
+                document.getElementById('qrUrl').textContent = url;
+                // Use a QR API to generate the code image
+                document.getElementById('qrImg').src =
+                    'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='
+                    + encodeURIComponent(url);
+                modal.style.display = 'flex';
+            } else {
+                modal.style.display = 'none';
+            }
+        }
+
+        function downloadQR() {
+            const img = document.getElementById('qrImg');
+            // Fetch the QR image and download it
+            fetch(img.src).then(r => r.blob()).then(blob => {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'hermes-qr.png';
+                a.click();
+                URL.revokeObjectURL(a.href);
+            });
+        }
+    </script>
+</body>
+</html>

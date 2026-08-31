@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Status Badge</title>
+<style>
+    :root { --bg:#0b0b12; --card:#13131c; --text:#ececf5; --muted:#6b6f82; --border:#23233a; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:40px 20px; }
+    .wrap { width:640px; display:flex; flex-direction:column; gap:28px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:20px; padding:28px 30px; }
+    .card h3 { font-size:0.95rem; color:var(--muted); margin-bottom:16px; font-weight:600; }
+    .svg-box { display:flex; justify-content:center; padding:8px 0; }
+    .svg-box img { max-width:100%; height:auto; }
+    .code { margin-top:16px; background:#0d0d17; border:1px solid var(--border); border-radius:12px; padding:12px 16px; font-size:0.72rem; color:var(--muted); font-family:monospace; word-break:break-all; }
+    .btn { background:#7c5cff; color:#fff; border:none; cursor:pointer; padding:9px 20px; border-radius:10px; font-size:0.82rem; font-weight:600; margin-top:14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <div class="card">
+        <h3>🚀 플랫 배지 (README/SNS용)</h3>
+        <div class="svg-box"><img src="flat.svg" alt="flat badge"></div>
+        <button class="btn" onclick="download('flat.svg','hermes-status-flat.svg')">💾 flat.svg 저장</button>
+    </div>
+    <div class="card">
+        <h3>🖼️ 서머리 카드 (크게 보여주기용)</h3>
+        <div class="svg-box"><img src="card.svg" alt="card badge"></div>
+        <button class="btn" onclick="download('card.svg','hermes-status-card.svg')">💾 card.svg 저장</button>
+    </div>
+    <div class="card">
+        <h3>📋 SVG 코드</h3>
+        <div class="code" id="code">로딩…</div>
+    </div>
+</div>
+<script>
+    fetch('flat.svg').then(r=>r.text()).then(t=>{
+        document.getElementById('code').textContent = t.slice(0,300) + ' …';
+    });
+    function download(src, name) {
+        fetch(src).then(r=>r.blob()).then(b=>{
+            const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; a.click();
+        });
+    }
+</script>
+</body>
+</html>

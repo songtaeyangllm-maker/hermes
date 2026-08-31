@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes 폴더 트리맵</title>
+<style>
+    :root {
+        --bg: #0b0b12;
+        --card: #13131c;
+        --text: #ececf5;
+        --muted: #6b6f82;
+        --border: #23233a;
+        --accent: #7c5cff;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: -apple-system, 'Segoe UI', 'Noto Sans KR', sans-serif;
+        background: var(--bg); color: var(--text);
+        min-height: 100vh; display: flex; align-items: center; justify-content: center;
+        padding: 30px 20px;
+    }
+    .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        padding: 32px 36px;
+        max-width: 880px; width: 100%;
+    }
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .title { font-size: 1.4rem; font-weight: 700; }
+    .root-name { color: var(--accent); font-weight: 700; }
+    .total { color: var(--muted); font-size: 0.9rem; }
+
+    .crumbs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; font-size: 0.8rem; }
+    .crumb { cursor: pointer; color: var(--muted); padding: 4px 10px; border-radius: 14px; background: rgba(124,92,255,0.08); }
+    .crumb:hover { color: var(--text); background: rgba(124,92,255,0.2); }
+    .crumb.active { color: var(--accent); font-weight: 600; background: rgba(124,92,255,0.15); }
+
+    #treemap { position: relative; width: 100%; height: 460px; overflow: hidden; border-radius: 16px; }
+    .tile {
+        position: absolute; overflow: hidden; cursor: pointer;
+        border: 1px solid rgba(0,0,0,0.4);
+        display: flex; flex-direction: column; justify-content: flex-end;
+        color: rgba(255,255,255,0.95);
+        font-size: 0.72rem; font-weight: 600;
+        padding: 4px 6px;
+        border-radius: 4px;
+        transition: filter 0.15s, z-index 0s;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+        white-space: nowrap;
+    }
+    .tile:hover { filter: brightness(1.3); z-index: 5; border-color: #fff; }
+    .tile .tname { overflow: hidden; text-overflow: ellipsis; }
+    .tile .tsize { font-weight: 400; opacity: 0.8; font-size: 0.68rem; }
+
+    .palette { display: flex; gap: 10px; justify-content: center; margin-top: 16px; }
+    .sw { width: 16px; height: 16px; border-radius: 4px; cursor: pointer; border: 2px solid transparent; }
+    .sw.active { border-color: #fff; }
+
+    .detail { margin-top: 18px; background: rgba(124,92,255,0.06); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; font-size: 0.9rem; }
+    .detail b { color: var(--accent); }
+    .hint { margin-top: 14px; text-align: center; font-size: 0.72rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="card">
+    <div class="header">
+        <div class="title">🗂️ 폴더 트리맵 <span class="root-name" id="rootName">—</span></div>
+        <div class="total" id="totalSize">0B</div>
+    </div>
+
+    <div class="crumbs" id="crumbs"></div>
+    <div id="treemap"></div>
+
+    <div class="palette" id="palette"></div>
+    <div class="detail" id="detail">클릭해서 폴더 탐색 · 마우스 올려 크기 확인</div>
+    <div class="hint">Hermes Agent · folder treemap</div>
+</div>
+
+<script src="tree_data.js"></script>
+<script>
+    const root = window.HERMES_TREE || { children: [] };
+    const PALETTES = [
+        ['#7c5cff', '#5c8aff', '#5ce6a8', '#ffcf5c', '#ff7c9e', '#ff8a5c', '#5cd6ff', '#b39cff'],
+        ['#e76f51', '#f4a261', '#e9c46a', '#2a9d8f', '#264653', '#a8dadc', '#457b9d', '#1d3557'],
+        ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#b657ff', '#ff9f43', '#00d2d3', '#8395a7'],
+    ];
+    let palette = PALETTES[0];
+    let stack = [];  // current path of nodes
+
+    function human(n) {
+        for (const u of ['B','KB','MB','GB','TB']) {
+            if (n < 1024 || u === 'TB') return u==='B' ? n+'B' : n.toFixed(1)+u;
+            n /= 1024;
+        }
+    }
+
+    function colorFor(name, idx, total) {
+        // hash name to pick from palette
+        let h = 0; for (let i=0;i<name.length;i++) h = (h*31 + name.charCodeAt(i)) >>> 0;
+        return palette[h % palette.length];
+    }
+
+    function render(node) {
+        const tm = document.getElementById('treemap');
+        tm.innerHTML = '';
+        const crumbs = document.getElementById('crumbs');
+
+        // Build crumbs path
+        const path = stack.concat([node]);
+        crumbs.innerHTML = '';
+        path.forEach((n, i) => {
+            const c = document.createElement('span');
+            c.className = 'crumb' + (i === path.length-1 ? ' active' : '');
+            c.textContent = n.name;
+            c.onclick = () => { if (i < path.length-1) { stack = path.slice(0, i+1); render(stack[stack.length-1]); } };
+            crumbs.appendChild(c);
+        });
+
+        document.getElementById('rootName').textContent = node.name;
+        document.getElementById('totalSize').textContent = human(node.size);
+
+        const children = (node.children || []).slice().sort((a,b)=>b.size-a.size);
+        if (children.length === 0) {
+            tm.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted)">하위 항목 없음</div>';
+            return;
+        }
+
+        const total = children.reduce((s,c)=>s+c.size,0) || 1;
+        const W = tm.clientWidth, H = tm.clientHeight;
+
+        // Slice-and-dice treemap
+        const rects = [];
+        let x = 0, y = 0, w = W, h = H;
+        let splitH = true;
+        let remaining = children.slice();
+        let remainingSize = total;
+        while (remaining.length > 0) {
+            // row = items that fit in current slice proportion
+            // we slice one rectangle fully across current height/width
+            const it = remaining[0];
+            const frac = it.size / remainingSize;
+            let tw, th, tx, ty;
+            if (splitH) {
+                tw = w; th = h * frac; tx = x; ty = y;
+                y += th; h -= th;
+            } else {
+                tw = w * frac; th = h; tx = x; ty = y;
+                x += tw; w -= tw;
+            }
+            rects.push({ ...it, x: tx, y: ty, w: tw, h: th });
+            remaining.shift();
+            remainingSize -= it.size;
+            splitH = !splitH;
+            if (w < 8 || h < 8) {
+                // too small — stop (avoid degenerate)
+                break;
+            }
+        }
+
+        rects.forEach((it) => {
+            if (it.w < 14 || it.h < 12) return; // too small to render
+            const t = document.createElement('div');
+            t.className = 'tile';
+            t.style.left = it.x + 'px';
+            t.style.top = it.y + 'px';
+            t.style.width = it.w + 'px';
+            t.style.height = it.h + 'px';
+            t.style.background = colorFor(it.name);
+            t.innerHTML = `<div class="tname">${it.name}</div><div class="tsize">${human(it.size)}</div>`;
+            t.onclick = () => { if (it.children && it.children.length) { stack.push(it); render(it); } };
+            t.title = `${it.name} — ${human(it.size)} (${(it.size/total*100).toFixed(1)}%)`;
+            tm.appendChild(t);
+        });
+    }
+
+    // Clear animation + rebuild palette
+    function initPalette() {
+        const p = document.getElementById('palette');
+        p.innerHTML = '';
+        PALETTES.forEach((pal, i) => {
+            const sw = document.createElement('span');
+            sw.className = 'sw' + (i===0?' active':'');
+            sw.style.background = `linear-gradient(135deg, ${pal[0]}, ${pal[1]}, ${pal[2]})`;
+            sw.onclick = () => { palette = pal; document.querySelectorAll('.sw').forEach(s=>s.classList.remove('active')); sw.classList.add('active'); render(stack[stack.length-1]||root); };
+            p.appendChild(sw);
+        });
+    }
+
+    initPalette();
+    render(root);
+</script>
+</body>
+</html>

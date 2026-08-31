@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏠 Hermes Workspace</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@300;400;600;700&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --bg: #0a0a0f;
+            --card: #12121a;
+            --card-hover: #1a1a28;
+            --border: #2a2a3a;
+            --accent: #6c5ce7;
+            --accent2: #a29bfe;
+            --text: #e8e8f0;
+            --muted: #6b7280;
+            --green: #00b894;
+            --red: #e74c3c;
+            --yellow: #fdcb6e;
+            --blue: #0984e3;
+            --pink: #fd79a8;
+            --gradient: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 50%, #74b9ff 100%);
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        /* Animated background */
+        .bg-animation {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: -1;
+            overflow: hidden;
+        }
+        
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(circle at 20% 50%, rgba(108, 92, 231, 0.08) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 20%, rgba(116, 185, 255, 0.06) 0%, transparent 50%),
+                        radial-gradient(circle at 40% 80%, rgba(253, 121, 168, 0.05) 0%, transparent 50%);
+            animation: bgRotate 20s linear infinite;
+        }
+        
+        @keyframes bgRotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Header */
+        .header {
+            padding: 30px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(20px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(10, 10, 15, 0.8);
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .logo-icon {
+            width: 40px; height: 40px;
+            background: var(--gradient);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            animation: logoPulse 3s ease-in-out infinite;
+        }
+        
+        @keyframes logoPulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(108, 92, 231, 0.3); }
+            50% { box-shadow: 0 0 40px rgba(108, 92, 231, 0.6); }
+        }
+        
+        .logo h1 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .clock {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .clock-dot {
+            width: 8px; height: 8px;
+            background: var(--green);
+            border-radius: 50%;
+            animation: blink 2s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        /* Main */
+        .main {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px 40px;
+        }
+        
+        /* Stats Row */
+        .hero {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 26px 30px;
+            margin-bottom: 24px;
+            background-image: radial-gradient(circle at 90% -20%, rgba(108,92,231,0.12), transparent 50%);
+        }
+        
+        .hero-greeting {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        
+        .hero-sub {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+        
+        .hero-right {
+            text-align: right;
+            min-width: 140px;
+        }
+        
+        .weather-temp {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--accent2);
+        }
+        
+        .weather-desc {
+            color: var(--muted);
+            font-size: 0.85rem;
+            margin-top: 4px;
+        }
+        
+        .weather-loading {
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+        
+        .weather-error {
+            color: var(--muted);
+            font-size: 0.8rem;
+        }
+        
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: var(--gradient);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .stat-card:hover {
+            background: var(--card-hover);
+            transform: translateY(-2px);
+            border-color: var(--accent);
+        }
+        
+        .stat-card:hover::before { opacity: 1; }
+        
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .stat-icon {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 2rem;
+            opacity: 0.15;
+        }
+        
+        /* Grid Layout */
+        .grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .panel {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+        }
+        
+        .panel-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .panel-title .dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+        }
+        
+        /* Quick Actions */
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+        
+        .action-btn {
+            background: rgba(108, 92, 231, 0.1);
+            border: 1px solid rgba(108, 92, 231, 0.2);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: var(--text);
+            text-decoration: none;
+        }
+        
+        .action-btn:hover {
+            background: rgba(108, 92, 231, 0.2);
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+        
+        .action-btn .icon { font-size: 1.5rem; margin-bottom: 8px; }
+        .action-btn .label { font-size: 0.85rem; font-weight: 500; }
+        
+        /* Notes */
+        .notes-area {
+            width: 100%;
+            min-height: 200px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            color: var(--text);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            resize: vertical;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        
+        .notes-area:focus {
+            border-color: var(--accent);
+        }
+        
+        .save-btn {
+            margin-top: 12px;
+            background: var(--gradient);
+            border: none;
+            border-radius: 8px;
+            padding: 10px 24px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .save-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(108, 92, 231, 0.4);
+        }
+        
+        /* Workspace Files */
+        .file-list {
+            list-style: none;
+        }
+        
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(42, 42, 58, 0.5);
+            transition: all 0.2s;
+        }
+        
+        .file-item:last-child { border-bottom: none; }
+        
+        .file-item:hover {
+            padding-left: 8px;
+        }
+        
+        .file-icon {
+            width: 36px; height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+        
+        .file-info { flex: 1; }
+        .file-name { font-weight: 500; font-size: 0.9rem; }
+        .file-meta { font-size: 0.75rem; color: var(--muted); }
+        
+        /* Activity Feed */
+        .activity-item {
+            display: flex;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(42, 42, 58, 0.3);
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        .activity-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            margin-top: 5px;
+            flex-shrink: 0;
+        }
+        
+        .activity-text { font-size: 0.85rem; line-height: 1.5; }
+        .activity-time { font-size: 0.7rem; color: var(--muted); margin-top: 4px; }
+        
+        /* Terminal Widget */
+        .terminal-widget {
+            background: #0d0d12;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            height: 200px;
+            overflow-y: auto;
+        }
+        
+        .terminal-line {
+            margin-bottom: 4px;
+            display: flex;
+            gap: 8px;
+        }
+        
+        .terminal-prompt { color: var(--green); }
+        .terminal-output { color: var(--muted); }
+        .terminal-cursor {
+            display: inline-block;
+            width: 8px;
+            height: 16px;
+            background: var(--accent);
+            animation: cursorBlink 1s infinite;
+            vertical-align: middle;
+        }
+        
+        @keyframes cursorBlink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        
+        /* Full Width Grid */
+        .full-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+        }
+        
+        /* Status indicator */
+        .status-online {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(0, 184, 148, 0.1);
+            border: 1px solid rgba(0, 184, 148, 0.3);
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 0.75rem;
+            color: var(--green);
+        }
+        
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: var(--muted);
+            font-size: 0.8rem;
+            border-top: 1px solid var(--border);
+            margin-top: 40px;
+        }
+        
+        .footer span {
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 600;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+        
+        /* Responsive */
+        @media (max-width: 900px) {
+            .stats-row { grid-template-columns: repeat(2, 1fr); }
+            .grid { grid-template-columns: 1fr; }
+            .full-grid { grid-template-columns: 1fr; }
+            .actions-grid { grid-template-columns: repeat(2, 1fr); }
+            .main { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+    
+    <header class="header">
+        <div class="logo">
+            <div class="logo-icon">⚡</div>
+            <h1>Hermes Workspace</h1>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;">
+            <div class="status-online">
+                <span>●</span> Online
+            </div>
+            <div class="clock">
+                <div class="clock-dot"></div>
+                <span id="clock">--:--:--</span>
+            </div>
+        </div>
+    </header>
+    
+    <main class="main">
+        <!-- ====== Greeting + Weather Hero ====== -->
+        <div class="hero">
+            <div class="hero-left">
+                <div class="hero-greeting" id="greeting">👋 반가워요!</div>
+                <div class="hero-sub" id="greetingSub"></div>
+            </div>
+            <div class="hero-right" id="weatherWidget">
+                <div class="weather-loading">🌤️ 날씨 불러오는 중...</div>
+            </div>
+        </div>
+        
+        <!-- Stats -->
+        <div class="stats-row">
+            <div class="stat-card" onclick="showDetail('projects')">
+                <div class="stat-label">Projects</div>
+                <div class="stat-value" style="color: var(--accent2);" id="projectCount">0</div>
+                <div class="stat-icon">📁</div>
+            </div>
+            <div class="stat-card" onclick="showDetail('scripts')">
+                <div class="stat-label">Scripts</div>
+                <div class="stat-value" style="color: var(--green);" id="scriptCount">0</div>
+                <div class="stat-icon">⚙️</div>
+            </div>
+            <div class="stat-card" onclick="showDetail('notes')">
+                <div class="stat-label">Notes</div>
+                <div class="stat-value" style="color: var(--yellow);" id="noteCount">0</div>
+                <div class="stat-icon">📝</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Uptime</div>
+                <div class="stat-value" style="color: var(--pink);" id="uptime">0h</div>
+                <div class="stat-icon">🕐</div>
+            </div>
+        </div>
+        
+        <!-- Main Grid -->
+        <div class="grid">
+            <div class="panel">
+                <div class="panel-title">
+                    <span class="dot" style="background: var(--accent);"></span>
+                    Quick Actions
+                </div>
+                <div class="actions-grid">
+                    <a class="action-btn" onclick="newNote()">
+                        <div class="icon">📝</div>
+                        <div class="label">New Note</div>
+                    </a>
+                    <a class="action-btn" onclick="runScript()">
+                        <div class="icon">▶️</div>
+                        <div class="label">Run Script</div>
+                    </a>
+                    <a class="action-btn" onclick="showTerminal()">
+                        <div class="icon">💻</div>
+                        <div class="label">Terminal</div>
+                    </a>
+                    <a class="action-btn" onclick="scanFiles()">
+                        <div class="icon">🔍</div>
+                        <div class="label">Scan Files</div>
+                    </a>
+                    <a class="action-btn" onclick="showWeather()">
+                        <div class="icon">🌤️</div>
+                        <div class="label">Weather</div>
+                    </a>
+                    <a class="action-btn" onclick="systemInfo()">
+                        <div class="icon">📊</div>
+                        <div class="label">System Info</div>
+                    </a>
+                </div>
+                
+                <!-- Notes Area -->
+                <div style="margin-top: 20px;">
+                    <div class="panel-title">
+                        <span class="dot" style="background: var(--yellow);"></span>
+                        Quick Notes
+                    </div>
+                    <textarea class="notes-area" id="quickNotes" placeholder="여기에 빠른 메모를 작성하세요... 💭"></textarea>
+                    <button class="save-btn" onclick="saveNotes()">💾 Save Notes</button>
+                </div>
+            </div>
+            
+            <div>
+                <div class="panel" style="margin-bottom: 20px;">
+                    <div class="panel-title">
+                        <span class="dot" style="background: var(--green);"></span>
+                        Recent Activity
+                    </div>
+                    <div id="activityFeed">
+                        <!-- Activities will be added dynamically -->
+                    </div>
+                </div>
+                
+                <div class="panel">
+                    <div class="panel-title">
+                        <span class="dot" style="background: var(--blue);"></span>
+                        Workspace Files
+                    </div>
+                    <ul class="file-list" id="fileList">
+                        <!-- Files will be listed dynamically -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Full Width Grid -->
+        <div class="full-grid">
+            <div class="panel">
+                <div class="panel-title">
+                    <span class="dot" style="background: var(--pink);"></span>
+                    🖥️ Terminal
+                </div>
+                <div class="terminal-widget" id="terminalWidget">
+                    <div class="terminal-line">
+                        <span class="terminal-prompt">hermes@workspace:~$</span>
+                        <span class="terminal-output">echo "Welcome to Hermes Workspace!"</span>
+                    </div>
+                    <div class="terminal-line">
+                        <span class="terminal-output">Welcome to Hermes Workspace!</span>
+                    </div>
+                    <div class="terminal-line">
+                        <span class="terminal-prompt">hermes@workspace:~$</span>
+                        <span class="terminal-cursor"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-title">
+                    <span class="dot" style="background: var(--accent2);"></span>
+                    🎵 Mood
+                </div>
+                <div style="text-align: center; padding: 20px;">
+                    <div style="font-size: 4rem; margin-bottom: 12px;" id="moodEmoji">🤖</div>
+                    <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 8px;" id="moodText">Hermes is ready</div>
+                    <div style="font-size: 0.8rem; color: var(--muted);" id="moodSub">Powered by Nous Research</div>
+                    <div style="margin-top: 16px;">
+                        <span id="moodButtons" style="font-size: 1.5rem; cursor: pointer;">😊 🤔 😎 🔥 💪</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-title">
+                    <span class="dot" style="background: var(--red);"></span>
+                    📅 Today's Focus
+                </div>
+                <div id="focusList" style="padding: 8px 0;">
+                    <!-- Focus items -->
+                </div>
+                <div style="margin-top: 12px; display: flex; gap: 8px;">
+                    <input type="text" id="focusInput" placeholder="Add task..." 
+                        style="flex: 1; background: rgba(0,0,0,0.3); border: 1px solid var(--border); 
+                        border-radius: 8px; padding: 8px 12px; color: var(--text); font-size: 0.85rem; outline: none;"
+                        onkeypress="if(event.key==='Enter') addFocus()">
+                    <button onclick="addFocus()" style="background: var(--accent); border: none; 
+                        border-radius: 8px; padding: 8px 16px; color: white; cursor: pointer; font-weight: 600;">+</button>
+                </div>
+            </div>
+        </div>
+        <!-- ====== Live System Monitor Panel ====== -->
+        <div class="panel" id="systemPanel" style="margin-top: 20px;">
+            <div class="panel-title">
+                <span class="dot" style="background: var(--accent2);"></span>
+                🖥️ Live System Monitor
+                <span id="systemTimestamp" style="margin-left: auto; font-size: 0.75rem; color: var(--muted);"></span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;" id="systemMetrics">
+                <!-- populated by renderSystemPanel() -->
+            </div>
+            <div id="topProcesses" style="margin-top: 16px;"></div>
+            <div id="historyChartSection" style="margin-top: 20px;">
+                <div class="panel-title" style="font-size:0.9rem; margin-bottom:8px;">📈 Resource History</div>
+                <canvas id="historyChart" style="width:100%; height:100px; display:block;"></canvas>
+            </div>
+        </div>
+
+        <!-- ====== Projects Board ====== -->
+        <div class="panel" id="projectsPanel" style="margin-top: 20px;">
+            <div class="panel-title">
+                <span class="dot" style="background: var(--green);"></span>
+                📁 Projects Board
+            </div>
+            <div id="projectsBoard" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;">
+                <!-- populated by renderProjects() -->
+            </div>
+        </div>
+    </main>
+    
+    <footer class="footer">
+        Built with ❤️ by <span>Hermes Agent</span> · Powered by Nous Research · 2026
+    </footer>
+    
+    <!-- Load live data (data.js + projects.js generated by hermes_toolkit.py refresh) -->
+    <script src="data.js"></script>
+    <script src="projects.js"></script>
+    <script>
+        // ====== Clock ======
+        function updateClock() {
+            const now = new Date();
+            const options = { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+            document.getElementById('clock').textContent = now.toLocaleTimeString('ko-KR', options) + ' KST';
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+        
+        // ====== Greeting + Weather ======
+        function updateGreeting() {
+            const now = new Date();
+            const h = now.getHours();
+            let greeting, emoji;
+            if (h >= 5 && h < 12) { greeting = '좋은 아침이에요!'; emoji = '🌅'; }
+            else if (h >= 12 && h < 18) { greeting = '즐거운 오후예요!'; emoji = '☀️'; }
+            else if (h >= 18 && h < 22) { greeting = '편안한 저녁이에요!'; emoji = '🌆'; }
+            else { greeting = '좋은 밤이에요!'; emoji = '🌙'; }
+            document.getElementById('greeting').textContent = `${emoji} ${greeting}`;
+            const day = now.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' });
+            const host = (window.HERMES_DATA && window.HERMES_DATA.hostname) ? window.HERMES_DATA.hostname : '워크스페이스';
+            document.getElementById('greetingSub').textContent = `${day} · ${host} · 오늘도 멋진 하루 보내세요!`;
+        }
+        updateGreeting();
+        
+        function updateWeather() {
+            const w = document.getElementById('weatherWidget');
+            const fetchWeather = () => {
+                fetch('https://api.open-meteo.com/v1/forecast?latitude=37.57&longitude=126.98&current_weather=true&timezone=Asia/Seoul')
+                    .then(r => r.json())
+                    .then(data => {
+                        const cw = data.current_weather;
+                        if (!cw) { w.innerHTML = ''; return; }
+                        const temp = Math.round(cw.temperature);
+                        const code = cw.weathercode;
+                        const desc = weatherDesc(code);
+                        const emoji = weatherEmoji(code);
+                        w.innerHTML = `<div>${emoji}</div>
+                            <div class="weather-temp">${temp}°C</div>
+                            <div class="weather-desc">서울 · ${desc}</div>`;
+                    })
+                    .catch(() => { w.innerHTML = ''; });
+            };
+            fetchWeather();
+        }
+        
+        function weatherDesc(code) {
+            if (code === 0) return '맑음';
+            if (code <= 3) return '약간 흐림';
+            if (code <= 48) return '안개';
+            if (code <= 67) return '비';
+            if (code <= 77) return '눈';
+            if (code <= 82) return '소나기';
+            return '뇌우';
+        }
+        
+        function weatherEmoji(code) {
+            if (code === 0) return '☀️';
+            if (code <= 3) return '⛅';
+            if (code <= 48) return '🌫️';
+            if (code <= 67) return '🌧️';
+            if (code <= 77) return '🌨️';
+            if (code <= 82) return '🌦️';
+            return '⛈️';
+        }
+        
+        updateWeather();
+        
+        // ====== Uptime ======
+        const startTime = Date.now();
+        function updateUptime() {
+            const diff = Math.floor((Date.now() - startTime) / 1000);
+            const hours = Math.floor(diff / 3600);
+            const mins = Math.floor((diff % 3600) / 60);
+            document.getElementById('uptime').textContent = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+        }
+        setInterval(updateUptime, 60000);
+        updateUptime();
+        
+        // ====== Activity Feed ======
+        const activities = [
+            { text: '🚀 Workspace initialized', color: 'var(--accent)', time: 'Just now' },
+            { text: '📁 Folder structure created', color: 'var(--green)', time: '1 min ago' },
+            { text: '⚡ Dashboard loaded', color: 'var(--blue)', time: 'Now' },
+        ];
+        
+        function renderActivities() {
+            const feed = document.getElementById('activityFeed');
+            feed.innerHTML = activities.map(a => `
+                <div class="activity-item">
+                    <div class="activity-dot" style="background: ${a.color};"></div>
+                    <div>
+                        <div class="activity-text">${a.text}</div>
+                        <div class="activity-time">${a.time}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        renderActivities();
+        
+        function addActivity(text, color = 'var(--accent)') {
+            activities.unshift({ text, color, time: 'Just now' });
+            if (activities.length > 10) activities.pop();
+            renderActivities();
+        }
+        
+        // ====== Notes ======
+        function saveNotes() {
+            const notes = document.getElementById('quickNotes').value;
+            localStorage.setItem('hermes_notes', notes);
+            addActivity('💾 Notes saved', 'var(--green)');
+            document.getElementById('noteCount').textContent = notes.split('\n').filter(l => l.trim()).length;
+        }
+        
+        // Load saved notes
+        const savedNotes = localStorage.getItem('hermes_notes');
+        if (savedNotes) {
+            document.getElementById('quickNotes').value = savedNotes;
+            document.getElementById('noteCount').textContent = savedNotes.split('\n').filter(l => l.trim()).length;
+        }
+        
+        // ====== Focus Tasks ======
+        let focusTasks = JSON.parse(localStorage.getItem('hermes_focus') || '[]');
+        
+        function renderFocus() {
+            const list = document.getElementById('focusList');
+            list.innerHTML = focusTasks.map((task, i) => `
+                <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(42,42,58,0.3);">
+                    <input type="checkbox" ${task.done ? 'checked' : ''} 
+                        onchange="toggleFocus(${i})"
+                        style="accent-color: var(--accent); cursor: pointer;">
+                    <span style="flex: 1; font-size: 0.85rem; ${task.done ? 'text-decoration: line-through; opacity: 0.5;' : ''}">${task.text}</span>
+                    <span style="cursor: pointer; opacity: 0.5;" onclick="removeFocus(${i})">✕</span>
+                </div>
+            `).join('');
+        }
+        
+        function addFocus() {
+            const input = document.getElementById('focusInput');
+            if (!input.value.trim()) return;
+            focusTasks.push({ text: input.value.trim(), done: false });
+            localStorage.setItem('hermes_focus', JSON.stringify(focusTasks));
+            input.value = '';
+            renderFocus();
+            addActivity(`📋 Task added: "${focusTasks[focusTasks.length-1].text}"`, 'var(--yellow)');
+        }
+        
+        function toggleFocus(i) {
+            focusTasks[i].done = !focusTasks[i].done;
+            localStorage.setItem('hermes_focus', JSON.stringify(focusTasks));
+            renderFocus();
+        }
+        
+        function removeFocus(i) {
+            focusTasks.splice(i, 1);
+            localStorage.setItem('hermes_focus', JSON.stringify(focusTasks));
+            renderFocus();
+        }
+        
+        renderFocus();
+        
+        // ====== Files List ======
+        const workspaceFiles = [
+            { name: 'dashboard/', type: 'folder', icon: '📁', color: 'rgba(108,92,231,0.15)' },
+            { name: 'tools/', type: 'folder', icon: '📁', color: 'rgba(0,184,148,0.15)' },
+            { name: 'scripts/', type: 'folder', icon: '📁', color: 'rgba(9,132,227,0.15)' },
+            { name: 'notes/', type: 'folder', icon: '📁', color: 'rgba(253,203,110,0.15)' },
+            { name: 'projects/', type: 'folder', icon: '📁', color: 'rgba(253,121,168,0.15)' },
+            { name: 'index.html', type: 'file', icon: '🌐', color: 'rgba(116,185,255,0.15)' },
+        ];
+        
+        const fileList = document.getElementById('fileList');
+        fileList.innerHTML = workspaceFiles.map(f => `
+            <li class="file-item">
+                <div class="file-icon" style="background: ${f.color};">${f.icon}</div>
+                <div class="file-info">
+                    <div class="file-name">${f.name}</div>
+                    <div class="file-meta">${f.type}</div>
+                </div>
+            </li>
+        `).join('');
+        
+        document.getElementById('projectCount').textContent = workspaceFiles.filter(f => f.type === 'folder').length;
+        document.getElementById('scriptCount').textContent = '0';
+        
+        // ====== Mood ======
+        const moods = [
+            { emoji: '🤖', text: 'Hermes is ready', sub: 'Powered by Nous Research' },
+            { emoji: '🚀', text: 'Let\'s build something!', sub: 'I\'m feeling productive' },
+            { emoji: '🤔', text: 'Thinking hard...', sub: 'Processing ideas' },
+            { emoji: '😎', text: 'Feeling confident', sub: 'Bring on the challenge!' },
+            { emoji: '🔥', text: 'On fire today!', sub: 'Maximum productivity mode' },
+            { emoji: '💪', text: 'Ready for anything', sub: 'Let\'s go!' },
+        ];
+        
+        let currentMood = 0;
+        document.getElementById('moodButtons').addEventListener('click', (e) => {
+            if (e.target.textContent.trim()) {
+                const idx = ['😊', '🤔', '😎', '🔥', '💪'].indexOf(e.target.textContent.trim());
+                if (idx >= 0) {
+                    currentMood = idx + 1;
+                    document.getElementById('moodEmoji').textContent = moods[currentMood].emoji;
+                    document.getElementById('moodText').textContent = moods[currentMood].text;
+                    document.getElementById('moodSub').textContent = moods[currentMood].sub;
+                    addActivity(`😊 Mood changed to: ${moods[currentMood].text}`, 'var(--pink)');
+                }
+            }
+        });
+        
+        // ====== Actions ======
+        function newNote() {
+            document.getElementById('quickNotes').focus();
+            addActivity('📝 New note started', 'var(--yellow)');
+        }
+        
+        function runScript() {
+            addActivity('▶️ Script runner (coming soon!)', 'var(--green)');
+        }
+        
+        function showTerminal() {
+            document.getElementById('terminalWidget').scrollIntoView({ behavior: 'smooth' });
+            addActivity('💻 Terminal focused', 'var(--blue)');
+        }
+        
+        function scanFiles() {
+            addActivity('🔍 Scanning workspace...', 'var(--accent)');
+            setTimeout(() => addActivity(`📁 Found ${workspaceFiles.length} items`, 'var(--green)'), 500);
+        }
+        
+        function showWeather() {
+            addActivity('🌤️ Seoul: Clear, 28°C (Summer evening)', 'var(--yellow)');
+        }
+        
+        function systemInfo() {
+            addActivity('📊 System Info (from live data)', 'var(--accent2)');
+            renderSystemPanel();
+        }
+        
+        function showDetail(type) {
+            addActivity(`📂 Viewing ${type}...`, 'var(--accent)');
+        }
+        
+        // ====== Terminal Simulation ======
+        const termWidget = document.getElementById('terminalWidget');
+        termWidget.addEventListener('click', () => {
+            const cmd = prompt('hermes@workspace:~$');
+            if (cmd) {
+                const lines = termWidget.querySelectorAll('.terminal-line');
+                const lastLine = lines[lines.length - 1];
+                lastLine.innerHTML = `<span class="terminal-prompt">hermes@workspace:~$</span> <span class="terminal-output">${cmd}</span>`;
+                
+                let output = '';
+                if (cmd === 'ls') output = 'dashboard/ tools/ scripts/ notes/ projects/ index.html';
+                else if (cmd === 'pwd') output = 'C:/hermes';
+                else if (cmd === 'date') output = new Date().toLocaleString('ko-KR');
+                else if (cmd === 'whoami') output = 'hermes-agent';
+                else if (cmd === 'help') output = 'Available: ls, pwd, date, whoami, help, clear';
+                else if (cmd === 'clear') { termWidget.innerHTML = ''; }
+                else output = `bash: ${cmd}: command not found`;
+                
+                if (cmd !== 'clear' && output) {
+                    termWidget.innerHTML += `<div class="terminal-line"><span class="terminal-output">${output}</span></div>`;
+                }
+                termWidget.innerHTML += `<div class="terminal-line"><span class="terminal-prompt">hermes@workspace:~$</span> <span class="terminal-cursor"></span></div>`;
+                termWidget.scrollTop = termWidget.scrollHeight;
+            }
+        });
+        
+        // ====== Random Facts ======
+        const facts = [
+            '💡 Hermes was named after the Greek god of messages',
+            '🚀 You can build amazing things with Hermes Agent',
+            '📁 This workspace is your creative playground',
+            '⚡ Every great project starts with a single file',
+            '🤖 AI + Human = Infinite possibilities',
+            '🎯 Focus on one task at a time for best results',
+        ];
+
+        function randomFact() {
+            return facts[Math.floor(Math.random() * facts.length)];
+        }
+
+        // ====== Live System Monitor ======
+        function renderMetricCard(icon, label, value, color) {
+            return `
+                <div class="stat-card" style="cursor: default;">
+                    <div class="stat-label">${icon} ${label}</div>
+                    <div class="stat-value" style="color: ${color};">${value}</div>
+                </div>
+            `;
+        }
+
+        function renderSystemPanel() {
+            const panel = document.getElementById('systemPanel');
+            const data = window.HERMES_DATA;
+            if (!data) {
+                panel.innerHTML = '<div style="color: var(--muted); padding: 20px; text-align:center;">'
+                    + 'No live data yet. Run <code>python tools/system_diagnostics.py --out dashboard/data.json</code> '
+                    + 'then <code>python -c "..."</code> to generate data.js.</div>';
+                panel.style.display = 'block';
+                return;
+            }
+            panel.style.display = 'block';
+
+            const cpu = data.cpu_percent !== null && data.cpu_percent !== undefined ? data.cpu_percent + '%' : 'n/a';
+            const mem = data.memory.percent !== null ? `${data.memory.used_gb}/${data.memory.total_gb} GB (${data.memory.percent}%)` : 'n/a';
+            const disk = data.disk.percent !== null ? `${data.disk.free_gb} GB free (${data.disk.percent}% used)` : 'n/a';
+            const procs = data.process_count !== null && data.process_count !== undefined ? data.process_count : 'n/a';
+
+            document.getElementById('systemTimestamp').textContent =
+                '⏱ Updated ' + (data.timestamp || '').replace('T', ' ');
+
+            document.getElementById('systemMetrics').innerHTML =
+                renderMetricCard('🎛️', 'CPU Load', cpu, 'var(--green)') +
+                renderMetricCard('🧠', 'Memory', mem, 'var(--blue)') +
+                renderMetricCard('💾', 'Disk', disk, 'var(--yellow)') +
+                renderMetricCard('🔄', 'Processes', procs, 'var(--accent2)');
+
+            const procsHtml = (data.top_processes || []).map(p => {
+                const bar = '█'.repeat(Math.min(Math.round(p.mem_mb / 100), 30));
+                return `<div style="display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid rgba(42,42,58,0.3);">
+                        <span style="font-family:monospace; font-size:0.8rem; width:140px;">${p.name}</span>
+                        <span style="flex:1; font-family:monospace; color:var(--accent2);">${bar}</span>
+                        <span style="font-family:monospace; font-size:0.75rem; color:var(--muted);">${p.mem_mb} MB</span>
+                    </div>`;
+            }).join('');
+            document.getElementById('topProcesses').innerHTML =
+                `<div class="panel-title" style="font-size:0.9rem; margin-bottom:8px;">⬇ Top Processes by Memory</div>${procsHtml}`;
+
+            drawHistoryChart(data.history);
+        }
+
+        // ====== Resource History Chart ======
+        function drawHistoryChart(history) {
+            const canvas = document.getElementById('historyChart');
+            if (!canvas || !history) return;
+            const demo = (history.cpu || []).length > 1;
+            // Use live history if we have 2+ samples, else show a friendly "collecting" demo line
+            let cpu = history.cpu, mem = history.mem, disk = history.disk;
+            if (!demo) {
+                // Build a few demo points so the chart isn't empty on first load
+                const n = 30, t0 = [30,35,28,42,38,45,50,44,36,40,48,52,46,38,35,40,43,47,50,44,39,42,46,49,45,41,38,43,47,44];
+                cpu = t0; mem = t0.map(v => 62 + (v % 7)); disk = t0.map(v => 76 + (v % 4));
+            }
+            const ctx = canvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const W = canvas.clientWidth, H = canvas.clientHeight;
+            if (canvas.width !== W * dpr || canvas.height !== H * dpr) {
+                canvas.width = W * dpr; canvas.height = H * dpr;
+            }
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, W, H);
+
+            const n = cpu.length;
+            if (n < 2) return;
+
+            // Grid lines
+            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 4; i++) {
+                const y = (H / 4) * i;
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+            }
+
+            const series = [
+                { data: cpu, color: '#7c5cff' },
+                { data: mem, color: '#3498db' },
+                { data: disk, color: '#f1c40f' },
+            ];
+            const maxV = 100;
+            series.forEach(s => {
+                ctx.beginPath();
+                s.data.forEach((v, i) => {
+                    const x = (i / (n - 1)) * W;
+                    const y = H - (Math.min(v, maxV) / maxV) * H;
+                    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                });
+                ctx.strokeStyle = s.color;
+                ctx.lineWidth = 1.8;
+                ctx.stroke();
+            });
+
+            // Legend
+            ctx.font = '10px JetBrains Mono, monospace';
+            const labels = [['CPU', '#7c5cff'], ['MEM', '#3498db'], ['DISK', '#f1c40f']];
+            let lx = 8;
+            labels.forEach(([t, c]) => {
+                ctx.fillStyle = 'rgba(107,111,130,0.9)';
+                ctx.fillRect(lx, H - 16, 8, 8);
+                ctx.fillStyle = c;
+                ctx.fillRect(lx, H - 16, 8, 8);
+                ctx.fillStyle = '#6b6f82';
+                ctx.fillText(t, lx + 12, H - 8);
+                lx += 50;
+            });
+        }
+
+        // ====== Projects Board ======
+        // Projects come from projects.js (generated by hermes_toolkit.py refresh);
+        // falls back to a static sample list if not present.
+        const FALLBACK_PROJECTS = [
+            { name: 'Hermes Workspace', status: 'active', desc: 'Personal command center', path: 'C:/hermes' },
+            { name: 'LunarDateUtil', status: 'done', desc: 'Korean lunar calendar converter', path: 'C:/github/20260730' },
+            { name: 'SNS Showcase', status: 'planned', desc: 'Shareable web demo', path: '' },
+        ];
+
+        const statusMeta = {
+            active:   { icon: '🚀', color: 'var(--green)' },
+            planned:  { icon: '📋', color: 'var(--blue)' },
+            paused:   { icon: '⏸️', color: 'var(--yellow)' },
+            done:     { icon: '✅', color: 'var(--accent2)' },
+            archived: { icon: '🗄️', color: 'var(--muted)' },
+        };
+
+        function renderProjects() {
+            const board = document.getElementById('projectsBoard');
+            if (!board) return;
+            const projects = (window.HERMES_PROJECTS && window.HERMES_PROJECTS.length)
+                ? window.HERMES_PROJECTS : FALLBACK_PROJECTS;
+            board.innerHTML = projects.map(p => {
+                if (typeof p === 'string') return '';
+                const meta = statusMeta[p.status] || statusMeta.planned;
+                return `
+                    <div class="stat-card" style="cursor: default; display: flex; flex-direction: column; gap: 8px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between;">
+                            <span style="font-weight:600; font-size:0.95rem;">${meta.icon} ${p.name}</span>
+                        </div>
+                        <div style="font-size:0.8rem; color:var(--muted); flex:1;">${p.description || p.desc || '—'}</div>
+                        <div style="font-size:0.72rem; color:${meta.color}; font-weight:600; text-transform:capitalize;">● ${p.status}</div>
+                        ${p.path ? `<div style="font-size:0.7rem; font-family:monospace; color:var(--muted);">${p.path}</div>` : ''}
+                    </div>`;
+            }).join('');
+        }
+
+        renderProjects();
+        renderSystemPanel();  // show live system monitor on load
+        window.renderSystemPanel = renderSystemPanel;
+
+        console.log('%c🏠 Hermes Workspace', 'font-size: 20px; font-weight: bold; color: #6c5ce7;');
+        console.log('%c' + randomFact(), 'color: #a29bfe;');
+    </script>
+</body>
+</html>

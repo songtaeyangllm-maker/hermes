@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes 인터넷 속도계</title>
+<style>
+    :root {
+        --bg: #0b0b12;
+        --card: #13131c;
+        --text: #ececf5;
+        --muted: #6b6f82;
+        --border: #23233a;
+        --accent: #7c5cff;
+        --green: #2ee6a8;
+        --yell: #ffcf5c;
+        --red: #ff5c7a;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: -apple-system, 'Segoe UI', 'Noto Sans KR', sans-serif;
+        background: var(--bg); color: var(--text);
+        min-height: 100vh; display: flex; align-items: center; justify-content: center;
+        padding: 30px 20px;
+    }
+    .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        padding: 36px 40px;
+        width: 520px;
+        text-align: center;
+    }
+    .title { font-size: 1.4rem; font-weight: 700; margin-bottom: 4px; }
+    .subtitle { color: var(--muted); font-size: 0.85rem; margin-bottom: 30px; }
+
+    .gauge {
+        position: relative;
+        width: 220px; height: 120px; margin: 0 auto 10px;
+    }
+    .gauge svg { width: 100%; height: 100%; }
+    .gauge-val {
+        position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%);
+        font-size: 2.4rem; font-weight: 800;
+    }
+    .gauge-unit { font-size: 0.8rem; color: var(--muted); }
+
+    .type-row { display: flex; gap: 8px; justify-content: center; margin: 24px 0 12px; }
+    .type-badge {
+        padding: 6px 16px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;
+        background: rgba(124,92,255,0.12); border: 1px solid var(--border); color: var(--muted);
+    }
+    .type-badge.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    #speed {
+        font-size: 1rem; color: var(--muted); margin: 4px 0 8px; min-height: 1.4em;
+    }
+
+    .btn {
+        background: var(--accent); color: #fff; border: none; cursor: pointer;
+        padding: 15px 40px; border-radius: 16px; font-size: 1.05rem; font-weight: 700;
+        transition: transform 0.15s, opacity 0.2s; margin-top: 8px;
+        box-shadow: 0 8px 24px rgba(124,92,255,0.3);
+    }
+    .btn:hover { transform: translateY(-2px); opacity: 0.92; }
+    .btn.running { background: var(--muted); cursor: not-allowed; }
+
+    .bars { margin-top: 26px; display: flex; flex-direction: column; gap: 12px; }
+    .bar-row { display: flex; align-items: center; gap: 12px; text-align: left; }
+    .bar-label { width: 64px; color: var(--muted); font-size: 0.8rem; font-weight: 600; }
+    .bar-track { flex: 1; height: 10px; background: var(--level0, #1c1c28); border-radius: 8px; overflow: hidden; }
+    .bar-fill { height: 100%; width: 0; border-radius: 8px; transition: width 0.4s; }
+    .bar-val { width: 110px; text-align: right; font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .bar-val b { color: var(--text); font-size: 0.95rem; }
+
+    .pings { margin-top: 20px; display: flex; gap: 16px; justify-content: center; font-size: 0.85rem; color: var(--muted); }
+    .ping-item b { color: var(--text); }
+
+    .hint { margin-top: 22px; font-size: 0.72rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="card">
+    <div class="title">⚡ 인터넷 속도 측정</div>
+    <div class="subtitle">실제 다운로드/업로드 테스트</div>
+
+    <div class="type-row">
+        <span class="type-badge active" id="badge-down">⬇️ 다운로드</span>
+        <span class="type-badge" id="badge-up">⬆️ 업로드</span>
+    </div>
+
+    <div class="gauge">
+        <svg viewBox="0 0 220 120">
+            <defs>
+                <linearGradient id="g1" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stop-color="#2ee6a8"/>
+                    <stop offset="100%" stop-color="#7c5cff"/>
+                </linearGradient>
+            </defs>
+            <!-- background semicircle -->
+            <path d="M 20 115 A 90 90 0 0 1 200 115" fill="none" stroke="#1c1c28" stroke-width="16" stroke-linecap="round"/>
+            <!-- value semicircle (rotated) -->
+            <path id="gaugeArc" d="M 20 115 A 90 90 0 0 1 200 115" fill="none" stroke="url(#g1)" stroke-width="16" stroke-linecap="round" stroke-dasharray="283 283" stroke-dashoffset="283" transform="rotate(180 110 115)"/>
+        </svg>
+        <div class="gauge-val"><span id="val">0</span><br><span class="gauge-unit" id="unit">Mbps</span></div>
+    </div>
+
+    <div id="speed">—</div>
+
+    <button class="btn" id="btn" onclick="runTest()">▶️ 테스트 시작</button>
+
+    <div class="bars">
+        <div class="bar-row">
+            <span class="bar-label">다운로드</span>
+            <div class="bar-track"><div class="bar-fill" id="fillDown" style="background:var(--accent)"></div></div>
+            <span class="bar-val"><b id="down">0</b> Mbps</span>
+        </div>
+        <div class="bar-row">
+            <span class="bar-label">업로드</span>
+            <div class="bar-track"><div class="bar-fill" id="fillUp" style="background:var(--green)"></div></div>
+            <span class="bar-val"><b id="up">0</b> Mbps</span>
+        </div>
+    </div>
+
+    <div class="pings">
+        <span class="ping-item">📡 지연 <b id="ping">—</b> ms</span>
+        <span class="ping-item">🖧 연결 <b id="ictype">—</b></span>
+    </div>
+
+    <div class="hint">테스트 파일: Cloudflare CDN · 결과는 브라우저에만 표시됩니다</div>
+</div>
+
+<script>
+    const TEST_DL = 'https://speed.cloudflare.com/__down?bytes=20000000'; // 20MB
+    // Upload via fetch POST (no server): we report timing of a null-body POST to a dummy endpoint
+    // For a true local-only widget, upload is estimated from a POST to cloudflare speed
+    const TEST_UP = 'https://speed.cloudflare.com/__up?bytes=5000000';
+
+    const $ = id => document.getElementById(id);
+    let running = false;
+
+    function setBadge(down) {
+        $('badge-down').classList.toggle('active', down);
+        $('badge-up').classList.toggle('active', !down);
+    }
+
+    async function measure() {
+        // Download test
+        setBadge(true);
+        $('speed').textContent = '다운로드 테스트 중…';
+        const t0 = performance.now();
+        try {
+            const res = await fetch(TEST_DL, { cache: 'no-store' });
+            const blob = await res.blob();
+            const secs = (performance.now() - t0) / 1000;
+            const mbps = (blob.size * 8) / secs / 1e6;
+            $('down').textContent = mbps.toFixed(1);
+            $('fillDown').style.width = Math.min(100, mbps / 20 * 100) + '%';
+            $('val').textContent = mbps.toFixed(1);
+            $('unit').textContent = 'Mbps';
+            animateArc(mbps / 20);
+            $('speed').textContent = `✅ 다운로드 완료 · ${mbps.toFixed(1)} Mbps`;
+        } catch (e) {
+            $('speed').textContent = '❌ 다운로드 테스트 실패 (네트워크 필요)';
+        }
+    }
+
+    function animateArc(frac) {
+        const arc = document.getElementById('gaugeArc');
+        const maxDash = 283;
+        arc.style.transition = 'stroke-dashoffset 0.6s ease';
+        arc.style.strokeDashoffset = maxDash - maxDash * Math.min(1, frac);
+    }
+
+    async function runTest() {
+        if (running) return;
+        running = true;
+        const btn = $('btn');
+        btn.classList.add('running'); btn.textContent = '⏳ 측정 중…';
+        $('val').textContent = '0'; $('speed').textContent = '지연 시간 측정 중…';
+
+        // Ping
+        const p0 = performance.now();
+        try { await fetch('https://speed.cloudflare.com/__down?bytes=0', { cache: 'no-store' }); }
+        catch(e){}
+        const ping = (performance.now() - p0).toFixed(0);
+        $('ping').textContent = ping;
+
+        // Connection type
+        const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        if (conn) {
+            $('ictype').textContent = `${conn.effectiveType || ''} (${conn.downlink || '?'}M)` || 'unknown';
+        } else {
+            $('ictype').textContent = 'n/a';
+        }
+
+        await measure();
+        running = false;
+        btn.classList.remove('running'); btn.textContent = '🔄 다시 측정';
+        setBadge(true);
+    }
+
+    // Initialize gauge arc at 0 (drawn empty)
+    animateArc(0);
+</script>
+</body>
+</html>

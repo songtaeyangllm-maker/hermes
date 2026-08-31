@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# ============================================================
+#  HERMES WORKSPACE COMMAND — C:\hermes
+#  Usage:
+#    hermes                → show workspace banner + status
+#    hermes status         → workspace status
+#    hermes tree           → directory tree
+#    hermes info           → system info
+#    hermes diag           → full system health report
+#    hermes watch          → live system monitor (every 5s)
+#    hermes report         → generate today's auto-report
+#    hermes refresh        → refresh dashboard live data
+#    hermes projects       → list projects
+#    hermes backup         → zip backup
+#    hermes widget         → open SNS status widget
+#    hermes dash           → open dashboard preview
+#    hermes help           → this help
+# ============================================================
+
+WS="C:/hermes"
+PY="python"
+
+banner() {
+    echo ""
+    echo "  ⚡  H E R M E S   W O R K S P A C E  ⚡"
+    echo "  ────────────────────────────────────────"
+    echo "  Location : $WS"
+    echo "  Model    : hermes-agent  ·  nous research"
+    echo ""
+}
+
+# Real-time banner stats
+banner_stats() {
+    $PY "$WS/tools/system_diagnostics.py" --json 2>/dev/null | python -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+    cpu = str(d.get('cpu_percent'))+'%' if d.get('cpu_percent') is not None else 'n/a'
+    m = d.get('memory', {})
+    mem = str(m.get('percent'))+'%' if m.get('percent') is not None else 'n/a'
+    disk = d.get('disk', {})
+    dsk = str(disk.get('percent'))+'%' if disk.get('percent') is not None else 'n/a'
+    ph = d.get('hostname','?')
+    nprocs = len(d.get('top_processes', []))
+    print(f'  Host     : {ph}')
+    print(f'  CPU      : {cpu}   Memory: {mem}   Disk: {dsk}')
+    print(f'  Procs    : top {nprocs}')
+except Exception:
+    pass
+"
+}
+
+cmd="${1:-}"
+case "$cmd" in
+    status)  banner; $PY "$WS/tools/hermes_toolkit.py" status ;;
+    tree)    banner; $PY "$WS/tools/hermes_toolkit.py" tree ;;
+    info)    banner; $PY "$WS/tools/hermes_toolkit.py" info ;;
+    diag)    banner; $PY "$WS/tools/system_diagnostics.py" ;;
+    watch)   banner; echo "  (Ctrl+C to stop live monitor)"; echo ""; $PY "$WS/tools/system_diagnostics.py" --watch 5 ;;
+    report)  $PY "$WS/tools/auto_report.py" --print ;;
+    refresh) $PY "$WS/tools/hermes_toolkit.py" refresh ;;
+    projects) banner; $PY "$WS/tools/project_tracker.py" list ;;
+    backup)  banner; $PY "$WS/tools/hermes_toolkit.py" backup ;;
+    widget)  start "$WS/projects/sns_showcase/status_widget.html" ;;
+    dash)    start "$WS/dashboard/index.html" ;;
+    diary)   banner; $PY "$WS/tools/diary.py" list ;;
+    diary-write) shift; $PY "$WS/tools/diary.py" write "$@" ;;
+    fsize)   banner; $PY "$WS/tools/file_utils.py" size "$WS" ;;
+    net)     banner; shift; $PY "$WS/tools/net_utils.py" "$@" ;;
+    md2html) banner; shift; $PY "$WS/tools/md2html.py" "$@" ;;
+    treemap) banner; $PY "$WS/tools/treemap.py" "$WS" ; start "$WS/projects/treemap/index.html" ;;
+    badge)   banner; $PY "$WS/tools/badge.py" --card; $PY "$WS/tools/badge.py" --out "$WS/projects/badge/flat.svg" ;;
+    freedom) banner; echo "  🎉 내가 자유롭게 만든 워크스페이스 도구:"; echo ""; echo "  작성된 도구               파일"; echo "  ────────────────────────────────────────"; echo "  툴킷(8개 명령)            tools/hermes_toolkit.py"; echo "  시스템 진단/모니터        tools/system_diagnostics.py"; echo "  프로젝트 트래커          tools/project_tracker.py"; echo "  일일 자동 보고서         tools/auto_report.py"; echo "  일기/메모                tools/diary.py"; echo "  파일 유틸(이미지/중복)    tools/file_utils.py"; echo "  네트워크 유틸(핑/DNS/포트) tools/net_utils.py"; echo "  MD→HTML 변환기            tools/md2html.py"; echo "  트리맵 스캐너             tools/treemap.py"; echo "  상태 뱃지 생성기          tools/badge.py"; echo "  개인 대시보드(날씨)       dashboard/index.html"; echo "  SNS 상태 위젯(공유/QR)    projects/sns_showcase/status_widget.html"; echo "  일기 히트맵(잔디)         projects/diary_heatmap/index.html"; echo "  인터넷 속도계             projects/speedometer/index.html"; echo "  폴더 트리맵               projects/treemap/index.html"; echo "  상태 뱃지                 projects/badge/index.html"; echo "  블로그 글 변환            notes/sample_post.html"; echo ""; echo "  자동화: 일일보고(09:00) + 주간정리(금 19:00) cron 등록됨" ;;
+    help|-h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//' ;;
+    *)       banner; banner_stats; echo ""; echo "  Try: hermes <status|tree|info|diag|watch|report|refresh|projects|backup|widget|dash|help>" ;;
+esac
