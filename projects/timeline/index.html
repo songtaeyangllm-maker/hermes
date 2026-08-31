@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes 활동 타임라인</title>
+<style>
+    :root {
+        --bg:#0b0b12; --card:#13131c; --text:#ececf5; --muted:#6b6f82;
+        --border:#23233a; --accent:#7c5cff;
+        --git:#5cd6ff; --diary:#5ce6a8; --report:#ffcf5c;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:40px 20px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:24px; padding:36px 42px; max-width:640px; width:100%; }
+    .header { display:flex; align-items:center; justify-content:space-between; margin-bottom:28px; }
+    .title { font-size:1.4rem; font-weight:700; }
+    .count { color:var(--muted); font-size:0.85rem; }
+
+    .filters { display:flex; gap:8px; margin-bottom:24px; }
+    .filter { padding:6px 14px; border-radius:18px; font-size:0.78rem; cursor:pointer; background:rgba(124,92,255,0.08); border:1px solid var(--border); color:var(--muted); }
+    .filter.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .filter:hover { color:var(--text); }
+
+    .timeline { position:relative; padding-left:28px; }
+    .timeline::before { content:''; position:absolute; left:8px; top:4px; bottom:4px; width:2px; background:var(--border); }
+
+    .event { position:relative; margin-bottom:22px; padding-left:16px; }
+    .event::before {
+        content:''; position:absolute; left:-24px; top:6px; width:12px; height:12px;
+        border-radius:50%; background:var(--card); border:3px solid var(--accent);
+        box-shadow:0 0 8px rgba(124,92,255,0.4);
+    }
+    .event.type-git::before { border-color:var(--git); box-shadow:0 0 8px rgba(92,214,255,0.4); }
+    .event.type-diary::before { border-color:var(--diary); box-shadow:0 0 8px rgba(92,230,168,0.4); }
+    .event.type-report::before { border-color:var(--report); box-shadow:0 0 8px rgba(255,207,92,0.4); }
+
+    .event-date { font-size:0.72rem; color:var(--muted); margin-bottom:3px; }
+    .event-title { font-weight:600; font-size:0.95rem; }
+    .event-type {
+        display:inline-block; font-size:0.62rem; padding:2px 8px; border-radius:10px;
+        margin-left:8px; vertical-align:middle; font-weight:600; text-transform:uppercase;
+    }
+    .type-git .event-type { background:rgba(92,214,255,0.15); color:var(--git); }
+    .type-diary .event-type { background:rgba(92,230,168,0.15); color:var(--diary); }
+    .type-report .event-type { background:rgba(255,207,92,0.15); color:var(--report); }
+    .event-detail { font-size:0.8rem; color:var(--muted); margin-top:4px; line-height:1.5; }
+    .event-ref { font-size:0.68rem; color:var(--accent); font-family:monospace; margin-top:2px; }
+
+    .empty { text-align:center; color:var(--muted); padding:30px; }
+    .btn { background:var(--accent); color:#fff; border:none; cursor:pointer; padding:9px 20px; border-radius:10px; font-size:0.82rem; font-weight:600; margin-top:6px; }
+</style>
+</head>
+<body>
+<div class="card">
+    <div class="header">
+        <div class="title">🕒 활동 타임라인</div>
+        <div class="count" id="count">—</div>
+    </div>
+    <div class="filters" id="filters">
+        <span class="filter active" data-f="all">전체</span>
+        <span class="filter" data-f="git">📦 git</span>
+        <span class="filter" data-f="diary">📔 일기</span>
+        <span class="filter" data-f="report">📊 보고서</span>
+    </div>
+    <div class="timeline" id="timeline"></div>
+    <div style="text-align:center;margin-top:20px">
+        <button class="btn" onclick="exportTXT()">💾 TXT 내보내기</button>
+    </div>
+</div>
+
+<script src="timeline_data.js"></script>
+<script>
+    const all = window.HERMES_TIMELINE || [];
+    let activeFilter = 'all';
+
+    const TYPE_LABEL = { git:'Commit', diary:'Diary', report:'Report' };
+
+    function fmt(iso) {
+        const d = new Date(iso);
+        return d.toLocaleString('ko-KR', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+    }
+    function fmtShort(iso) {
+        const d = new Date(iso);
+        return d.toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric' });
+    }
+
+    function render() {
+        const tl = document.getElementById('timeline');
+        const list = activeFilter === 'all' ? all : all.filter(e => e.type === activeFilter);
+        document.getElementById('count').textContent = `${list.length}개 이벤트`;
+        tl.innerHTML = '';
+        if (list.length === 0) {
+            tl.innerHTML = '<div class="empty">이벤트 없음</div>';
+            return;
+        }
+        list.forEach(e => {
+            const ev = document.createElement('div');
+            ev.className = `event type-${e.type}`;
+            const dateStr = e.type === 'git'
+                ? fmt(e.ts)
+                : fmtShort(e.ts) + (e.type === 'diary' ? ' · 일기' : '');
+            ev.innerHTML = `
+                <div class="event-date">${dateStr}</div>
+                <div class="event-title">${e.title}<span class="event-type">${TYPE_LABEL[e.type]||e.type}</span></div>
+                <div class="event-detail">${e.detail || ''}</div>
+                ${e.ref ? `<div class="event-ref">🔑 ${e.ref}</div>` : ''}`;
+            tl.appendChild(ev);
+        });
+    }
+
+    document.getElementById('filters').addEventListener('click', (ev) => {
+        const f = ev.target.closest('.filter');
+        if (!f) return;
+        activeFilter = f.dataset.f;
+        document.querySelectorAll('.filter').forEach(x => x.classList.toggle('active', x === f));
+        render();
+    });
+
+    function exportTXT() {
+        let txt = '# Hermes 활동 타임라인\n';
+        all.forEach(e => {
+            txt += `\n[${fmt(e.ts)}] ${e.title} (${TYPE_LABEL[e.type]||e.type})\n`;
+            if (e.detail) txt += `  ${e.detail}\n`;
+            if (e.ref) txt += `  ref: ${e.ref}\n`;
+        });
+        const blob = new Blob([txt], { type:'text/plain;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'hermes-timeline.txt';
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    render();
+</script>
+</body>
+</html>

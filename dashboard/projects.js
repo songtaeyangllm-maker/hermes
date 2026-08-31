@@ -62,5 +62,21 @@ window.HERMES_PROJECTS = [
     "path": "C:/hermes/projects/badge",
     "created": "2026-08-31",
     "updated": "2026-08-31 17:45"
+  },
+  {
+    "name": "Wordcloud",
+    "status": "active",
+    "description": "노트 단어 워드클라우드",
+    "path": "C:/hermes/projects/wordcloud",
+    "created": "2026-08-31",
+    "updated": "2026-08-31 17:57"
+  },
+  {
+    "name": "Timeline",
+    "status": "active",
+    "description": "활동 로그 타임라인",
+    "path": "C:/hermes/projects/timeline",
+    "created": "2026-08-31",
+    "updated": "2026-08-31 17:57"
   }
 ];
