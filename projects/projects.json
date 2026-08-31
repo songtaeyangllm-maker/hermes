@@ -102,5 +102,29 @@
     "path": "C:/hermes/projects/showcase",
     "created": "2026-08-31",
     "updated": "2026-08-31 18:03"
+  },
+  {
+    "name": "Breakout",
+    "status": "active",
+    "description": "벽돌깨기 게임",
+    "path": "C:/hermes/projects/breakout",
+    "created": "2026-08-31",
+    "updated": "2026-08-31 18:08"
+  },
+  {
+    "name": "Fortune",
+    "status": "active",
+    "description": "운세/명언 위젯",
+    "path": "C:/hermes/projects/fortune",
+    "created": "2026-08-31",
+    "updated": "2026-08-31 18:08"
+  },
+  {
+    "name": "Command Center",
+    "status": "active",
+    "description": "마스터 대시보드",
+    "path": "C:/hermes/projects/command_center",
+    "created": "2026-08-31",
+    "updated": "2026-08-31 18:08"
   }
 ]

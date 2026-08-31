@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Breakout</title>
+<style>
+    :root { --bg:#0b0b12; --card:#13131c; --text:#ececf5; --muted:#6b6f82; --border:#23233a; --accent:#7c5cff; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:30px 20px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:24px; padding:26px 28px; text-align:center; max-width:560px; width:100%; }
+    .title { font-size:1.5rem; font-weight:800; margin-bottom:4px; }
+    .title span { color:var(--accent); }
+
+    .hud { display:flex; justify-content:space-between; align-items:center; margin:16px 0 12px; gap:10px; }
+    .stat { background:rgba(124,92,255,0.1); border:1px solid var(--border); border-radius:12px; padding:6px 16px; min-width:80px; }
+    .stat .l { font-size:0.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; }
+    .stat .v { font-size:1.3rem; font-weight:800; color:var(--accent); }
+    .lives .v { color:#ff7c9e; }
+
+    canvas { background:#0d0d17; border:1px solid var(--border); border-radius:14px; display:block; margin:0 auto; max-width:100%; cursor:none; touch-action:none; }
+
+    .controls { display:flex; gap:10px; justify-content:center; margin-top:16px; flex-wrap:wrap; }
+    .btn { background:var(--accent); color:#fff; border:none; cursor:pointer; padding:10px 20px; border-radius:12px; font-size:0.9rem; font-weight:700; transition:transform 0.15s; }
+    .btn:hover { transform:translateY(-2px); }
+    .btn.ghost { background:transparent; border:1px solid var(--border); color:var(--text); }
+
+    .settings { display:flex; gap:14px; justify-content:center; align-items:center; margin-top:14px; font-size:0.8rem; color:var(--muted); flex-wrap:wrap; }
+    .settings select { background:#0d0d17; color:var(--text); border:1px solid var(--border); border-radius:8px; padding:5px 10px; font-size:0.8rem; }
+    .hint { margin-top:14px; font-size:0.75rem; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="card">
+    <div class="title">🧱 <span>HERMES</span> BREAKOUT</div>
+    <div class="hud">
+        <div class="stat"><div class="l">Score</div><div class="v" id="score">0</div></div>
+        <div class="stat"><div class="l">Level</div><div class="v" id="level">1</div></div>
+        <div class="stat lives"><div class="l">Lives</div><div class="v" id="lives">3</div></div>
+    </div>
+
+    <canvas id="game" width="520" height="440"></canvas>
+
+    <div class="controls">
+        <button class="btn" onclick="toggle()">▶️ 시작</button>
+        <button class="btn ghost" onclick="resetGame()">🔄 리셋</button>
+    </div>
+
+    <div class="settings">
+        <label>속도 <select id="speed" onchange="applySpeed()">
+            <option value="1.0">보통</option>
+            <option value="0.75">느림</option>
+            <option value="1.3">빠름</option>
+        </select></label>
+        <label>테마 <select id="theme" onchange="applyTheme()">
+            <option value="neon" selected>네온</option>
+            <option value="ocean">오션</option>
+            <option value="candy">캔디</option>
+        </select></label>
+    </div>
+    <div class="hint">마우스/터치로 패들 이동 · 모든 벽돌을 깨세요</div>
+</div>
+
+<script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+
+    const THEMES = {
+        neon:  { bg:'#0d0d17', paddle:'#b39cff', ball:'#7c5cff', bricks:['#7c5cff','#5c8aff','#5ce6a8','#ffcf5c','#ff7c9e'], wall:'#23233a' },
+        ocean: { bg:'#0a1622', paddle:'#5cd6ff', ball:'#2a9d8f', bricks:['#2a9d8f','#457b9d','#a8dadc','#e9c46a','#264653'], wall:'#1a3550' },
+        candy: { bg:'#1a0f1e', paddle:'#ff7c9e', ball:'#ffcf5c', bricks:['#ff7c9e','#ff9f43','#ffd93d','#6bcb77','#b657ff'], wall:'#382a4a' },
+    };
+
+    const COLS = 8, ROWS = 5;
+    let brickW, brickH, brickGap, brickTop;
+    let bricks = [];
+    let paddle, ball, score, lives, level, running, gameOver, raf;
+    let speedMul = 1.0;
+    let theme = 'neon';
+    let started = false;
+
+    function buildBricks() {
+        brickGap = 8;
+        brickTop = 50;
+        const pad = 16;
+        brickW = (W - pad*2 - (COLS-1)*brickGap) / COLS;
+        brickH = 22;
+        bricks = [];
+        const th = THEMES[theme].bricks;
+        for (let r=0; r<ROWS; r++) {
+            for (let c=0; c<COLS; c++) {
+                bricks.push({
+                    x: pad + c*(brickW+brickGap),
+                    y: brickTop + r*(brickH+brickGap),
+                    w: brickW, h: brickH,
+                    alive: true,
+                    color: th[r % th.length],
+                });
+            }
+        }
+    }
+
+    function resetGame() {
+        paddle = { x: W/2 - 45, y: H-28, w: 90, h: 12 };
+        ball = { x: W/2, y: H-40, vx: 4*speedMul, vy: -4*speedMul, r: 7 };
+        score = 0; lives = 3; level = 1; running = false; gameOver = false; started = false;
+        buildBricks();
+        updateHUD();
+        draw();
+    }
+
+    function updateHUD() {
+        document.getElementById('score').textContent = score;
+        document.getElementById('level').textContent = level;
+        document.getElementById('lives').textContent = lives;
+    }
+
+    function draw() {
+        const th = THEMES[theme];
+        ctx.fillStyle = th.bg; ctx.fillRect(0,0,W,H);
+        // wall line
+        ctx.strokeStyle = th.wall; ctx.lineWidth = 3;
+        ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(0,40); ctx.lineTo(W,40); ctx.stroke();
+        // bricks
+        bricks.forEach(b => {
+            if (!b.alive) return;
+            ctx.fillStyle = b.color;
+            ctx.shadowColor = b.color; ctx.shadowBlur = 8;
+            ctx.beginPath();
+            ctx.roundRect(b.x, b.y, b.w, b.h, 6);
+            ctx.fill();
+            // shine
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(255,255,255,0.15)';
+            ctx.fillRect(b.x+3, b.y+3, b.w-6, 4);
+        });
+        // paddle
+        ctx.fillStyle = th.paddle; ctx.shadowColor = th.paddle; ctx.shadowBlur = 14;
+        ctx.beginPath(); ctx.roundRect(paddle.x, paddle.y, paddle.w, paddle.h, 7); ctx.fill();
+        ctx.shadowBlur = 0;
+        // ball
+        ctx.fillStyle = th.ball; ctx.shadowColor = th.ball; ctx.shadowBlur = 12;
+        ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+
+    function loop() {
+        if (!running || gameOver) return;
+        moveBall();
+        draw();
+        raf = requestAnimationFrame(loop);
+    }
+
+    function moveBall() {
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+        // walls
+        if (ball.x < ball.r) { ball.x = ball.r; ball.vx = Math.abs(ball.vx); }
+        if (ball.x > W-ball.r) { ball.x = W-ball.r; ball.vx = -Math.abs(ball.vx); }
+        if (ball.y < ball.r+38) { ball.y = ball.r+38; ball.vy = Math.abs(ball.vy); }
+        // paddle
+        if (ball.vy > 0 && ball.y + ball.r >= paddle.y && ball.y + ball.r <= paddle.y + paddle.h + 6 &&
+            ball.x >= paddle.x - ball.r && ball.x <= paddle.x + paddle.w + ball.r) {
+            ball.vy = -Math.abs(ball.vy);
+            // angle by hit position
+            const hit = (ball.x - (paddle.x + paddle.w/2)) / (paddle.w/2);
+            ball.vx = hit * 5 * speedMul;
+        }
+        // bricks
+        for (let i=0; i<bricks.length; i++) {
+            const b = bricks[i];
+            if (!b.alive) continue;
+            if (ball.x + ball.r > b.x && ball.x - ball.r < b.x + b.w &&
+                ball.y + ball.r > b.y && ball.y - ball.r < b.y + b.h) {
+                b.alive = false;
+                score += 10 * level;
+                // bounce
+                if (ball.x < b.x || ball.x > b.x+b.w) ball.vx *= -1;
+                else ball.vy *= -1;
+                updateHUD();
+                if (bricks.every(x => !x.alive)) nextLevel();
+                return;
+            }
+        }
+        // fall
+        if (ball.y > H + 20) loseLife();
+    }
+
+    function nextLevel() {
+        level++;
+        updateHUD();
+        buildBricks();
+        ball = { x: W/2, y: H-40, vx: 4*speedMul, vy: -4*speedMul, r: 7 };
+        startLoop();
+    }
+
+    function loseLife() {
+        lives--;
+        updateHUD();
+        if (lives <= 0) {
+            running = false; gameOver = true;
+            setTimeout(() => draw(), 0);
+            return;
+        }
+        ball = { x: W/2, y: H-40, vx: 4*speedMul, vy: -4*speedMul, r: 7 };
+    }
+
+    function toggle() {
+        if (gameOver) resetGame();
+        running = !running;
+        if (running) startLoop();
+    }
+    function startLoop() {
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(loop);
+    }
+
+    function applySpeed() {
+        speedMul = parseFloat(document.getElementById('speed').value);
+        ball.vx = Math.sign(ball.vx) * 4 * speedMul;
+        ball.vy = Math.sign(ball.vy) * 4 * speedMul;
+    }
+    function applyTheme() { theme = document.getElementById('theme').value; buildBricks(); draw(); }
+
+    // mouse
+    canvas.addEventListener('mousemove', e => {
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left) * (W / rect.width);
+        paddle.x = Math.max(5, Math.min(W - paddle.w - 5, x - paddle.w/2));
+    });
+    // touch
+    canvas.addEventListener('touchmove', e => {
+        e.preventDefault();
+        const t = e.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        paddle.x = (t.clientX - rect.left) * (W/rect.width) - paddle.w/2;
+        paddle.x = Math.max(5, Math.min(W - paddle.w - 5, paddle.x));
+    }, { passive:false });
+
+    // spacebar
+    document.addEventListener('keydown', e => {
+        if (e.key === ' ') { e.preventDefault(); toggle(); }
+    });
+
+    resetGame();
+</script>
+</body>
+</html>
