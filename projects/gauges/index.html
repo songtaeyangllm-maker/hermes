@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Live Gauges</title>
+<style>
+:root { --bg:#0b0b12; --card:#12121c; --text:#ececf5; --muted:#6b6f82; --border:#22223a; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px; }
+h1 { font-size:1.3rem; font-weight:800; margin-bottom:4px; }
+h1 span { color:#7c5cff; }
+.sub { color:var(--muted); font-size:0.8rem; margin-bottom:30px; }
+.gauges { display:flex; gap:34px; flex-wrap:wrap; justify-content:center; }
+.gauge-card { background:var(--card); border:1px solid var(--border); border-radius:24px; padding:28px 26px; text-align:center; width:230px; }
+.gauge-card .gname { font-size:0.78rem; color:var(--muted); text-transform:uppercase; letter-spacing:1.5px; margin-bottom:16px; }
+.ring { width:150px; height:150px; margin:0 auto 18px; position:relative; }
+.ring svg { width:100%; height:100%; transform:rotate(-90deg); }
+.ring .bg { fill:none; stroke:#1c1c2a; stroke-width:11; }
+.ring .fg { fill:none; stroke-width:11; stroke-linecap:round; transition:stroke-dashoffset 0.8s ease, stroke 0.5s; }
+.ring .val { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.ring .num { font-size:1.7rem; font-weight:800; font-variant-numeric:tabular-nums; }
+.ring .unit { font-size:0.7rem; color:var(--muted); }
+.detail { font-size:0.78rem; color:var(--muted); min-height:32px; line-height:1.5; }
+.status { margin-top:28px; font-size:0.75rem; color:var(--muted); display:flex; align-items:center; gap:8px; }
+.dot { width:8px; height:8px; border-radius:50%; background:#ff6b6b; }
+.dot.live { background:#5ce6a8; box-shadow:0 0 8px #5ce6a8; animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+</style>
+</head>
+<body>
+    <h1>◉ <span>LIVE</span> GAUGES</h1>
+    <div class="sub">실시간 시스템 상태 · 2초 갱신</div>
+
+    <div class="gauges" id="gauges"></div>
+
+    <div class="status"><div class="dot" id="dot"></div><span id="statusText">API 서버 연결 확인 중...</span></div>
+
+<script>
+const CIRC = 2 * Math.PI * 58; // r = 58 (150px - stroke)
+
+const GAUGES = [
+    { id:'cpu', name:'CPU', color:'#7c5cff', unit:'%', max:100 },
+    { id:'mem', name:'메모리', color:'#5c8aff', unit:'%', max:100 },
+    { id:'disk', name:'디스크', color:'#5ce6a8', unit:'%', max:100 },
+];
+
+const container = document.getElementById('gauges');
+const state = {};
+
+GAUGES.forEach(g => {
+    state[g.id] = { val: 0 };
+    const card = document.createElement('div');
+    card.className = 'gauge-card';
+    card.innerHTML = `
+        <div class="gname">${g.name}</div>
+        <div class="ring">
+            <svg viewBox="0 0 150 150">
+                <circle class="bg" cx="75" cy="75" r="58"/>
+                <circle class="fg" id="fg_${g.id}" cx="75" cy="75" r="58" stroke="${g.color}" stroke-dasharray="${CIRC}" stroke-dashoffset="${CIRC}"/>
+            </svg>
+            <div class="val"><div class="num" id="num_${g.id}">0</div><div class="unit">${g.unit}</div></div>
+        </div>
+        <div class="detail" id="det_${g.id}">측정 대기</div>`;
+    container.appendChild(card);
+});
+
+function setGauge(id, pct, detail) {
+    const fg = document.getElementById('fg_' + id);
+    const num = document.getElementById('num_' + id);
+    const det = document.getElementById('det_' + id);
+    pct = Math.max(0, Math.min(100, pct));
+    fg.style.strokeDashoffset = CIRC * (1 - pct / 100);
+    num.textContent = Math.round(pct);
+    if (detail) det.textContent = detail;
+    state[id].val = pct;
+}
+
+async function refresh() {
+    try {
+        const r = await fetch('http://127.0.0.1:8765/api/status');
+        if (!r.ok) throw new Error('bad status');
+        const d = await r.json();
+        const mem = d.memory || {};
+        const disk = d.disk || {};
+        setGauge('cpu', d.cpu || 0, '프로세스 ' + (d.processes || 0) + '개');
+        setGauge('mem', mem.percent || 0, (mem.used_gb||0) + ' / ' + (mem.total_gb||0) + ' GB');
+        setGauge('disk', disk.percent || 0, '여유 ' + Math.round((disk.free_gb||0)/1073741824) + ' GB');
+        document.getElementById('dot').classList.add('live');
+        document.getElementById('statusText').textContent = '● 라이브 · ' + new Date().toLocaleTimeString('ko-KR');
+    } catch (e) {
+        document.getElementById('dot').classList.remove('live');
+        document.getElementById('statusText').textContent = 'API 서버 꺼짐 — 터미널에서 "hermes api" 실행 후 새로고침';
+    }
+}
+
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>

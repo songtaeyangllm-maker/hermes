@@ -182,5 +182,21 @@
     "path": "C:/hermes/projects/poster",
     "created": "2026-08-31",
     "updated": "2026-08-31 18:27"
+  },
+  {
+    "name": "Gauges",
+    "status": "active",
+    "description": "실시간 원형 게이지",
+    "path": "C:/hermes/projects/gauges",
+    "created": "2026-08-31",
+    "updated": "2026-08-31 18:35"
+  },
+  {
+    "name": "Smoke",
+    "status": "active",
+    "description": "통합 스모크테스트",
+    "path": "C:/hermes/tools/smoke.py",
+    "created": "2026-08-31",
+    "updated": "2026-08-31 18:35"
   }
 ]
