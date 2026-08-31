@@ -158,5 +158,13 @@
     "path": "C:/hermes/tools/api_server.py",
     "created": "2026-08-31",
     "updated": "2026-08-31 18:21"
+  },
+  {
+    "name": "Hermes OS",
+    "status": "active",
+    "description": "미니 OS 바탕화면 런처",
+    "path": "C:/hermes/projects/hermes_os",
+    "created": "2026-08-31",
+    "updated": "2026-08-31 18:23"
   }
 ]

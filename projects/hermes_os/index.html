@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes OS</title>
+<style>
+:root { --bg:#0d0d16; --card:rgba(255,255,255,0.05); --text:#ececf5; --muted:#8a8fa3; --border:rgba(255,255,255,0.09); --accent:#7c5cff; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(124,92,255,0.18), transparent 60%),
+    radial-gradient(900px 500px at 10% 110%, rgba(92,138,255,0.12), transparent 60%),
+    var(--bg); color:var(--text); height:100vh; overflow:hidden; position:relative; }
+.star { position:absolute; background:#fff; border-radius:50%; opacity:0.4; animation:twinkle 3s infinite; }
+@keyframes twinkle { 0%,100%{opacity:0.2} 50%{opacity:0.7} }
+
+/* Status bar */
+.topbar { position:fixed; top:0; left:0; right:0; height:44px; display:flex; align-items:center; justify-content:space-between; padding:0 22px; background:rgba(13,13,22,0.75); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); z-index:20; font-size:0.8rem; }
+.topbar .brand { font-weight:800; letter-spacing:1px; }
+.topbar .brand span { color:var(--accent); }
+.topbar .sys { display:flex; gap:20px; color:var(--muted); font-variant-numeric:tabular-nums; }
+.topbar .sys b { color:var(--text); }
+
+/* Desktop */
+.desktop { position:fixed; top:44px; bottom:64px; left:0; right:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); align-content:start; gap:8px; padding:26px 30px; overflow-y:auto; }
+.icon { display:flex; flex-direction:column; align-items:center; gap:8px; padding:14px 6px; border-radius:14px; cursor:pointer; transition:all .15s; border:1px solid transparent; text-align:center; }
+.icon:hover { background:var(--card); border-color:var(--border); transform:translateY(-2px); }
+.icon .glyph { width:54px; height:54px; border-radius:15px; display:flex; align-items:center; justify-content:center; font-size:1.6rem; background:linear-gradient(135deg,#242438,#1a1a2c); border:1px solid var(--border); box-shadow:0 4px 14px rgba(0,0,0,0.35); }
+.icon .lbl { font-size:0.72rem; color:var(--text); line-height:1.3; word-break:keep-all; }
+.icon .cat { font-size:0.6rem; color:var(--muted); }
+
+/* Dock */
+.dock { position:fixed; bottom:0; left:0; right:0; height:64px; display:flex; align-items:center; justify-content:center; gap:6px; background:rgba(13,13,22,0.75); backdrop-filter:blur(12px); border-top:1px solid var(--border); z-index:20; }
+.dock .dicon { width:46px; height:46px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.4rem; background:var(--card); border:1px solid var(--border); cursor:pointer; transition:all .15s; }
+.dock .dicon:hover { transform:translateY(-4px); background:rgba(124,92,255,0.2); border-color:var(--accent); }
+
+/* Launcher overlay (live apps open in iframe) */
+.launcher { position:fixed; inset:44px 0 64px; background:rgba(8,8,14,0.97); z-index:30; display:none; flex-direction:column; }
+.launcher.open { display:flex; }
+.launcher .head { display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid var(--border); }
+.launcher iframe { flex:1; border:none; background:#fff; }
+.launcher .close { cursor:pointer; padding:8px 14px; border-radius:10px; background:var(--accent); color:#fff; font-weight:700; border:none; font-size:0.85rem; }
+.blur { filter:blur(4px) brightness(0.6); pointer-events:none; }
+</style>
+</head>
+<body>
+<div class="topbar">
+    <div class="brand">◈ <span>HERMES</span> OS</div>
+    <div class="sys">
+        <span>CPU <b id="sCpu">―</b>%</span>
+        <span>MEM <b id="sMem">―</b>%</span>
+        <span id="sTime">--:--:--</span>
+        <span id="sDate"></span>
+    </div>
+</div>
+
+<div class="desktop" id="desktop"></div>
+
+<div class="dock" id="dock"></div>
+
+<div class="launcher" id="launcher">
+    <div class="head"><span id="appTitle">App</span><button class="close" onclick="closeLauncher()">✕ 닫기</button></div>
+    <iframe id="appFrame"></iframe>
+</div>
+
+<script>
+// App catalog: all workspace widgets/tools
+const APPS = [
+    // 대시보드 & 정보
+    { g:'🖥️', l:'커맨드센터', c:'dashboard', p:'../command_center/index.html' },
+    { g:'📊', l:'개인 대시보드', c:'dashboard', p:'../../dashboard/index.html' },
+    { g:'🏅', l:'상태 뱃지', c:'dashboard', p:'../badge/index.html' },
+    // 창작 시각화
+    { g:'🗂️', l:'폴더 트리맵', c:'creative', p:'../treemap/index.html' },
+    { g:'📔', l:'일기 히트맵', c:'creative', p:'../diary_heatmap/index.html' },
+    { g:'⏱️', l:'활동 타임라인', c:'creative', p:'../timeline/index.html' },
+    { g:'☁️', l:'워드클라우드', c:'creative', p:'../wordcloud/wc.png', img:true },
+    { g:'⚡', l:'인터넷 속도계', c:'creative', p:'../speedometer/index.html' },
+    { g:'📡', l:'SNS 상태 위젯', c:'creative', p:'../sns_showcase/status_widget.html' },
+    { g:'🍀', l:'운세 & 명언', c:'creative', p:'../fortune/index.html' },
+    // 게임
+    { g:'🐍', l:'스네이크', c:'game', p:'../snake/index.html' },
+    { g:'🧱', l:'벽돌깨기', c:'game', p:'../breakout/index.html' },
+    { g:'⌨️', l:'타이핑', c:'game', p:'../typing/index.html' },
+    // 생산성
+    { g:'🍅', l:'포모도로', c:'productivity', p:'../pomodoro/index.html' },
+    { g:'🧮', l:'Dev 계산기', c:'productivity', p:'../devcalc/index.html' },
+    { g:'🔍', l:'정규식 테스터', c:'productivity', p:'../regex/index.html' },
+    // SNS
+    { g:'🛍️', l:'공유 갤러리', c:'share', p:'../showcase/index.html' },
+];
+
+const CATS = { dashboard:'대시보드', creative:'창작', game:'게임', productivity:'생산성', share:'공유' };
+const CAT_COLOR = { dashboard:'#7c5cff', creative:'#5c8aff', game:'#5ce6a8', productivity:'#ffd166', share:'#ff6b9d' };
+
+const desktop = document.getElementById('desktop');
+
+// Desktop icons grouped by category
+Object.keys(CATS).forEach(cat => {
+    const apps = APPS.filter(a => a.c === cat);
+    if (apps.length) {
+        const catEl = document.createElement('div');
+        catEl.style.cssText = 'grid-column:1/-1;font-size:0.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:2px;margin:8px 4px 4px;';
+        catEl.style.color = CAT_COLOR[cat];
+        catEl.textContent = CATS[cat];
+        desktop.appendChild(catEl);
+        apps.forEach(a => {
+            const el = document.createElement('div');
+            el.className = 'icon';
+            el.innerHTML = `<div class="glyph">${a.g}</div><div class="lbl">${a.l}</div>`;
+            el.onclick = () => openApp(a);
+            desktop.appendChild(el);
+        });
+    }
+});
+
+// Dock — quick launch favorites
+const dock = document.getElementById('dock');
+[APPS[0], APPS[4], APPS[9], APPS[11], APPS[13], APPS[16]].forEach(a => {
+    const d = document.createElement('div');
+    d.className = 'dicon';
+    d.textContent = a.g;
+    d.title = a.l;
+    d.onclick = () => openApp(a);
+    dock.appendChild(d);
+});
+
+function openApp(a) {
+    if (a.img) {
+        window.open(a.p, '_blank');
+        return;
+    }
+    document.getElementById('appTitle').textContent = a.g + ' ' + a.l;
+    const frame = document.getElementById('appFrame');
+    frame.src = a.p;
+    document.getElementById('launcher').classList.add('open');
+    document.querySelector('.desktop').classList.add('blur');
+}
+function closeLauncher() {
+    document.getElementById('launcher').classList.remove('open');
+    document.getElementById('appFrame').src = 'about:blank';
+    document.querySelector('.desktop').classList.remove('blur');
+}
+
+// Clock + date
+function tickTime() {
+    const d = new Date();
+    document.getElementById('sTime').textContent = d.toLocaleTimeString('ko-KR');
+    document.getElementById('sDate').textContent = d.toLocaleDateString('ko-KR', {weekday:'short', month:'short', day:'numeric'});
+}
+setInterval(tickTime, 1000); tickTime();
+
+// Stars background
+for (let i=0;i<70;i++){
+    const s=document.createElement('div'); s.className='star';
+    const sz=Math.random()*2+1;
+    s.style.cssText=`width:${sz}px;height:${sz}px;left:${Math.random()*100}%;top:${Math.random()*100}%;animation-delay:${Math.random()*3}s`;
+    document.body.appendChild(s);
+}
+
+// Live system metrics from local API (falls back quietly)
+async function refreshSys(){
+    try{
+        const r=await fetch('http://127.0.0.1:8765/api/status');
+        if(r.ok){const d=await r.json();
+            document.getElementById('sCpu').textContent=Math.round(d.cpu||0);
+            document.getElementById('sMem').textContent=d.memory?Math.round(d.memory.percent):'―';
+        }
+    }catch(e){}
+}
+refreshSys(); setInterval(refreshSys, 5000);
+</script>
+</body>
+</html>
