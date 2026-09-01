@@ -326,5 +326,13 @@
     "path": "C:/hermes/projects/ray",
     "created": "2026-09-01",
     "updated": "2026-09-01 10:43"
+  },
+  {
+    "name": "SolarSystem",
+    "status": "active",
+    "description": "태양계 궤도 시뮬레이터(8행성)",
+    "path": "C:/hermes/projects/solar",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 10:44"
   }
 ]

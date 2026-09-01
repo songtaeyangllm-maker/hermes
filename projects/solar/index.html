@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Solar System</title>
+<style>
+:root { --bg:#05070e; --text:#dbe4f0; --muted:#6b7686; --card:#0d1424; --border:#1c2a44; --accent:#5b8cff; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; display:flex; flex-direction:column; align-items:center; gap:14px; padding:20px; min-height:100vh; }
+h1{ font-size:20px; letter-spacing:2px; }
+h1 span{ color:var(--accent); }
+.sub{ color:var(--muted); font-size:13px; }
+#cv{ background:radial-gradient(circle at 50% 45%, #0b1020, #05070e 70%); border:1px solid var(--border); border-radius:14px; display:block; box-shadow:0 10px 40px rgba(0,0,0,.5); }
+.panel{ background:var(--card); border:1px solid var(--border); border-radius:10px; padding:12px 18px; display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+.lbl{ font-size:12px; color:var(--muted); }
+input[type=range]{ accent-color:var(--accent); width:140px; }
+.badge{ background:var(--card); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-size:12px; color:var(--muted); }
+.badge b{ color:var(--text); }
+</style>
+</head>
+<body>
+<h1>☀️ SOLAR <span>SYSTEM</span></h1>
+<div class="sub">실제 궤도 비율로 도는 태양계 · 클릭해서 행성 정보 보기</div>
+<canvas id="cv" width="760" height="640"></canvas>
+<div class="panel">
+  <span class="lbl">속도</span>
+  <input type="range" id="spd" min="0" max="400" value="90">
+  <span class="badge">공전 <b id="sval">1x</b></span>
+  <span class="badge">🪐 <b id="sel">태양</b></span>
+  <span class="badge">일수 <b id="day">0</b></span>
+</div>
+<script>
+const cv=document.getElementById('cv'), c=cv.getContext('2d');
+const W=cv.width,H=cv.height, CX=W/2, CY=H/2+10;
+// planets: [name, orbitRadius, angularSpeed(deg/day scaled), size, color, fact]
+const P=[
+  ['수성',60, 4.15, 5, '#aab2bd','지구의 0.39배 거리 · 하루가 지구의 59일'],
+  ['금성',86, 1.62, 7, '#e6c07a','역회전 · 가장 뜨거운 행성 465°C'],
+  ['지구',112,1.0, 8, '#5b8cff','우리의 푸른 별 · 달 1개'],
+  ['화성',138,0.53, 6, '#d97a4a','붉은 행성 · 올림푸스 산 최고봉'],
+  ['목성',182,0.084,16,'#d8a05a','최대 행성 · 대적반 폭풍'],
+  ['토성',226,0.034,14,'#e6cf9a','고리 시스템 · 밀도 물보다 낮음'],
+  ['천왕성',270,0.012,10,'#7ad0e0','옆으로 누운 행성 98°'],
+  ['해왕성',312,0.006,10,'#5a7ad0','가장 빠른 바람 2100km/h'],
+];
+const speed=document.getElementById('spd'), sval=document.getElementById('sval'), sel=document.getElementById('sel'), dayEl=document.getElementById('day');
+const stars=[]; for(let i=0;i<220;i++)stars.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.4+0.3,tw:Math.random()*Math.PI*2});
+let day=0, selPlanet=null;
+speed.addEventListener('input',()=>sval.textContent=(speed.value/90).toFixed(1)+'x');
+cv.addEventListener('click',e=>{
+  const r=cv.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+  selPlanet=null; sel.textContent='태양';
+  for(const pl of P){ const a=pl[4]*(day/pl[3]/(360/pl[2])); const ang=-a*Math.PI/180; const x=CX+pl[1]*Math.cos(ang), y=CY+pl[1]*Math.sin(ang);
+    if(Math.hypot(mx-x,my-y)<=pl[4]+6){ selPlanet=pl; sel.textContent=pl[0]+' · '+pl[5]; break; } }
+});
+let last=performance.now();
+function frame(now){
+  const dt=Math.min((now-last)/1000,0.05); last=now;
+  day += dt*speed.value/90*4.1; // ~4.1 days/sec at 1x
+  dayEl.textContent=Math.round(day);
+  c.clearRect(0,0,W,H);
+  // stars
+  for(const s of stars){ c.globalAlpha=0.5+0.5*Math.sin(s.tw+now/600); c.fillStyle='#fff'; c.beginPath(); c.arc(s.x,s.y,s.r,0,7); c.fill(); }
+  c.globalAlpha=1;
+  // sun glow
+  const g=c.createRadialGradient(CX,CY,0,CX,CY,40); g.addColorStop(0,'#fff7d0'); g.addColorStop(0.2,'#ffd95e'); g.addColorStop(0.5,'#ff9d2e'); g.addColorStop(1,'rgba(255,120,20,0)');
+  c.fillStyle=g; c.beginPath(); c.arc(CX,CY,40,0,7); c.fill();
+  c.fillStyle='#fff2b0'; c.beginPath(); c.arc(CX,CY,13,0,7); c.fill();
+  // orbits & planets
+  for(const pl of P){
+    const rad=pl[1];
+    c.strokeStyle='rgba(90,120,180,0.18)'; c.lineWidth=1; c.beginPath(); c.arc(CX,CY,rad,0,7); c.stroke();
+  }
+  for(const pl of P){
+    const a=pl[4]*(day/pl[3]/(360/pl[2])); const ang=-a*Math.PI/180;
+    const x=CX+pl[1]*Math.cos(ang), y=CY+pl[1]*Math.sin(ang);
+    // glow
+    c.fillStyle=pl[5]; c.globalAlpha=0.15; c.beginPath(); c.arc(x,y,pl[4]*2.2,0,7); c.fill(); c.globalAlpha=1;
+    c.fillStyle=pl[5]; c.beginPath(); c.arc(x,y,pl[4],0,7); c.fill();
+    // saturn ring
+    if(pl[0]==='토성'){ c.strokeStyle='rgba(230,207,154,0.7)'; c.lineWidth=3; c.beginPath(); c.ellipse(x,y,pl[4]*1.9,pl[4]*0.7,-0.5,0,7); c.stroke(); }
+    c.fillStyle='#cdd8e8'; c.font='11px sans-serif'; c.textAlign='center'; c.fillText(pl[0],x,y+pl[4]+12);
+    if(selPlanet===pl){ c.strokeStyle='#fff'; c.lineWidth=1.5; c.beginPath(); c.arc(x,y,pl[4]+5,0,7); c.stroke(); }
+  }
+  // earth moon
+  const ea=P[2][4]*(day/P[2][3]/360); const ex=CX+P[2][1]*Math.cos(-ea*Math.PI/180), ey=CY+P[2][1]*Math.sin(-ea*Math.PI/180);
+  const ma=ea*13; const mx2=ex+14*Math.cos(-ma*Math.PI/180), my2=ey+14*Math.sin(-ma*Math.PI/180);
+  c.fillStyle='#ccc'; c.beginPath(); c.arc(mx2,my2,3,0,7); c.fill();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
