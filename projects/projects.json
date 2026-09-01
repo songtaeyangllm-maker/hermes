@@ -214,5 +214,29 @@
     "path": "C:/hermes/projects/analytics",
     "created": "2026-09-01",
     "updated": "2026-09-01 10:05"
+  },
+  {
+    "name": "2048",
+    "status": "active",
+    "description": "2048 퍼즐 게임",
+    "path": "C:/hermes/projects/g2048",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 10:10"
+  },
+  {
+    "name": "TicTacToe",
+    "status": "active",
+    "description": "틱택토 (미니맥스 AI)",
+    "path": "C:/hermes/projects/gttt",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 10:10"
+  },
+  {
+    "name": "GameHub",
+    "status": "active",
+    "description": "미니게임 컬렉션 허브",
+    "path": "C:/hermes/projects/gamehub",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 10:10"
   }
 ]

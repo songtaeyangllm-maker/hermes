@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Game Hub</title>
+<style>
+:root { --bg:#0b0b12; --card:#14141f; --border:#23233a; --text:#ececf5; --muted:#6b6f82; --accent:#7c5cff; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; background:var(--bg); color:var(--text); padding:34px 22px; }
+.wrap { max-width:980px; margin:0 auto; }
+.head h1 { font-size:1.6rem; font-weight:800; } .head h1 span{color:var(--accent);} 
+.head p { color:var(--muted); font-size:0.85rem; margin-top:5px; }
+.hub { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; margin-top:22px; }
+.game { background:var(--card); border:1px solid var(--border); border-radius:18px; padding:20px; cursor:pointer; transition:all .2s; position:relative; overflow:hidden; }
+.game:hover { transform:translateY(-4px); border-color:var(--accent); box-shadow:0 8px 30px rgba(124,92,255,0.15); }
+.game .ico { font-size:2.4rem; margin-bottom:10px; }
+.game h3 { font-size:1rem; font-weight:800; }
+.game .d { color:var(--muted); font-size:0.76rem; margin-top:5px; line-height:1.5; min-height:44px; }
+.game .tag { display:inline-block; margin-top:10px; font-size:0.62rem; padding:3px 9px; border-radius:20px; background:var(--bg); border:1px solid var(--border); color:var(--muted); font-weight:700; }
+.game .play { position:absolute; top:14px; right:14px; font-size:1.3rem; opacity:0; transition:opacity .2s; }
+.game:hover .play { opacity:1; }
+.stats { display:flex; gap:22px; margin-top:18px; color:var(--muted); font-size:0.8rem; }
+.stats b { color:var(--accent); font-size:1.2rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <div class="head">
+        <h1>🎮 <span>GAME HUB</span></h1>
+        <p>허미즈 미니게임 컬렉션 — 클릭해서 바로 플레이</p>
+        <div class="stats">
+            <div><b id="gameCount">0</b> 게임</div>
+            <div><b>∞</b> 재미</div>
+        </div>
+    </div>
+    <div class="hub" id="hub"></div>
+</div>
+<script>
+const GAMES = [
+    { ico:'🐍', name:'스네이크', d:'고전 스네이크. 음식을 먹고 성장, 점수 & 속도 조절, 다크 테마', tag:'아케이드', path:'../snake/index.html' },
+    { ico:'🔢', name:'2048', d:'타일을 합쳐 2048에 도전. 키보드/스와이프, 최고점수 저장', tag:'퍼즐', path:'../g2048/index.html' },
+    { ico:'⭕', name:'틱택토', d:'미니맥스 AI에게 이겨보세요. 2인 대전 모드도 지원', tag:'전략', path:'../gttt/index.html' },
+    { ico:'🧱', name:'벽돌깨기', d:'패들로 공을 받아 벽돌을 모두 부수세요. 레벨/생명/테마', tag:'아케이드', path:'../breakout/index.html' },
+    { ico:'⌨️', name:'타이핑 테스트', d:'WPM/정확도 측정. 한글+영문 문장', tag:'생산성', path:'../typing/index.html' },
+    { ico:'🍅', name:'포모도로', d:'집중 타이머. SVG 원형 진행 + 알림', tag:'생산성', path:'../pomodoro/index.html' },
+];
+document.getElementById('gameCount').textContent=GAMES.length;
+document.getElementById('hub').innerHTML = GAMES.map(g=>
+    `<div class="game" onclick="location.href='${g.path}'">
+        <div class="ico">${g.ico}</div><h3>${g.name}</h3>
+        <div class="d">${g.d}</div>
+        <span class="tag">${g.tag}</span><span class="play">▶</span>
+    </div>`).join('');
+</script>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Tic-Tac-Toe</title>
+<style>
+:root { --bg:#0b0b12; --card:#14141f; --border:#23233a; --text:#ececf5; --muted:#6b6f82; --accent:#7c5cff; --x:#5ce6a8; --o:#ff6b6b; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; }
+h1 { font-size:1.4rem; font-weight:800; } h1 span { color:var(--accent); }
+.sub { color:var(--muted); font-size:0.82rem; margin:6px 0 20px; }
+
+.mode { display:flex; gap:8px; margin-bottom:18px; }
+.mbtn { padding:9px 16px; border-radius:30px; border:1.5px solid var(--border); background:transparent; color:var(--muted); font-size:0.8rem; font-weight:700; cursor:pointer; transition:all .2s; }
+.mbtn.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+
+.score { display:flex; gap:14px; margin-bottom:18px; }
+.sc { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:9px 24px; text-align:center; min-width:96px; }
+.sc .l { font-size:0.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; }
+.sc .v { font-size:1.5rem; font-weight:800; font-variant-numeric:tabular-nums; }
+.sc.x .v { color:var(--x); } .sc.o .v { color:var(--o); } .sc.d .v { color:var(--muted); }
+
+.board { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; background:var(--card); border:1px solid var(--border); border-radius:20px; padding:10px; width:min(88vw,340px); aspect-ratio:1; }
+.cell { background:#1c1c2a; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:3rem; font-weight:800; cursor:pointer; user-select:none; transition:all .15s; }
+.cell:not(.taken):hover { background:#24243a; }
+.cell.x { color:var(--x); } .cell.o { color:var(--o); }
+.cell.win { background:#2a2a4a; }
+
+.status { margin-top:18px; font-size:0.95rem; font-weight:600; min-height:24px; }
+.status b { color:var(--accent); }
+.btn { margin-top:12px; padding:11px 30px; border-radius:30px; border:none; background:var(--accent); color:#fff; font-weight:700; font-size:0.85rem; cursor:pointer; transition:filter .2s; }
+.btn:hover { filter:brightness(1.15); }
+</style>
+</head>
+<body>
+    <h1>⭕ <span>틱택토</span> ❌</h1>
+    <div class="sub">3칸을 먼저 잇는 쪽이 승리</div>
+
+    <div class="mode">
+        <button class="mbtn active" data-mode="ai" onclick="setMode('ai')">🤖 AI 대전</button>
+        <button class="mbtn" data-mode="pvp" onclick="setMode('pvp')">👥 2인 대전</button>
+    </div>
+
+    <div class="score">
+        <div class="sc x"><div class="l">X</div><div class="v" id="sX">0</div></div>
+        <div class="sc d"><div class="l">무승부</div><div class="v" id="sD">0</div></div>
+        <div class="sc o"><div class="l">O</div><div class="v" id="sO">0</div></div>
+    </div>
+
+    <div class="board" id="board"></div>
+    <div class="status" id="status">X의 차례</div>
+    <button class="btn" onclick="reset()">↺ 새 게임</button>
+
+<script>
+const B=document.getElementById('board');
+let board=Array(9).fill('');
+let turn='X';
+let mode='ai'; // ai or pvp
+let scores={X:0,O:0,D:0};
+let gameOver=false;
+
+function updateScores(){
+    document.getElementById('sX').textContent=scores.X;
+    document.getElementById('sO').textContent=scores.O;
+    document.getElementById('sD').textContent=scores.D;
+}
+function setMode(m){
+    mode=m;
+    document.querySelectorAll('.mbtn').forEach(b=>b.classList.toggle('active',b.dataset.mode===m));
+    reset();
+    document.getElementById('status').innerHTML = m==='ai' ? '🤖 AI와 대전! 당신은 <b>X</b> 먼저' : '2인 대전 · <b>X</b> 먼저';
+}
+function render(){
+    B.innerHTML='';
+    board.forEach((val,i)=>{
+        const c=document.createElement('div');
+        c.className='cell '+val+(val? ' taken':'');
+        c.textContent=val==='X'?'✕':(val==='O'?'◯':'');
+        c.onclick=()=>place(i);
+        B.appendChild(c);
+    });
+}
+function place(i){
+    if(board[i]||gameOver) return;
+    if(mode==='ai' && turn!=='X') return;
+    board[i]=turn;
+    if(checkWin()){
+        end(turn); return;
+    }
+    if(board.every(x=>x)){ end('D'); return; }
+    turn = turn==='X'?'O':'X';
+    document.getElementById('status').innerHTML = turn==='X'?'<b>X</b>의 차례':'<b>O</b>의 차례';
+    render();
+    if(mode==='ai' && turn==='O') setTimeout(aiMove,400);
+}
+function checkWin(){
+    const L=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    for(const [a,b,c] of L){
+        if(board[a] && board[a]===board[b] && board[a]===board[c]){
+            // highlight win
+            for(const idx of [a,b,c]) B.children[idx].classList.add('win');
+            return board[a];
+        }
+    }
+    return null;
+}
+function end(w){
+    gameOver=true;
+    const body = w==='D' ? '무승부!' : (w==='X'?'<b style="color:#5ce6a8">X 승리!</b>':'<b style="color:#ff6b6b">O 승리!</b>');
+    scores[w==='D'?'D':w]++;
+    updateScores();
+    document.getElementById('status').innerHTML = body + ' · <button class="btn" style="margin:0 0 0 12px;padding:7px 18px" onclick="reset()">다시</button>';
+}
+function reset(){
+    board=Array(9).fill('');
+    turn='X'; gameOver=false;
+    document.getElementById('status').innerHTML = mode==='ai' ? '당신은 <b>X</b> 먼저' : '<b>X</b>의 차례';
+    render();
+}
+// Minimax AI (unbeatable)
+function aiMove(){
+    const idx=bestMove();
+    if(idx!==-1) place(idx);
+}
+function bestMove(){
+    let bestScore=-Infinity, move=-1;
+    for(let i=0;i<9;i++){
+        if(!board[i]){
+            board[i]='O';
+            const s=minimax(board,0,false);
+            board[i]='';
+            if(s>bestScore){ bestScore=s; move=i; }
+        }
+    }
+    return move;
+}
+function minimax(b,depth,isMax){
+    const w=checkBoard(b);
+    if(w==='O') return 10-depth;
+    if(w==='X') return depth-10;
+    if(b.every(x=>x)) return 0;
+    if(isMax){
+        let best=-Infinity;
+        for(let i=0;i<9;i++){ if(!b[i]){ b[i]='O'; best=Math.max(best,minimax(b,depth+1,false)); b[i]=''; } }
+        return best;
+    }else{
+        let best=Infinity;
+        for(let i=0;i<9;i++){ if(!b[i]){ b[i]='X'; best=Math.min(best,minimax(b,depth+1,true)); b[i]=''; } }
+        return best;
+    }
+}
+function checkBoard(b){
+    const L=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    for(const [a,c,d] of L){ if(b[a] && b[a]===b[c] && b[a]===b[d]) return b[a]; }
+    return null;
+}
+render();
+</script>
+</body>
+</html>
