@@ -270,5 +270,13 @@
     "path": "C:/hermes/projects/daily",
     "created": "2026-09-01",
     "updated": "2026-09-01 10:16"
+  },
+  {
+    "name": "Engine3D",
+    "status": "active",
+    "description": "순수 JS 3D 엔진(행렬회전/원근투영)",
+    "path": "C:/hermes/projects/engine3d",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 10:19"
   }
 ]

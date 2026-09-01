@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes 3D Engine</title>
+<style>
+:root { --text:#ececf5; --muted:#8a8fa3; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; background:#050509; color:var(--text); overflow:hidden; height:100vh; }
+canvas { display:block; }
+.hud { position:fixed; top:20px; left:24px; z-index:5; pointer-events:none; }
+.hud h1 { font-size:1.15rem; font-weight:800; letter-spacing:1px; }
+.hud h1 span { color:#7c5cff; }
+.hud p { color:var(--muted); font-size:0.8rem; margin-top:5px; }
+.hud .fps { position:fixed; top:20px; right:24px; font-size:0.8rem; color:#5ce6a8; font-family:monospace; }
+.hint { position:fixed; bottom:22px; left:0; right:0; text-align:center; color:var(--muted); font-size:0.78rem; z-index:5; pointer-events:none; }
+.ctrls { position:fixed; bottom:22px; right:24px; z-index:5; display:flex; gap:8px; }
+.ctrls button { padding:8px 16px; border-radius:20px; border:1px solid rgba(124,92,255,0.5); background:rgba(124,92,255,0.12); color:var(--text); font-size:0.75rem; cursor:pointer; transition:all .2s; font-weight:700; }
+.ctrls button:hover { background:rgba(124,92,255,0.3); }
+.ctrls button.on { background:#7c5cff; border-color:#7c5cff; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+    <h1>🔮 <span>3D ENGINE</span></h1>
+    <p>순수 행렬 회전 + 원근 투영 · 드래그로 조작</p>
+</div>
+<div class="fps" id="fps">60 FPS</div>
+<div class="hint">🖱️ 드래그: 회전 · 휠: 확대/축소</div>
+<div class="ctrls">
+    <button id="bMode" class="on">큐브 장</button>
+    <button id="bWire">와이어프레임</button>
+    <button id="bBurst">폭발 파티클</button>
+</div>
+<script>
+const cv=document.getElementById('c'), cx=cv.getContext('2d');
+let W,H; function resize(){ W=cv.width=innerWidth; H=cv.height=innerHeight; } resize(); addEventListener('resize',resize);
+
+// --- 3D math ---
+function T(){ return [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]; }
+function rx(a){ const c=Math.cos(a),s=Math.sin(a); return [1,0,0,0, 0,c,-s,0, 0,s,c,0, 0,0,0,1]; }
+function ry(a){ const c=Math.cos(a),s=Math.sin(a); return [c,0,s,0, 0,1,0,0, -s,0,c,0, 0,0,0,1]; }
+function rz(a){ const c=Math.cos(a),s=Math.sin(a); return [c,-s,0,0, s,c,0,0, 0,0,1,0, 0,0,0,1]; }
+function mul(a,b){ const r=T(); for(let i=0;i<4;i++)for(let j=0;j<4;j++){ r[i*4+j]=0; for(let k=0;k<4;k++) r[i*4+j]+=a[i*4+k]*b[k*4+j]; } return r; }
+function apply(m,v){ return [ m[0]*v[0]+m[1]*v[1]+m[2]*v[2]+m[3], m[4]*v[0]+m[5]*v[1]+m[6]*v[2]+m[7], m[8]*v[0]+m[9]*v[1]+m[10]*v[2]+m[11] ]; }
+
+// cube geometry (unit cube centered, half=1)
+function cubeVerts(){ return [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]]; }
+// faces: [v0,v1,v2,v3, color]
+const FACES=[
+  [0,1,2,3,'#7c5cff'],[5,4,7,6,'#5ce6a8'],[4,0,3,7,'#ff6b6b'],
+  [1,5,6,2,'#ffd166'],[3,2,6,7,'#5c8aff'],[4,5,1,0,'#ff9d6b']
+];
+
+// --- state ---
+let rotX=-0.5, rotY=0.5, zoom=3.2;
+let drag=false, lx=0, ly=0;
+let mode='solid'; // solid, wire, burst
+const bursts=[];
+let t=0;
+
+// mouse
+cv.addEventListener('mousedown',e=>{ drag=true; lx=e.clientX; ly=e.clientY; });
+addEventListener('mouseup',()=>drag=false);
+addEventListener('mousemove',e=>{ if(drag){ rotY+=(e.clientX-lx)*0.01; rotX+=(e.clientY-ly)*0.01; lx=e.clientX; ly=e.clientY; } });
+cv.addEventListener('wheel',e=>{ zoom+=e.deltaY*0.003; zoom=Math.max(1.5,Math.min(8,zoom)); e.preventDefault(); },{passive:false});
+
+// controls
+document.getElementById('bMode').onclick=()=>{ mode='solid'; setBtn(); };
+document.getElementById('bWire').onclick=()=>{ mode='wire'; setBtn(); };
+document.getElementById('bBurst').onclick=()=>{ mode='burst'; setBtn(); };
+function setBtn(){ document.querySelectorAll('.ctrls button').forEach(b=>b.classList.remove('on')); const map={solid:'bMode',wire:'bWire',burst:'bBurst'}; document.getElementById(map[mode]).classList.add('on'); }
+
+function project(v){
+    const f=zoom; const px=f*W/2.4, py=f*H/2.4;
+    const z=v[2]; const scale=1/(z+4);
+    return [W/2+v[0]*px*scale, H/2+v[1]*py*scale, scale];
+}
+
+// draw solid cube
+function drawCube(M, opts){
+    opts=opts||{};
+    // rotate+project verts
+    const pts=cubeVerts().map(v=>project(apply(M,v)));
+    const faces=FACES.map(f=>{
+        const depth=pts[f[0]][2]+pts[f[1]][2]+pts[f[2]][2]+pts[f[3]][2];
+        return {idx:f, depth};
+    }).sort((a,b)=>b.depth-a.depth);
+    faces.forEach(({idx})=>{
+        const p=idx.map(i=>pts[i]);
+        cx.beginPath();
+        cx.moveTo(p[0][0],p[0][1]);
+        for(let i=1;i<4;i++) cx.lineTo(p[i][0],p[i][1]);
+        cx.closePath();
+        if(opts.wire){
+            cx.strokeStyle=idx[4]; cx.lineWidth=2; cx.stroke();
+        }else{
+            cx.fillStyle=idx[4]; cx.globalAlpha=0.75; cx.fill(); cx.globalAlpha=1;
+            cx.strokeStyle='rgba(255,255,255,0.25)'; cx.lineWidth=1; cx.stroke();
+        }
+    });
+}
+
+// draw many cubes (burst)
+function drawBurst(){
+    // 3D scatter with individual rotation
+    for(const b of bursts){
+        b.ang+=0.02;
+        const M=mul(mul(mul(ry(b.ang),rx(b.ang*0.7)),rz(b.ang*0.4)), b.posM);
+        // project 8 verts of small cube
+        const pts=cubeVerts().map(v=>{
+            const q=apply(b.posM,[v[0]*b.scale,v[1]*b.scale,v[2]*b.scale]);
+            return project(q);
+        });
+        // draw as small filled square approx (sum of projected w for size)
+        const depth=pts[0][2];
+        const size=Math.max(1, Math.min(6,(1/depth)*b.scale*30));
+        cx.globalAlpha=0.8*(1/depth);
+        cx.fillStyle=b.col;
+        cx.fillRect(pts[0][0]-size/2, pts[0][1]-size/2, size, size);
+        cx.globalAlpha=1;
+    }
+}
+
+function frame(){
+    t+=0.01;
+    cx.fillStyle='#050509'; cx.fillRect(0,0,W,H);
+    // faint starfield
+    for(let i=0;i<60;i++){
+        const sx=((i*137.5)%1)*W, sy=((i*i*7.3)%1)*H;
+        cx.fillStyle=`rgba(255,255,255,${0.08})`; cx.fillRect(sx,sy,1.5,1.5);
+    }
+
+    if(mode==='solid'||mode==='wire'){
+        const M=mul(rx(rotX),ry(rotY));
+        drawCube(M,{wire:mode==='wire'});
+    }else if(mode==='burst'){
+        drawBurst();
+    }
+
+    // fps (throttle calc)
+    requestAnimationFrame(frame);
+}
+
+// init burst particles on first burst mode
+function initBurst(){
+    bursts.length=0;
+    const col=['#7c5cff','#5ce6a8','#ff6b6b','#ffd166','#5c8aff','#ff9d6b'];
+    for(let i=0;i<200;i++){
+        const ang=i*2.4, rad=1.2+ (i%5)*0.7;
+        const x=Math.cos(ang)*rad, z=Math.sin(ang)*rad, y=(i%7-3)*0.55;
+        bursts.push({ ang:Math.random()*6.3, scale:0.08+ (i%4)*0.03, col:col[i%6], posM:tx(x,y,z) });
+    }
+}
+function tx(x,y,z){ return [1,0,0,x, 0,1,0,y, 0,0,1,z, 0,0,0,1]; }
+
+// auto-rotate when not dragging
+let last=performance.now(), frames=0, fpsT=last;
+(function loop(){
+    const now=performance.now();
+    if(!drag){ rotY+=0.004; rotX+=0.001; }
+    // fps
+    frames++; if(now-fpsT>500){ document.getElementById('fps').textContent=Math.round(frames*1000/(now-fpsT))+' FPS'; fpsT=now; frames=0; }
+    frame();
+    requestAnimationFrame(loop);
+})();
+
+if(bursts.length===0) initBurst();
+</script>
+</body>
+</html>
