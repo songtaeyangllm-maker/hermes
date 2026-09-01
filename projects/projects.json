@@ -350,5 +350,13 @@
     "path": "C:/hermes/projects/portal",
     "created": "2026-09-01",
     "updated": "2026-09-01 10:49"
+  },
+  {
+    "name": "FractalViewer",
+    "status": "active",
+    "description": "맨델브로트/줄리아 프랙탈 뷰어",
+    "path": "C:/hermes/projects/fra",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 10:51"
   }
 ]

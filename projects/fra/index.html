@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Fractal</title>
+<style>
+:root { --bg:#05070e; --text:#dbe4f0; --muted:#6b7686; --card:#0d1424; --border:#1c2a44; --accent:#5b8cff; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; display:flex; flex-direction:column; align-items:center; gap:14px; padding:20px; min-height:100vh; }
+h1{ font-size:20px; letter-spacing:2px; } h1 span{ color:var(--accent); }
+.sub{ color:var(--muted); font-size:13px; }
+#cv{ border:1px solid var(--border); border-radius:12px; background:#000; display:block; cursor:grab; image-rendering:pixelated; }
+.bar{ display:flex; gap:9px; flex-wrap:wrap; justify-content:center; align-items:center; }
+.btn{ background:#16223a; color:#dbe4f0; border:1px solid var(--border); border-radius:8px; padding:7px 13px; cursor:pointer; font-size:13px; }
+.btn:hover{ background:#1f3050; } .btn.active{ background:var(--accent); color:#081020; font-weight:600; }
+.badge{ background:var(--card); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-size:12px; color:var(--muted); }
+.badge b{ color:var(--text); }
+input[type=range]{ accent-color:var(--accent); width:110px; }
+.help{ font-size:12px; color:#55606f; max-width:620px; text-align:center; line-height:1.6; }
+.help kbd{ background:#16223a; border-radius:4px; padding:1px 6px; font-size:11px; }
+</style>
+</head>
+<body>
+<h1>FRACTAL <span>· VIEWER</span></h1>
+<div class="sub">복소수 반복으로 피어나는 무한한 패턴 · 드래그로 이동, 휠로 줌</div>
+<canvas id="cv" width="760" height="520"></canvas>
+<div class="bar">
+  <button class="btn active" id="mb">🟤 맨델브로트</button>
+  <button class="btn" id="jb">🧬 줄리아</button>
+  <span class="badge">반복 <input type="range" id="iter" min="50" max="500" value="200"></span>
+  <span class="badge">컬러 <select id="cmap">
+    <option value="0">⚡ 네온</option><option value="1">🔥 파이어</option>
+    <option value="2">💠 오션</option><option value="3">🌿 포레스트</option>
+  </select></span>
+  <button class="btn" id="reset">🔄 원래대로</button>
+  <button class="btn" id="rnd">🎲 랜덤 줄리아</button>
+</div>
+<div class="help">
+  * <kbd>드래그</kbd> 이동 · <kbd>휠</kbd> 줌 (중심 기준) · <kbd>더블클릭</kbd> 그 지점으로 이동 ·
+  줄리아 모드에선 c 파라미터를 변경한 <kbd>랜덤</kbd>으로 다른 이국적 패턴 탐험
+</div>
+<script>
+const cv=document.getElementById('cv'), c=cv.getContext('2d');
+const W=cv.width,H=cv.height;
+// compute buffer slightly downscaled for speed, upscaled by css
+const CW=Math.floor(W/2), CH=Math.floor(H/2);
+const buf=document.createElement('canvas'); buf.width=CW; buf.height=CH;
+const bc=buf.getContext('2d');
+let type='mandel', cx0=0, cy0=0, zoom=0.0032, IT=200, cmap=0, juliaC={re:-0.7,im:0.27};
+const cb=document.getElementById('cmap');
+function render(){
+  const img=bc.createImageData(CW,CH);
+  const d=img.data;
+  for(let py=0;py<CH;py++)for(let px=0;px<CW;px++){
+    const x=(px-CW/2)*zoom+cx0, y=(py-CH/2)*zoom+cy0;
+    let zr= x, zi= y;
+    let cr=x, ci=y;
+    if(type==='julia'){ zr=cr; zi=ci; }
+    let n=0;
+    let zr2=zr*zr, zi2=zi*zi;
+    while(n<IT && zr2+zi2<=4){
+      if(type==='mandel'){ zi=2*zr*zi+ci; zr=zr2-zi2+cr; }
+      else { const t=zr*zr-zi*zi+juliaC.re; zi=2*zr*zi+juliaC.im; zr=t; }
+      zr2=zr*zr; zi2=zi*zi; n++;
+    }
+    const idx=(py*CW+px)*4;
+    let r,g,b;
+    if(n===IT){ r=g=b=0; }
+    else {
+      const t=n/Math.log(n+2)*0.9;
+      const map=[[t*9%255,(t*6+80)%255,(t*13+140)%255],  // neon
+                 [Math.min(255,t*2),Math.min(255,t*0.8),Math.min(255,t*0.3)], // fire
+                 [Math.min(255,t*0.5),Math.min(255,t*1.1),Math.min(255,t*1.8)], // ocean
+                 [Math.min(255,t*0.4),Math.min(255,t*1.5),Math.min(255,t*0.5)]][cmap];
+      r=map[0];g=map[1];b=map[2];
+    }
+    d[idx]=r; d[idx+1]=g; d[idx+2]=b; d[idx+3]=255;
+  }
+  bc.putImageData(img,0,0);
+  c.imageSmoothingEnabled=false;
+  c.drawImage(buf,0,0,W,H);
+}
+// interaction
+let drag=false,sx=0,sy=0,scx=0,scy=0;
+cv.addEventListener('mousedown',e=>{drag=true;sx=e.clientX;sy=e.clientY;scx=cx0;scy=cy0;cv.style.cursor='grabbing';});
+addEventListener('mouseup',()=>{drag=false;cv.style.cursor='grab';});
+addEventListener('mousemove',e=>{ if(!drag)return; const r=cv.getBoundingClientRect(); const dx=(e.clientX-sx)*zoom*(W/r.width); const dy=(e.clientY-sy)*zoom*(H/r.height); cx0=scx-dx; cy0=scy-dy; render(); });
+cv.addEventListener('wheel',e=>{ e.preventDefault(); const r=cv.getBoundingClientRect(); const px=(e.clientX-r.left)/r.width*W, py=(e.clientY-r.top)/r.height*H; const wx=(px-CW/2)*zoom+cx0, wy=(py-CH/2)*zoom+cy0; const f=e.deltaY<0?0.85:1.18; zoom*=f; cx0=wx-(px-CW/2)*zoom; cy0=wy-(py-CH/2)*zoom; render(); },{passive:false});
+cv.addEventListener('dblclick',e=>{ const r=cv.getBoundingClientRect(); const px=(e.clientX-r.left)/r.width*W, py=(e.clientY-r.top)/r.height*H; cx0=(px-CW/2)*zoom+cx0; cy0=(py-CH/2)*zoom+cy0; render(); });
+document.getElementById('mb').addEventListener('click',()=>{type='mandel';document.getElementById('mb').classList.add('active');document.getElementById('jb').classList.remove('active');render();});
+document.getElementById('jb').addEventListener('click',()=>{type='julia';document.getElementById('jb').classList.add('active');document.getElementById('mb').classList.remove('active');render();});
+document.getElementById('iter').addEventListener('input',e=>{IT=+e.target.value;render();});
+cb.addEventListener('change',()=>{cmap=+cb.value;render();});
+document.getElementById('reset').addEventListener('click',()=>{cx0=0;cy0=0;zoom=0.0032;render();});
+document.getElementById('rnd').addEventListener('click',()=>{ juliaC={re:(Math.random()*2-1)*0.8, im:(Math.random()*2-1)*0.8}; render(); });
+render();
+</script>
+</body>
+</html>
