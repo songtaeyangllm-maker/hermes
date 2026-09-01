@@ -454,5 +454,13 @@
     "path": "C:/hermes/projects/lor",
     "created": "2026-09-01",
     "updated": "2026-09-01 11:29"
+  },
+  {
+    "name": "WaveSim",
+    "status": "active",
+    "description": "파동방정식 잔물결 시뮬",
+    "path": "C:/hermes/projects/wave",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 11:35"
   }
 ]

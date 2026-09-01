@@ -122,6 +122,7 @@ sleep 2; curl -s http://127.0.0.1:8765/api/health || echo "  (curl로 상태 확
     astar)  start "$WS/projects/astar/index.html" ;;
     ca)     start "$WS/projects/ca/index.html" ;;
     lor)    start "$WS/projects/lor/index.html" ;;
+    wave)   start "$WS/projects/wave/index.html" ;;
     simon)  start "$WS/projects/simon/index.html" ;;
     conv)   start "$WS/projects/conv/index.html" ;;
     sec)    start "$WS/projects/sec/index.html" ;;
