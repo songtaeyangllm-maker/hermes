@@ -366,5 +366,13 @@
     "path": "C:/hermes/projects/nn",
     "created": "2026-09-01",
     "updated": "2026-09-01 10:53"
+  },
+  {
+    "name": "Gravity",
+    "status": "active",
+    "description": "중력 N-바디 시뮬레이터",
+    "path": "C:/hermes/projects/grav",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 10:56"
   }
 ]

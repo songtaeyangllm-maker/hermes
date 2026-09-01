@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Gravity</title>
+<style>
+:root { --bg:#05070e; --text:#dbe4f0; --muted:#6b7686; --card:#0d1424; --border:#1c2a44; --accent:#5b8cff; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; display:flex; flex-direction:column; align-items:center; gap:14px; padding:20px; min-height:100vh; }
+h1{ font-size:20px; letter-spacing:2px; } h1 span{ color:var(--accent); }
+.sub{ color:var(--muted); font-size:13px; }
+#cv{ border:1px solid var(--border); border-radius:12px; background:#000; display:block; cursor:crosshair; }
+.bar{ display:flex; gap:9px; flex-wrap:wrap; justify-content:center; align-items:center; }
+.btn{ background:#16223a; color:#dbe4f0; border:1px solid var(--border); border-radius:8px; padding:7px 14px; cursor:pointer; font-size:13px; }
+.btn:hover{ background:#1f3050; } .btn.active{ background:var(--accent); color:#081020; font-weight:600; }
+.badge{ background:var(--card); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-size:12px; color:var(--muted); }
+.badge b{ color:var(--text); }
+input[type=range]{ accent-color:var(--accent); width:110px; }
+.help{ font-size:12px; color:#55606f; max-width:640px; text-align:center; line-height:1.7; }
+.help b{ color:#9aa7bd; }
+</style>
+</head>
+<body>
+<h1>GRAVITY <span>· N-BODY</span></h1>
+<div class="sub">뉴턴 중력 · 수백 개 천체가 서로 끌어당겨 궤도를 그린다</div>
+<canvas id="cv" width="720" height="560"></canvas>
+<div class="bar">
+  <button class="btn" id="run">⏸ 정지</button>
+  <button class="btn" id="burst">✨ 폭발 300개</button>
+  <button class="btn" id="reset">🧹 지우기</button>
+  <span class="badge">중력 <input type="range" id="g" min="0.1" max="3" step="0.05" value="1"></span>
+  <span class="badge">속도 <input type="range" id="sp" min="0.1" max="3" step="0.05" value="1"></span>
+  <span class="badge">천체 <b id="cnt">0</b></span>
+</div>
+<div class="help">
+  <b>클릭</b>하면 그 자리에 새 천체를 추가 · 여러 개를 던지면 아름다운 다체 궤도가 펼쳐져요 ·
+  서로 끌어당겨 나선을 그리며 병합되는 모습을 감상하세요
+</div>
+<script>
+const cv=document.getElementById('cv'), c=cv.getContext('2d');
+const W=cv.width,H=cv.height;
+let bodies=[]; let running=true;
+let G=1, SPD=1;
+document.getElementById('g').addEventListener('input',e=>G=+e.target.value);
+document.getElementById('sp').addEventListener('input',e=>SPD=+e.target.value);
+document.getElementById('run').addEventListener('click',e=>{running=!running;e.target.textContent=running?'⏸ 정지':'▶ 시작';e.target.classList.toggle('active',running);});
+function addBody(x,y,m,vx,vy,color){
+  const col=color||'hsl('+Math.floor(Math.random()*360)+',80%,65%)';
+  bodies.push({x,y,vx:vx,vy:vy||0,m,r:Math.max(2,Math.cbrt(m)*1.8),col});
+  document.getElementById('cnt').textContent=bodies.length;
+}
+function burst(){
+  bodies=[];
+  for(let i=0;i<300;i++){ const a=Math.random()*6.28, sp=0.5+Math.random()*2; addBody(W/2+Math.cos(a)*30,H/2+Math.sin(a)*30,2+Math.random()*6,Math.cos(a)*sp,Math.sin(a)*sp); }
+  document.getElementById('cnt').textContent=bodies.length;
+}
+document.getElementById('burst').addEventListener('click',burst);
+document.getElementById('reset').addEventListener('click',()=>{bodies=[];c.fillStyle='#000';c.fillRect(0,0,W,H);document.getElementById('cnt').textContent=0;});
+cv.addEventListener('mousedown',e=>{ const r=cv.getBoundingClientRect(); addBody(e.clientX-r.left,e.clientY-r.top,8+Math.random()*8,0,0); });
+// init: central star + orbiting bodies
+function init(){
+  addBody(W/2,H/2,60,0,0,'#ffd95e');
+  for(let i=0;i<40;i++){ const a=i/40*6.28, rr=60+Math.random()*240; const sp=Math.sqrt(60*G*(rr>50?1:1)/(rr*2)); 
+    addBody(W/2+Math.cos(a)*rr, H/2+Math.sin(a)*rr, 3+Math.random()*6, -Math.sin(a)*sp*4, Math.cos(a)*sp*4);
+  }
+}
+init();
+let last=performance.now();
+function frame(now){
+  const dt=Math.min((now-last)/1000,0.05)*SPD; last=now;
+  // trail fade
+  c.fillStyle='rgba(0,0,0,0.06)'; c.fillRect(0,0,W,H);
+  if(running&&bodies.length){
+    const n=bodies.length;
+    // forces
+    const f=new Float64Array(n*2);
+    for(let i=0;i<n;i++){
+      const a=bodies[i];
+      for(let j=i+1;j<n;j++){
+        const b=bodies[j];
+        let dx=b.x-a.x, dy=b.y-a.y;
+        let d2=dx*dx+dy*dy+4; const d=Math.sqrt(d2); if(d<4)d=4;
+        const f2=G*SPD/d2; // G m1m2 / r^2 ~ force per (m ~ small)
+        const fx=dx/d*f2, fy=dy/d*f2;
+        f[i*2]+=fx*b.m; f[i*2+1]+=fy*b.m;
+        f[j*2]-=fx*a.m; f[j*2+1]-=fy*a.m;
+      }
+    }
+    for(let i=0;i<n;i++){
+      const b=bodies[i];
+      if(b.x<0||b.x>W||b.y<0||b.y>H){ /* keep, wrap */ }
+      b.vx+=f[i*2]*dt; b.vy+=f[i*2+1]*dt;
+      b.x+=b.vx*dt; b.y+=b.vy*dt;
+      // soft bounds
+      const damp=0.995;
+      if(b.x<2){b.x=2;b.vx*=-damp;} if(b.x>W-2){b.x=W-2;b.vx*=-damp;}
+      if(b.y<2){b.y=2;b.vy*=-damp;} if(b.y>H-2){b.y=H-2;b.vy*=-damp;}
+      c.globalAlpha=0.9; c.fillStyle=b.col;
+      c.beginPath(); c.arc(b.x,b.y,Math.min(b.r,5),0,7); c.fill(); c.globalAlpha=1;
+    }
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
