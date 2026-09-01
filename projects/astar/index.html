@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes A* Pathfinding</title>
+<style>
+:root { --bg:#05070e; --text:#dbe4f0; --muted:#6b7686; --card:#0d1424; --border:#1c2a44; --accent:#5b8cff; --green:#4ade80; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-serif; display:flex; flex-direction:column; align-items:center; gap:14px; padding:20px; min-height:100vh; }
+h1{ font-size:19px; letter-spacing:2px; } h1 span{ color:var(--green); }
+.sub{ color:var(--muted); font-size:12px; }
+canvas{ border:1px solid var(--border); border-radius:10px; background:#0a0f1e; cursor:crosshair; }
+.bar{ display:flex; gap:9px; flex-wrap:wrap; justify-content:center; align-items:center; }
+.btn{ background:#16223a; color:#dbe4f0; border:1px solid var(--border); border-radius:8px; padding:7px 14px; cursor:pointer; font-size:13px; }
+.btn:hover{ background:#1f3050; } .btn.active{ background:var(--green); color:#081020; font-weight:600; }
+.badge{ background:var(--card); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+.badge b{ color:var(--text); }
+.legend{ display:flex; gap:14px; font-size:12px; color:#9fb0c8; flex-wrap:wrap; justify-content:center; }
+.legend i{ display:inline-block; width:14px; height:14px; border-radius:3px; margin-right:4px; vertical-align:-2px; }
+</style>
+</head>
+<body>
+<h1>A* <span>· PATHFINDING</span></h1>
+<div class="sub">휴리스틱(맨해튼) + 실제비용으로 최단경로를 탐색 — 최소힙 우선순위 큐</div>
+<canvas id="cv" width="800" height="480"></canvas>
+<div class="bar">
+  <button class="btn active" id="mWall">🧱 벽</button>
+  <button class="btn" id="mStart">🟢 시작</button>
+  <button class="btn" id="mGoal">🔴 목표</button>
+  <button class="btn" id="find">▶ 찾기</button>
+  <button class="btn" id="reset">🔄 초기화</button>
+  <button class="btn" id="maze">🌲 무작위 미로</button>
+  <span class="badge">탐색 <b id="nOpen">0</b>칸 · 경로 <b id="nPath">―</b>칸</span>
+</div>
+<div class="legend">
+  <span><i style="background:#2a3b5c"></i>열린목록</span>
+  <span><i style="background:#7c5b8a"></i>닫힌목록</span>
+  <span><i style="background:#e9b45b"></i>최종 경로</span>
+  <span><i style="background:#4ade80"></i>시작</span>
+  <span><i style="background:#ff6b6b"></i>목표</span>
+  <span><i style="background:#9aa7bd"></i>벽</span>
+</div>
+<script>
+const COLS=40, ROWS=30, CW=20;
+const cv=document.getElementById('cv'), g=cv.getContext('2d');
+let mode='wall';
+let grid=Array.from({length:ROWS},()=>Array(COLS).fill(0));
+let start={x:2, y:Math.floor(ROWS/2)}, goal={x:COLS-5, y:Math.floor(ROWS/2)};
+let searching=false;
+const idx=(x,y)=>y*COLS+x;
+function resetGrid(){ grid=Array.from({length:ROWS},()=>Array(COLS).fill(0)); }
+document.getElementById('mWall').addEventListener('click',e=>setMode('wall',e.target));
+document.getElementById('mStart').addEventListener('click',e=>setMode('start',e.target));
+document.getElementById('mGoal').addEventListener('click',e=>setMode('goal',e.target));
+document.getElementById('reset').addEventListener('click',()=>{resetGrid(); searching=false; draw();});
+['mWall','mStart','mGoal'].forEach(id=>document.getElementById(id).addEventListener('click',e=>{
+  const btns=['mWall','mStart','mGoal']; btns.forEach(b=>document.getElementById(b).classList.remove('active'));
+  e.target.classList.add('active');
+}));
+function setMode(m,el){ mode=m; }
+document.getElementById('find').addEventListener('click',()=>{ searching=true; openSet=[]; closedSet=new Set(); runASTAR(); });
+// min-heap priority queue
+let openSet=[], closedSet=new Set();
+function heapPush(n){ openSet.push(n); let i=openSet.length-1; while(i>0){ const p=(i-1)>>1; if(openSet[p].f<=openSet[i].f)break; [openSet[p],openSet[i]]=[openSet[i],openSet[p]]; i=p; } }
+function heapPop(){ const top=openSet[0], last=openSet.pop(); if(openSet.length){ openSet[0]=last; let i=0; for(;;){ const l=2*i+1,r=2*i+2; let s=i; if(l<openSet.length&&openSet[l].f<openSet[s].f)s=l; if(r<openSet.length&&openSet[r].f<openSet[s].f)s=r; if(s===i)break; [openSet[s],openSet[i]]=[openSet[i],openSet[s]]; i=s; } } return top; }
+function heuristic(a,b){ return Math.abs(a.x-b.x)+Math.abs(a.y-b.y); }
+function buildPath(cur){ const path=[]; while(cur){ path.unshift(cur); cur=cur.parent; } return path; }
+function runASTAR(){
+  openSet=[]; closedSet=new Set();
+  const s={...start, g:0, h:heuristic(start,goal), f:heuristic(start,goal), parent:null};
+  heapPush(s);
+  const dirs=[[0,1],[1,0],[0,-1],[-1,0],[1,1],[-1,1],[1,-1],[-1,-1]];
+  const step=()=>{
+    if(!openSet.length){ searching=false; draw(); document.getElementById('nPath').textContent='없음'; return; }
+    const cur=heapPop();
+    if(cur.x===goal.x&&cur.y===goal.y){ searching=false; const path=buildPath(cur); document.getElementById('nPath').textContent=path.length; draw(path); return; }
+    closedSet.add(cur.x+','+cur.y);
+    for(const [dx,dy] of dirs){
+      const nx=cur.x+dx, ny=cur.y+dy;
+      if(nx<0||ny<0||nx>=COLS||ny>=ROWS) continue;
+      if(grid[ny][nx]===1) continue;
+      if(closedSet.has(nx+','+ny)) continue;
+      const diag=dx!==0&&dy!==0;
+      if(diag){ if(grid[ny][cur.x]===1||grid[cur.y][nx]===1) continue; } // no corner cutting
+      const ng=cur.g+(diag?1.414:1);
+      const key=nx+','+ny;
+      let inOpen=openSet.find(n=>n.x===nx&&n.y===ny);
+      if(inOpen){ if(ng<inOpen.g){ inOpen.g=ng; inOpen.f=ng+inOpen.h; inOpen.parent=cur; } }
+      else { const n={x:nx,y:ny,g:ng,h:heuristic({x:nx,y:ny},goal),f:ng+heuristic({x:nx,y:ny},goal),parent:cur}; heapPush(n); }
+    }
+    document.getElementById('nOpen').textContent=openSet.length;
+    draw(); setTimeout(step,0);
+  };
+  step();
+}
+function draw(path){
+  for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++){ const c=grid[y][x]; g.fillStyle=c===1?'#9aa7bd':'#0a0f1e'; g.fillRect(x*CW,y*CW,CW,CW); }
+  closedSet.forEach(k=>{ const [xx,yy]=k.split(',').map(Number); g.fillStyle='#7c5b8a'; g.globalAlpha=0.55; g.fillRect(xx*CW,yy*CW,CW,CW); g.globalAlpha=1; });
+  openSet.forEach(n=>{ g.fillStyle='#2a3b5c'; g.globalAlpha=0.7; g.fillRect(n.x*CW,n.y*CW,CW,CW); g.globalAlpha=1; });
+  if(path){ path.forEach(n=>{ g.fillStyle='#e9b45b'; g.fillRect(n.x*CW,n.y*CW,CW,CW); }); }
+  g.fillStyle='#4ade80'; g.fillRect(start.x*CW,start.y*CW,CW,CW);
+  g.fillStyle='#ff6b6b'; g.fillRect(goal.x*CW,goal.y*CW,CW,CW);
+  g.strokeStyle='#1a2a44'; g.lineWidth=1;
+  g.beginPath(); for(let x=0;x<=COLS;x++){ g.moveTo(x*CW,0); g.lineTo(x*CW,ROWS*CW); } for(let y=0;y<=ROWS;y++){ g.moveTo(0,y*CW); g.lineTo(COLS*CW,y*CW); } g.stroke();
+}
+// interaction
+let drawing=false;
+cv.addEventListener('mousedown',e=>{ const r=cv.getBoundingClientRect(), x=Math.floor((e.clientX-r.left)/CW), y=Math.floor((e.clientY-r.top)/CW); if(x<0||y<0||x>=COLS||y>=ROWS)return; if(mode==='wall'){ grid[y][x]=grid[y][x]===1?0:1; } else if(mode==='start'){ start={x,y}; } else if(mode==='goal'){ goal={x,y}; } draw(); });
+// random maze (binary-tree style open maze)
+document.getElementById('maze').addEventListener('click',()=>{ resetGrid(); for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++) if(x%2===0||y%2===0) if(Math.random()<0.35) grid[y][x]=1; searching=false; draw(); });
+draw();
+</script>
+</body>
+</html>

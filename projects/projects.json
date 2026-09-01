@@ -398,5 +398,13 @@
     "path": "C:/hermes/projects/ga",
     "created": "2026-09-01",
     "updated": "2026-09-01 11:09"
+  },
+  {
+    "name": "AStar",
+    "status": "active",
+    "description": "A* 경로찾기 시각화",
+    "path": "C:/hermes/projects/astar",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 11:14"
   }
 ]
