@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Workspace Showcase</title>
+<style>
+:root{ --bg:#080b14; --card:#0e1527; --text:#e4ecf8; --muted:#8b96ab; --border:#1c2a44; --accent:#5b8cff; --accent2:#5bff8c; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; min-height:100vh; padding:28px 20px 60px; }
+.wrap{ max-width:1000px; margin:0 auto; }
+.head{ text-align:center; margin-bottom:22px; }
+.head h1{ font-size:26px; letter-spacing:2px; }
+.head h1 span{ color:var(--accent); }
+.head p{ color:var(--muted); font-size:13px; margin-top:6px; }
+.stats{ display:flex; gap:14px; justify-content:center; margin:14px 0 22px; flex-wrap:wrap; }
+.stat{ background:var(--card); border:1px solid var(--border); border-radius:10px; padding:8px 16px; text-align:center; }
+.stat b{ display:block; font-size:18px; color:var(--accent2); }
+.stat span{ font-size:11px; color:var(--muted); }
+.controls{ display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap; margin-bottom:24px; }
+.chip{ background:var(--card); border:1px solid var(--border); border-radius:20px; padding:7px 16px; cursor:pointer; font-size:13px; color:var(--muted); transition:all .15s; }
+.chip:hover{ border-color:var(--accent); color:var(--text); }
+.chip.on{ background:var(--accent); color:#081020; border-color:var(--accent); font-weight:600; }
+#q{ background:var(--card); border:1px solid var(--border); border-radius:20px; padding:8px 16px; color:var(--text); font-size:13px; width:220px; outline:none; }
+#q:focus{ border-color:var(--accent); }
+.grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(215px,1fr)); gap:14px; }
+.card{ background:linear-gradient(160deg,var(--card),#0b1120); border:1px solid var(--border); border-radius:14px; padding:16px; cursor:pointer; transition:transform .15s, box-shadow .15s, border-color .15s; display:flex; flex-direction:column; gap:8px; }
+.card:hover{ transform:translateY(-3px); box-shadow:0 10px 30px rgba(0,0,0,.4); border-color:var(--accent); }
+.ico{ font-size:30px; }
+.card h3{ font-size:15px; }
+.card p{ font-size:12px; color:var(--muted); line-height:1.5; flex:1; }
+.tag{align-self:flex-start; font-size:10px; background:rgba(91,140,255,.15); color:var(--accent); border-radius:4px; padding:2px 8px; }
+.none{ text-align:center; color:var(--muted); padding:40px; grid-column:1/-1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <h1>HERMES <span>WORKSPACE</span></h1>
+    <p>자유롭고 멈추지 않는 창작의 기록 — 44개 앱을 하나로</p>
+    <div class="stats">
+      <div class="stat"><b>44</b><span>프로젝트</span></div>
+      <div class="stat"><b>12,000+</b><span>코드줄</span></div>
+      <div class="stat"><b>14/14</b><span>스모크테스트</span></div>
+      <div class="stat"><b>20+</b><span>Python 도구</span></div>
+    </div>
+  </div>
+  <div class="controls">
+    <input id="q" placeholder="🔍 검색 (예: 게임, 감정, 3D...)">
+    <button class="chip on" data-c="all">전체</button>
+    <button class="chip" data-c="fun">🎮 게임</button>
+    <button class="chip" data-c="viz">📊 시각화</button>
+    <button class="chip" data-c="prod">⚡ 생산성</button>
+    <button class="chip" data-c="audio">🎵 오디오</button>
+    <button class="chip" data-c="tool">🧰 도구</button>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+<script>
+const items=[
+ {i:'🖥️',n:'Hermes OS',d:'모든 앱을 실행하는 미니 바탕화면 런처',c:'prod',p:'../hermes_os/index.html'},
+ {i:'🧊',n:'커맨드센터',d:'워크스페이스 실시간 KPI 대시보드',c:'viz',p:'../command_center/index.html'},
+ {i:'📊',n:'분석 대시보드',d:'일기·감정·git·키워드 SVG 시각화',c:'viz',p:'../analytics/index.html'},
+ {i:'🧊',n:'큐브 쇼케이스',d:'3D 회전큐브+파티클 랜딩',c:'viz',p:'../landing/index.html'},
+ {i:'🔮',n:'3D 엔진',d:'행렬회전+원근투영 순수JS 3D',c:'viz',p:'../engine3d/index.html'},
+ {i:'🎮',n:'레이캐스터 3D',d:'Wolfenstein식 DDA 미로 탐험',c:'fun',p:'../ray/index.html'},
+ {i:'☀️',n:'태양계',d:'8행성 공전 시뮬레이션',c:'viz',p:'../solar/index.html'},
+ {i:'🦠',n:'라이프 게임',d:'Conway 생명 규칙 자동화',c:'fun',p:'../life/index.html'},
+ {i:'📆',n:'데일리 트래커',d:'습관·할일·타이머·메모·히트맵',c:'prod',p:'../daily/index.html'},
+ {i:'🍅',n:'포모도로',d:'집중 타이머 + 기록',c:'prod',p:'../pomodoro/index.html'},
+ {i:'🥁',n:'드럼머신',d:'Web Audio 16스텝 시퀀서',c:'audio',p:'../drum/index.html'},
+ {i:'🎹',n:'신디사이저',d:'4파형 건반 + 녹음재생',c:'audio',p:'../synth/index.html'},
+ {i:'📊',n:'오디오 비주얼라이저',d:'실시간 스펙트럼/파형',c:'audio',p:'../viz/index.html'},
+ {i:'🟢',n:'미니 언어',d:'순수JS 토크나이저+파서+인터프리터',c:'tool',p:'../lang/index.html'},
+ {i:'🐍',n:'스네이크',d:'클래식 뱀 게임',c:'fun',p:'../snake/index.html'},
+ {i:'⌨️',n:'타이핑',d:'타자 속도 측정 게임',c:'fun',p:'../typing/index.html'},
+ {i:'🎱',n:'벽돌깨기',d:'브레이크아웃 아케이드',c:'fun',p:'../breakout/index.html'},
+ {i:'🎲',n:'운세',d:'오늘의 럭키 타임 + 랜덤운',c:'fun',p:'../fortune/index.html'},
+ {i:'🔢',n:'2048',d:'타일 합치기 퍼즐',c:'fun',p:'../g2048/index.html'},
+ {i:'⭕',n:'틱택토',d:'미니맥스 불가능 AI 대전',c:'fun',p:'../gttt/index.html'},
+ {i:'🧠',n:'메모리',d:'이모지 카드 짝 맞추기',c:'fun',p:'../gmem/index.html'},
+ {i:'⚡',n:'반응속도',d:'신호에 최속 반응 테스트',c:'fun',p:'../greact/index.html'},
+ {i:'🎮',n:'게임 허브',d:'모든 미니게임 한곳에',c:'fun',p:'../gamehub/index.html'},
+ {i:'📋',n:'SNS 쇼케이스',d:'6테마 카드 + 공유/QR',c:'tool',p:'../sns_showcase/index.html'},
+ {i:'🔥',n:'일기 히트맵',d:'감정/활동 연속성 달력',c:'viz',p:'../diary_heatmap/index.html'},
+ {i:'⚡',n:'속도계',d:'실시간 인터넷 속도 게이지',c:'viz',p:'../speedometer/index.html'},
+ {i:'🗂️',n:'폴더 트리맵',d:'디렉토리 점유율 시각화',c:'viz',p:'../treemap/index.html'},
+ {i:'🏅',n:'배지 제너레이터',d:'상태 배지 PNG 생성',c:'tool',p:'../badge/index.html'},
+ {i:'☁️',n:'워드클라우드',d:'노트 단어 빈도 이미지',c:'viz',p:'../wordcloud/index.html'},
+ {i:'⏱️',n:'타임라인',d:'활동 이력 축 시각화',c:'viz',p:'../timeline/index.html'},
+ {i:'😊',n:'감정 리포트',d:'한글 감정분석 월간보고',c:'viz',p:'../sentiment/report.html'},
+ {i:'🖼️',n:'갤러리',d:'쇼케이스 컬렉션 뷰어',c:'viz',p:'../showcase/index.html'},
+ {i:'🌿',n:'호흡 가이드',d:'4-7-8 명상 타이머',c:'prod',p:'../breath/index.html'},
+ {i:'◉',n:'라이브 게이지',d:'CPU/메모리 실시간 원형',c:'viz',p:'../gauges/index.html'},
+ {i:'🧮',n:'Dev 계산기',d:'Base64/URL/HEX/SHA 변환',c:'tool',p:'../devcalc/index.html'},
+ {i:'🔍',n:'정규식 테스터',d:'실시간 매칭 하이라이트',c:'tool',p:'../regex/index.html'},
+ {i:'🔁',n:'단위 변환기',d:'길이·무게·온도 등 7종',c:'tool',p:'../conv/index.html'},
+];
+const grid=document.getElementById('grid'), q=document.getElementById('q');
+let cat='all', query='';
+function render(){
+  grid.innerHTML='';
+  const f=items.filter(it=>(cat==='all'||it.c===cat)&&(query===''||it.n.includes(query)||it.d.includes(query)));
+  if(!f.length){ grid.innerHTML='<div class="none">찾는 결과가 없어요 🧐</div>'; return; }
+  for(const it of f){
+    const d=document.createElement('div'); d.className='card';
+    d.innerHTML='<span class="ico">'+it.i+'</span><h3>'+it.n+'</h3><p>'+it.d+'</p><span class="tag">'+catName(it.c)+'</span>';
+    d.onclick=()=>location.href=it.p;
+    grid.appendChild(d);
+  }
+}
+function catName(c){ return {fun:'🎮 게임',viz:'📊 시각화',prod:'⚡ 생산성',audio:'🎵 오디오',tool:'🧰 도구'}[c]||c; }
+document.querySelectorAll('.chip').forEach(ch=>ch.addEventListener('click',()=>{
+  document.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));
+  ch.classList.add('on'); cat=ch.dataset.c; render();
+}));
+q.addEventListener('input',()=>{ query=q.value.trim(); render(); });
+render();
+</script>
+</body>
+</html>
