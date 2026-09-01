@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Cellular Automata</title>
+<style>
+:root { --bg:#05070e; --text:#dbe4f0; --muted:#6b7686; --card:#0d1424; --border:#1c2a44; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-serif; display:flex; flex-direction:column; align-items:center; gap:12px; padding:18px; min-height:100vh; }
+h1{ font-size:19px; letter-spacing:2px; } h1 span{ color:#e9b45b; }
+.sub{ color:var(--muted); font-size:12px; }
+canvas{ border:1px solid var(--border); border-radius:10px; background:#0a0f1e; }
+.bar{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; align-items:center; }
+.btn{ background:#16223a; color:#dbe4f0; border:1px solid var(--border); border-radius:8px; padding:6px 12px; cursor:pointer; font-size:12px; }
+.btn:hover{ background:#1f3050; } .btn.active{ background:#e9b45b; color:#081020; font-weight:600; }
+.badge{ background:var(--card); border:1px solid var(--border); border-radius:8px; padding:5px 11px; font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+.badge b{ color:var(--text); }
+input[type=range]{ accent-color:#e9b45b; width:120px; }
+</style>
+</head>
+<body>
+<h1>CELLULAR <span>· AUTOMATA</span></h1>
+<div class="sub">1차원 셀 오토마타 — 3-이웃 규칙이 만드는 계산과 프랙탈</div>
+<canvas id="cv" width="700" height="520"></canvas>
+<div class="bar">
+  <button class="btn active" id="r90">Rule 90</button>
+  <button class="btn" id="r30">Rule 30</button>
+  <button class="btn" id="r110">Rule 110</button>
+  <button class="btn" id="r184">Rule 184</button>
+  <button class="btn" id="r73">Rule 73</button>
+  <span class="badge">규칙 <b id="ruleV">90</b> <input type="range" id="rule" min="0" max="255" value="90"></span>
+  <button class="btn" id="one">▪ 단일셀</button>
+  <button class="btn" id="rnd">🎲 랜덤시드</button>
+</div>
+<script>
+const W=700,H=520,CELL=2;
+const cv=document.getElementById('cv'), g=cv.getContext('2d');
+let rule=90, seedMode='one';
+let nCols=W/CELL, rows=Math.floor(H/CELL);
+function applyRule(a,b,c){ const t=(a<<2)|(b<<1)|c; return (rule>>t)&1; }
+function setRule(r){
+  rule=r; document.getElementById('rule').value=r; document.getElementById('ruleV').textContent=r;
+  document.getElementById('r90').classList.toggle('active',r===90);
+  document.getElementById('r30').classList.toggle('active',r===30);
+  document.getElementById('r110').classList.toggle('active',r===110);
+  document.getElementById('r184').classList.toggle('active',r===184);
+  document.getElementById('r73').classList.toggle('active',r===73);
+  run();
+}
+function gen(){
+  let row=new Uint8Array(nCols);
+  if(seedMode==='one') row[Math.floor(nCols/2)]=1;
+  else for(let i=0;i<nCols;i++) if(Math.random()<0.4) row[i]=1;
+  g.fillStyle='#0a0f1e'; g.fillRect(0,0,W,H);
+  for(let r=0;r<rows;r++){
+    for(let x=0;x<nCols;x++){
+      if(row[x]){ g.fillStyle=`hsl(${200-rule*0.4+ (r/rows)*60},70%,${55-(r/rows)*18}%)`; g.fillRect(x*CELL,r*CELL,CELL,CELL); }
+    }
+    const next=new Uint8Array(nCols);
+    for(let x=0;x<nCols;x++){ const a=row[(x-1+nCols)%nCols], b=row[x], c=row[(x+1)%nCols]; next[x]=applyRule(a,b,c); }
+    row=next;
+  }
+}
+const ruleEl=document.getElementById('rule');
+ruleEl.addEventListener('input',e=>{ rule=+e.target.value; document.getElementById('ruleV').textContent=rule; gen(); });
+document.getElementById('r90').addEventListener('click',()=>setRule(90));
+document.getElementById('r30').addEventListener('click',()=>setRule(30));
+document.getElementById('r110').addEventListener('click',()=>setRule(110));
+document.getElementById('r184').addEventListener('click',()=>setRule(184));
+document.getElementById('r73').addEventListener('click',()=>setRule(73));
+document.getElementById('one').addEventListener('click',e=>{ seedMode='one'; e.target.classList.add('active'); document.getElementById('rnd').classList.remove('active'); gen(); });
+document.getElementById('rnd').addEventListener('click',e=>{ seedMode='random'; e.target.classList.add('active'); document.getElementById('one').classList.remove('active'); gen(); });
+function run(){ gen(); }
+gen();
+</script>
+</body>
+</html>

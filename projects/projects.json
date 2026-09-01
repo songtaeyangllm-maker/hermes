@@ -406,5 +406,13 @@
     "path": "C:/hermes/projects/astar",
     "created": "2026-09-01",
     "updated": "2026-09-01 11:14"
+  },
+  {
+    "name": "CellularAutomata",
+    "status": "active",
+    "description": "1D 셀 오토마타 Rule 0~255",
+    "path": "C:/hermes/projects/ca",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 11:16"
   }
 ]
