@@ -238,5 +238,21 @@
     "path": "C:/hermes/projects/gamehub",
     "created": "2026-09-01",
     "updated": "2026-09-01 10:10"
+  },
+  {
+    "name": "Memory",
+    "status": "active",
+    "description": "기억력 카드 맞추기",
+    "path": "C:/hermes/projects/gmem",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 10:12"
+  },
+  {
+    "name": "Reflex",
+    "status": "active",
+    "description": "반응속도 테스트",
+    "path": "C:/hermes/projects/greact",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 10:12"
   }
 ]

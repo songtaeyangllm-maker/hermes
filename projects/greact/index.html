@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Reflex</title>
+<style>
+:root { --bg:#0b0b12; --card:#13131c; --border:#23233a; --text:#ececf5; --muted:#6b6f82; --accent:#7c5cff; --go:#5ce6a8; --wait:#ffd166; --bad:#ff6b6b; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; }
+h1 { font-size:1.4rem; font-weight:800; } h1 span{color:var(--accent);}
+.sub { color:var(--muted); font-size:0.82rem; margin:6px 0 20px; }
+
+.pad { width:min(90vw,470px); aspect-ratio:1.6; border-radius:26px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background .12s; user-select:none; text-align:center; padding:20px; }
+.pad.wait { background:var(--wait); } .pad.go { background:var(--go); } .pad.bad { background:var(--bad); }
+.pad .t { font-size:1.35rem; font-weight:800; color:#0b0b12; }
+.pad .s { font-size:0.85rem; font-weight:600; color:rgba(11,11,18,0.7); margin-top:6px; }
+
+.stats { display:flex; gap:14px; margin-top:16px; }
+.bx { background:var(--card); border:1px solid var(--border); border-radius:13px; padding:8px 20px; text-align:center; min-width:88px; }
+.bx .l { font-size:0.62rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; }
+.bx .v { font-size:1.25rem; font-weight:800; color:var(--accent); font-variant-numeric:tabular-nums; }
+.bar { margin-top:16px; display:flex; align-items:flex-end; gap:3px; height:42px; }
+.bar i { flex:1; background:var(--accent); border-radius:3px 3px 0 0; opacity:.7; }
+.msg { margin-top:14px; font-size:0.85rem; color:var(--muted); min-height:18px; }
+.btn { margin-top:12px; padding:10px 26px; border-radius:30px; border:none; background:var(--accent); color:#fff; font-weight:700; cursor:pointer; transition:filter .2s; }
+.btn:hover { filter:brightness(1.15); }
+</style>
+</head>
+<body>
+    <h1>⚡ <span>REFLEX</span></h1>
+    <div class="sub">초록이 될 때 가장 빨리 클릭하세요 · 5회 평균</div>
+
+    <div class="pad wait" id="pad">
+        <div><div class="t">준비...</div><div class="s">초록으로 바뀌면 클릭!</div></div>
+    </div>
+
+    <div class="stats">
+        <div class="bx"><div class="l">회차</div><div class="v" id="round">0/5</div></div>
+        <div class="bx"><div class="l">최근</div><div class="v" id="last">—</div></div>
+        <div class="bx"><div class="l">평균</div><div class="v" id="avg">—</div></div>
+        <div class="bx"><div class="l">최고</div><div class="v" id="best">—</div></div>
+    </div>
+
+    <div class="bar" id="bar"></div>
+    <div class="msg" id="msg">아무 때나 클릭해서 시작</div>
+    <button class="btn" onclick="reset()">↺ 다시</button>
+
+<script>
+const pad=document.getElementById('pad');
+let times=[], round=0, waiting=false, goTime=0, timeoutId=null;
+let best=parseInt(localStorage.getItem('reflexBest')||'0');
+if(best) document.getElementById('best').textContent=best+'ms';
+
+function setPad(state,title,sub){
+    pad.className='pad '+state;
+    pad.innerHTML=`<div><div class="t">${title}</div><div class="s">${sub}</div></div>`;
+}
+function reset(){
+    clearTimeout(timeoutId); times=[]; round=0;
+    document.getElementById('round').textContent='0/5';
+    document.getElementById('last').textContent='—';
+    document.getElementById('avg').textContent='—';
+    document.getElementById('bar').innerHTML='';
+    document.getElementById('msg').textContent='아무 때나 클릭해서 시작';
+    waiting=false; setPad('wait','준비...','초록으로 바뀌면 클릭!');
+}
+function click(){
+    if(waiting){ // clicked too early during wait
+        clearTimeout(timeoutId); waiting=false;
+        setPad('bad','너무 빨라요!','다시 시도하려면 클릭');
+        document.getElementById('msg').textContent='⚠️ 기다렸다가 초록이 된 뒤 클릭하세요';
+        return;
+    }
+    if(pad.classList.contains('go')){ // worked
+        const rt=performance.now()-goTime;
+        times.push(Math.round(rt));
+        round++;
+        document.getElementById('round').textContent=round+'/5';
+        document.getElementById('last').textContent=Math.round(rt)+'ms';
+        const avg=Math.round(times.reduce((a,b)=>a+b,0)/times.length);
+        document.getElementById('avg').textContent=avg+'ms';
+        renderBar();
+        if(best===0||Math.round(rt)<best){ best=Math.round(rt); localStorage.setItem('reflexBest',String(best)); document.getElementById('best').textContent=best+'ms'; }
+        if(round>=5){
+            document.getElementById('msg').innerHTML=`✅ 완료! 평균 <b>${avg}ms</b>`;
+            setPad('go','평균 '+avg+'ms','클릭하면 다시 시작');
+            round=0; times=[]; document.getElementById('round').textContent='0/5';
+            return;
+        }
+        document.getElementById('msg').textContent=`${round}회 완료 · 계속!`;
+        startWait();
+    }else{
+        // idle/start -> begin a wait
+        startWait();
+    }
+}
+function startWait(){
+    waiting=true;
+    setPad('wait','준비...','초록으로 바뀌면 클릭!');
+    document.getElementById('msg').textContent='기다리세요...';
+    const delay=1000+Math.random()*2500;
+    timeoutId=setTimeout(()=>{
+        waiting=false;
+        goTime=performance.now();
+        setPad('go','클릭!','⚡');
+    },delay);
+}
+function renderBar(){
+    const bar=document.getElementById('bar');
+    bar.innerHTML='';
+    times.forEach(t=>{ const h=Math.min(40,t/4); bar.innerHTML+=`<i style="height:${h}px"></i>`; });
+}
+pad.onclick=click;
+reset();
+</script>
+</body>
+</html>

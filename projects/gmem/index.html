@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Memory</title>
+<style>
+:root { --bg:#0b0b12; --card:#13131c; --border:#23233a; --text:#ececf5; --muted:#6b6f82; --accent:#7c5cff; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; }
+h1 { font-size:1.4rem; font-weight:800; } h1 span{color:var(--accent);}
+.sub { color:var(--muted); font-size:0.82rem; margin:6px 0 18px; }
+.bar { display:flex; gap:14px; margin-bottom:20px; }
+.bx { background:var(--card); border:1px solid var(--border); border-radius:13px; padding:8px 22px; text-align:center; }
+.bx .l { font-size:0.62rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; }
+.bx .v { font-size:1.3rem; font-weight:800; color:var(--accent); font-variant-numeric:tabular-nums; }
+
+.grid { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; width:min(90vw,360px); aspect-ratio:1; perspective:900px; }
+.card { position:relative; transform-style:preserve-3d; cursor:pointer; transition:transform .4s; }
+.card.flip { transform:rotateY(180deg); }
+.card.matched { cursor:default; }
+.face { position:absolute; inset:0; backface-visibility:hidden; border-radius:12px; display:flex; align-items:center; justify-content:center; }
+.front { background:linear-gradient(145deg,#1c1c2e,#23233a); border:1px solid #2e2e48; font-size:1.6rem; color:#6b6f82; }
+.front::after { content:'?'; }
+.back { background:linear-gradient(145deg,#13131c,#1a1a2a); border:1px solid var(--border); font-size:2.2rem; transform:rotateY(180deg); }
+.card.matched .back { background:rgba(92,230,168,0.12); border-color:#2a5a45; }
+
+.msg { margin-top:18px; font-size:0.92rem; font-weight:600; min-height:22px; text-align:center; }
+.btn { margin-top:14px; padding:11px 30px; border-radius:30px; border:none; background:var(--accent); color:#fff; font-weight:700; font-size:0.85rem; cursor:pointer; transition:filter .2s; }
+.btn:hover { filter:brightness(1.15); }
+.diff { display:flex; gap:8px; margin-bottom:18px; }
+.dbtn { padding:8px 16px; border-radius:20px; border:1.5px solid var(--border); background:transparent; color:var(--muted); font-size:0.75rem; font-weight:700; cursor:pointer; transition:all .2s; }
+.dbtn.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+</style>
+</head>
+<body>
+    <h1>🧠 <span>메모리</span></h1>
+    <div class="sub">같은 이모지 카드를 찾아 짝을 맞추세요</div>
+
+    <div class="diff">
+        <button class="dbtn active" data-n="4" onclick="setDiff(4)">쉬움 4×4</button>
+        <button class="dbtn" data-n="6" onclick="setDiff(6)">보통 4×6</button>
+        <button class="dbtn" data-n="8" onclick="setDiff(8)">어려움 4×8</button>
+    </div>
+
+    <div class="bar">
+        <div class="bx"><div class="l">이동</div><div class="v" id="moves">0</div></div>
+        <div class="bx"><div class="l">시간</div><div class="v" id="time">0:00</div></div>
+        <div class="bx"><div class="l">최고기록</div><div class="v" id="best">—</div></div>
+    </div>
+
+    <div class="grid" id="grid"></div>
+    <div class="msg" id="msg">카드를 뒤집어 시작하세요</div>
+    <button class="btn" onclick="start()">↺ 새 게임</button>
+
+<script>
+const EM = ['🍎','🍌','🍇','🍕','🎈','🎁','🎧','⚽','🐱','🐶','🌙','⭐','🚀','🌈','🔥','🍉','🥑','🍒'];
+const grid=document.getElementById('grid');
+let N=4, cards=[], first=null, lock=false, moves=0, matched=0, timer=null, secs=0, started=false;
+let bestKey='memBest4';
+document.getElementById('best').textContent=localStorage.getItem(bestKey)? '∞':'—';
+
+function shuff(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function setDiff(n){ N=n; document.querySelectorAll('.dbtn').forEach(b=>b.classList.toggle('active',+b.dataset.n===n)); start(); }
+function start(){
+    clearInterval(timer); secs=0; started=false; moves=0; matched=0; first=null; lock=false;
+    document.getElementById('moves').textContent=0; document.getElementById('time').textContent='0:00';
+    document.getElementById('msg').textContent='카드를 뒤집어 시작하세요';
+    bestKey='memBest'+N;
+    const old=localStorage.getItem(bestKey);
+    document.getElementById('best').textContent = old? old+'점':'—';
+    const pairs=N*2;
+    const emo=shuff(EM.slice()).slice(0,pairs);
+    cards=shuff([...emo,...emo]);
+    render();
+}
+function render(){
+    grid.style.gridTemplateColumns=`repeat(4,1fr)`;
+    grid.innerHTML='';
+    cards.forEach((e,i)=>{
+        const d=document.createElement('div');
+        d.className='card'; d.dataset.i=i;
+        d.innerHTML=`<div class="face back">${e}</div><div class="face front"></div>`;
+        d.onclick=()=>flip(d);
+        grid.appendChild(d);
+    });
+}
+function flip(d){
+    if(lock || d.classList.contains('flip') || d.classList.contains('matched')) return;
+    if(!started){ started=true; timer=setInterval(tick,1000); }
+    d.classList.add('flip');
+    if(!first){ first=d; return; }
+    moves++; document.getElementById('moves').textContent=moves;
+    if(first.querySelector('.back').textContent === d.querySelector('.back').textContent){
+        first.classList.add('matched'); d.classList.add('matched');
+        matched++;
+        if(matched===N*2){ win(); }
+    }else{
+        lock=true;
+        const a=first;
+        setTimeout(()=>{ a.classList.remove('flip'); d.classList.remove('flip'); lock=false; },700);
+    }
+    first=null;
+}
+function tick(){ secs++; const m=Math.floor(secs/60), s=secs%60; document.getElementById('time').textContent=`${m}:${String(s).padStart(2,'0')}`; }
+function win(){
+    clearInterval(timer);
+    const words=EM.slice().slice(0,N*2).length;
+    const prev=parseInt(localStorage.getItem(bestKey)||'999999');
+    if(moves<prev){ localStorage.setItem(bestKey,String(moves)); document.getElementById('best').textContent=moves+'점 🎉'; }
+    document.getElementById('msg').innerHTML=`🎉 클리어! ${moves}이동 · ${document.getElementById('time').textContent}`;
+}
+start();
+</script>
+</body>
+</html>
