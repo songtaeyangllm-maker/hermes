@@ -358,5 +358,13 @@
     "path": "C:/hermes/projects/fra",
     "created": "2026-09-01",
     "updated": "2026-09-01 10:51"
+  },
+  {
+    "name": "NeuralNet",
+    "status": "active",
+    "description": "신경망 학습 시각화(경사하강 분류)",
+    "path": "C:/hermes/projects/nn",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 10:53"
   }
 ]

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Neural Net</title>
+<style>
+:root { --bg:#05070e; --text:#dbe4f0; --muted:#6b7686; --card:#0d1424; --border:#1c2a44; --accent:#5b8cff; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; display:flex; flex-direction:column; align-items:center; gap:14px; padding:20px; min-height:100vh; }
+h1{ font-size:20px; letter-spacing:2px; } h1 span{ color:var(--accent); }
+.sub{ color:var(--muted); font-size:13px; }
+.wrap{ display:flex; gap:14px; flex-wrap:wrap; justify-content:center; align-items:flex-start; }
+#cv{ border:1px solid var(--border); border-radius:12px; background:#080b14; display:block; cursor:crosshair; }
+#loss{ border:1px solid var(--border); border-radius:12px; background:#080b14; }
+.bar{ display:flex; gap:9px; flex-wrap:wrap; justify-content:center; align-items:center; }
+.btn{ background:#16223a; color:#dbe4f0; border:1px solid var(--border); border-radius:8px; padding:7px 14px; cursor:pointer; font-size:13px; }
+.btn:hover{ background:#1f3050; } .btn.primary{ background:var(--accent); color:#081020; font-weight:600; }
+.badge{ background:var(--card); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-size:12px; color:var(--muted); }
+.badge b{ color:var(--text); }
+input[type=range]{ accent-color:var(--accent); width:110px; }
+.help{ font-size:12px; color:#55606f; max-width:660px; text-align:center; line-height:1.7; }
+.help b{ color:#9aa7bd; }
+</style>
+</head>
+<body>
+<h1>NEURAL <span>· NET</span></h1>
+<div class="sub">진짜 경사하강법으로 분류 경계를 학습하는 신경망 (2-4-1, tanh)</div>
+<div class="wrap">
+  <canvas id="cv" width="620" height="520"></canvas>
+  <div style="display:flex;flex-direction:column;gap:12px;align-items:center">
+    <canvas id="loss" width="230" height="120"></canvas>
+    <div class="bar"><button class="btn primary" id="train">▶ 학습 (50에폭)</button>
+      <button class="btn" id="one">1에폭</button>
+      <button class="btn" id="resets">🔄 초기화</button>
+      <button class="btn" id="gen">✨ 샘플 데이터</button></div>
+    <span class="badge">손실 <b id="lval">-</b></span>
+    <span class="badge">정확도 <b id="acc">-</b></span>
+    <span class="badge">학습률 <input type="range" id="lr" min="0.01" max="1" step="0.01" value="0.2"></span>
+  </div>
+</div>
+<div class="help">
+  <b>좌클릭</b> = 파란 점 추가 · <b>우클릭</b> = 빨간 점 추가 · <b>학습</b>을 누르면 신경망이 두 클래스를 나누는
+  경계를 배워요 — 배경색은 신경망의 예측, 선은 경계랍니다. 배경이 어두울수록 파랑 예측, 밝을수록 빨강 예측.
+</div>
+<script>
+const cv=document.getElementById('cv'), c=cv.getContext('2d');
+const lc=document.getElementById('loss'), lx=lc.getContext('2d');
+const W=cv.width,H=cv.height;
+let pts=[]; // {x,y,t} t in {-1(RED),1(BLUE)}
+// init sample: two blobs
+function genSample(){
+  pts=[];
+  for(let i=0;i<30;i++){ const a=Math.random()*2*Math.PI; const r=Math.random()*60; pts.push({x:220+Math.cos(a)*r, y:260+Math.sin(a)*r, t:1}); }
+  for(let i=0;i<30;i++){ const a=Math.random()*2*Math.PI; const r=Math.random()*60; pts.push({x:400+Math.cos(a)*r, y:260+Math.sin(a)*r, t:-1}); }
+}
+genSample();
+// normalize to [-1,1]
+function normX(x){return x/W*2-1;} function normY(y){return y/H*2-1;}
+// ---- simple MLP 2-4-1 ----
+let W1=Array.from({length:4},()=>[randn(),randn()]), b1=Array.from({length:4},()=>0);
+let W2=Array.from({length:4},()=>randn()), b2=0;
+function randn(){ let s=0; for(let i=0;i<6;i++)s+=Math.random(); return (s-3)/1.5; }
+function tanh(x){ const e=Math.exp(2*x); return (e-1)/(e+1); }
+function dtanh(y){ return 1-y*y; }
+function forward(x,y){
+  const h=[];
+  for(let j=0;j<4;j++){ h.push(tanh(W1[j][0]*x+W1[j][1]*y+b1[j])); }
+  let o=0; for(let j=0;j<4;j++)o+=W2[j]*h[j]; o+=b2; o=tanh(o);
+  return {h,o};
+}
+function predict(x,y){ return forward(normX(x),normY(y)).o; }
+function loss(){
+  let s=0; for(const p of pts){ s+=Math.pow(p.t-forward(normX(p.x),normY(p.y)).o,2); }
+  return pts.length?s/pts.length:0;
+}
+const losses=[];
+function trainEpoch(){
+  for(const p of pts){
+    const xi=normX(p.x), yi=normY(p.y), t=p.t;
+    const f=forward(xi,yi); const h=f.h, o=f.o;
+    const dLoss=2*(o-t)*dtanh(o); // dL/do
+    // output weights
+    for(let j=0;j<4;j++){ W2[j]-=LR*dLoss*h[j]; }
+    b2-=LR*dLoss;
+    // hidden
+    for(let j=0;j<4;j++){
+      const hj=h[j];
+      const dh= dLoss*W2[j]*dtanh(hj);
+      W1[j][0]-=LR*dh*xi; W1[j][1]-=LR*dh*yi; b1[j]-=LR*dh;
+    }
+  }
+  losses.push(loss());
+  if(losses.length>400)losses.shift();
+}
+let LR=0.2;
+document.getElementById('lr').addEventListener('input',e=>LR=+e.target.value);
+document.getElementById('train').addEventListener('click',()=>{ for(let i=0;i<50;i++)trainEpoch(); });
+document.getElementById('one').addEventListener('click',()=>trainEpoch());
+document.getElementById('resets').addEventListener('click',()=>{ W1=Array.from({length:4},()=>[randn(),randn()]); b1=Array.from({length:4},()=>0); W2=Array.from({length:4},()=>randn()); b2=0; losses.length=0; });
+document.getElementById('gen').addEventListener('click',genSample);
+// add points
+cv.addEventListener('contextmenu',e=>e.preventDefault());
+cv.addEventListener('mousedown',e=>{
+  const r=cv.getBoundingClientRect(); const x=e.clientX-r.left,y=e.clientY-r.top;
+  pts.push({x,y,t:e.button===2?-1:1});
+});
+let color=0;
+function draw(){
+  c.fillStyle='#080b14'; c.fillRect(0,0,W,H);
+  // background = network prediction (blocky for speed)
+  const step=8;
+  for(let gy=0;gy<H;gy+=step)for(let gx=0;gx<W;gx+=step){
+    const o=predict(gx+step/2,gy+step/2);
+    const v=(o+1)/2; // 0 blue .. 1 red
+    c.fillStyle='rgb('+Math.floor(30+15*v)+','+Math.floor(40*(1-v)+50*v)+','+Math.floor(120+80*(1-v))+')';
+    c.fillRect(gx,gy,step,step);
+  }
+  // data points
+  for(const p of pts){
+    c.beginPath(); c.arc(p.x,p.y,5,0,7);
+    c.fillStyle=p.t===1?'#5b8cff':'#ff5b5b'; c.fill();
+    c.strokeStyle='#fff'; c.lineWidth=1; c.stroke();
+  }
+  // loss chart
+  lx.fillStyle='#080b14'; lx.fillRect(0,0,230,120);
+  if(losses.length>1){
+    const mx=Math.max(...losses,0.1);
+    lx.strokeStyle='#5bff8c'; lx.lineWidth=2; lx.beginPath();
+    for(let i=0;i<losses.length;i++){ const px2=i/(losses.length-1)*228, py2=112-losses[i]/mx*100; if(i===0)lx.moveTo(px2,py2); else lx.lineTo(px2,py2); }
+    lx.stroke();
+  }
+  lx.fillStyle='#8b96ab'; lx.font='10px sans-serif'; lx.fillText('loss ('+losses.length+' ep)',6,112);
+  document.getElementById('lval').textContent=losses.length?(losses[losses.length-1].toFixed(4)):'-';
+  // accuracy
+  let correct=0; for(const p of pts){ const o=predict(p.x,p.y); if((o>0&&p.t===1)||(o<0&&p.t===-1))correct++; }
+  document.getElementById('acc').textContent=pts.length?(Math.round(correct/pts.length*100)+'%'):'-';
+}
+setInterval(draw,40);
+</script>
+</body>
+</html>
