@@ -422,5 +422,13 @@
     "path": "C:/hermes/projects/simon",
     "created": "2026-09-01",
     "updated": "2026-09-01 11:18"
+  },
+  {
+    "name": "SecurityUtils",
+    "status": "active",
+    "description": "비번/UUID/닉네임/해시 유틸",
+    "path": "C:/hermes/projects/sec",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 11:24"
   }
 ]

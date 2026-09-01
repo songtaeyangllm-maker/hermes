@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Security Utils</title>
+<style>
+:root { --bg:#05070e; --text:#dbe4f0; --muted:#6b7686; --card:#0d1424; --border:#1c2a44; --accent:#5b8cff; --green:#4ade80; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-serif; padding:22px; display:flex; flex-direction:column; align-items:center; gap:16px; }
+h1{ font-size:20px; letter-spacing:3px; } h1 span{ color:var(--green); }
+.sub{ color:var(--muted); font-size:12px; }
+.grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; width:100%; max-width:900px; }
+.card{ background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; display:flex; flex-direction:column; gap:10px; }
+.card h3{ font-size:14px; color:#9fb0c8; display:flex; align-items:center; gap:6px; }
+.out{ background:#0a0f1e; border:1px solid var(--border); border-radius:8px; padding:12px; font-family:Consolas,monospace; font-size:13px; word-break:break-all; min-height:20px; color:var(--text); }
+.row{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+.btn{ background:#16223a; color:#dbe4f0; border:1px solid var(--border); border-radius:7px; padding:6px 12px; cursor:pointer; font-size:12px; }
+.btn:hover{ background:#1f3050; } .btn.gen{ background:var(--accent); color:#051; font-weight:600; }
+.chk{ display:flex; gap:8px; align-items:center; font-size:12px; color:#9fb0c8; }
+input[type=text]{ background:#0a0f1e; border:1px solid var(--border); color:var(--text); border-radius:7px; padding:8px; font-size:13px; flex:1; min-width:0; font-family:Consolas,monospace; }
+input[type=range]{ accent-color:var(--accent); }
+.tiny{ color:var(--muted); font-size:11px; }
+</style>
+</head>
+<body>
+<h1>SECURITY <span>· UTILS</span></h1>
+<div class="sub">비밀번호 · UUID · 닉네임 · 해시 — 무작위성과 암호학</div>
+<div class="grid">
+  <div class="card">
+    <h3>🔐 비밀번호 생성</h3>
+    <div><input type="text" id="pwOut" readonly></div>
+    <div class="row">
+      <label class="chk">길이 <input type="range" id="pwLen" min="8" max="32" value="16"><span id="pwLenV">16</span></label>
+    </div>
+    <div class="row">
+      <label class="chk"><input type="checkbox" id="pwUpp" checked>대문자</label>
+      <label class="chk"><input type="checkbox" id="pwNum" checked>숫자</label>
+      <label class="chk"><input type="checkbox" id="pwSym" checked>특수</label>
+    </div>
+    <div class="row"><button class="btn gen" id="pwGen">⚡ 생성</button><button class="btn copy" data-t="pwOut">복사</button></div>
+  </div>
+  <div class="card">
+    <h3>🆔 UUID v4</h3>
+    <div><input type="text" id="uuidOut" readonly></div>
+    <div class="row"><button class="btn gen" id="uuidGen">생성</button><button class="btn copy" data-t="uuidOut">복사</button></div>
+    <div class="tiny">RFC 4122 — crypto.getRandomValues 기반</div>
+  </div>
+  <div class="card">
+    <h3>🎏 랜덤 닉네임</h3>
+    <div><input type="text" id="nickOut" readonly></div>
+    <div class="row"><button class="btn gen" id="nickGen">생성</button><button class="btn copy" data-t="nickOut">복사</button></div>
+    <div class="tiny">감성 + 동물 조합 (한국어/영문)</div>
+  </div>
+  <div class="card" style="grid-column:1/-1;">
+    <h3>🔏 텍스트 해시 (SHA-256 / SHA-1 / MD5)</h3>
+    <div class="row"><input type="text" id="hashIn" placeholder="해시할 텍스트 입력…"></div>
+    <div class="col" style="display:flex;flex-direction:column;gap:6px;">
+      <div class="row"><span class="tiny" style="width:70px">SHA-256</span><code id="sha256" style="font-size:12px;color:#9fb0c8;word-break:break-all"></code></div>
+      <div class="row"><span class="tiny" style="width:70px">SHA-1</span><code id="sha1" style="font-size:12px;color:#9fb0c8;word-break:break-all"></code></div>
+      <div class="row"><span class="tiny" style="width:70px">MD5</span><code id="md5" style="font-size:12px;color:#9fb0c8;word-break:break-all"></code></div>
+    </div>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+function copy(id){ const el=$(id); el.select(); el.setSelectionRange(0,99999); try{ navigator.clipboard.writeText(el.value); }catch(e){ document.execCommand('copy'); } }
+document.querySelectorAll('.copy').forEach(b=>b.addEventListener('click',e=>{ const t=copy(e.target.dataset.t); const o=b.textContent; b.textContent='✔ 복사됨'; b.style.background='#4ade80'; setTimeout(()=>{b.textContent=o;b.style.background='';},900); }));
+document.querySelectorAll('input[type=text]').forEach(i=>i.addEventListener('click',e=>e.target.select()));
+// password
+const upper='ABCDEFGHIJKLMNOPQRSTUVWXYZ', lower='abcdefghijklmnopqrstuvwxyz', digits='0123456789', syms='!@#$%^&*()-_=+[]{};:,.?';
+function genPW(){
+  let len=+$('pwLen').value, chars=lower, ensure=[];
+  if($('pwUpp').checked){ chars+=upper; ensure.push(upper[Math.floor(Math.random()*upper.length)]); }
+  if($('pwNum').checked){ chars+=digits; ensure.push(digits[Math.floor(Math.random()*digits.length)]); }
+  if($('pwSym').checked){ chars+=syms; ensure.push(syms[Math.floor(Math.random()*syms.length)]); }
+  const arr=new Uint32Array(len); crypto.getRandomValues(arr);
+  let s='';
+  for(let i=0;i<len;i++) s+=chars[arr[i]%chars.length];
+  // ensure at least one of each selected class
+  const base=[...s].slice(0,len-ensure.length); const pw=[...ensure,...base].sort(()=>Math.random()-.5).join('');
+  $('pwOut').value=pw;
+}
+$('pwLen').addEventListener('input',e=>$('pwLenV').textContent=e.target.value);
+$('pwGen').addEventListener('click',genPW);
+// uuid
+function genUUID(){
+  if(crypto.randomUUID){ $('uuidOut').value=crypto.randomUUID(); return; }
+  const b=crypto.getRandomValues(new Uint8Array(16)); b[6]=(b[6]&0x0f)|0x40; b[8]=(b[8]&0x3f)|0x80;
+  const h=[...b].map(x=>x.toString(16).padStart(2,'0')).join('');
+  $('uuidOut').value=`${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+}
+$('uuidGen').addEventListener('click',genUUID);
+// nick
+const adj=['푸른','따뜻한','빠른','은하','초록','반짝','달빛','비밀','용감한','졸린','무지개','은하수','꿈꾸는','눈부신','조용한','신나는'];
+const animal=['여우','수달','독수리','고래','호랑이','강아지','햄스터','펭귄','참새','나무늘보','코알라','여우원숭이','다람쥐','토끼','늑대','살쾡이'];
+function genNick(){ $('nickOut').value=adj[Math.floor(Math.random()*adj.length)]+animal[Math.floor(Math.random()*animal.length)]+Math.floor(100+Math.random()*900); }
+$('nickGen').addEventListener('click',genNick);
+// hash
+async function hashAll(){
+  const t=$('hashIn').value||'';
+  const enc=new TextEncoder().encode(t);
+  const s256=await crypto.subtle.digest('SHA-256',enc);
+  const s1=await crypto.subtle.digest('SHA-1',enc);
+  $('sha256').textContent=[...new Uint8Array(s256)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  $('sha1').textContent=[...new Uint8Array(s1)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  $('md5').textContent=md5(t);
+}
+$('hashIn').addEventListener('input',hashAll);
+function md5(str){
+  const rotl=(x,c)=>((x<<c)|(x>>>(32-c)))>>>0;
+  const bytes=[]; for(let i=0;i<str.length;i++)bytes.push(str.charCodeAt(i)&0xff);
+  const bitLen=str.length*8;
+  const bl=(((str.length+8)>>6)+1)*16;
+  const word=new Array(bl).fill(0);
+  for(let i=0;i<bytes.length;i++){ word[i>>2]=(word[i>>2]|(bytes[i]<<((i%4)*8)))>>>0; }
+  word[str.length>>2]=(word[str.length>>2]|(0x80<<((str.length%4)*8)))>>>0;
+  word[bl-2]=bitLen>>>0; word[bl-1]=Math.floor(bitLen/4294967296)>>>0;
+  const F=(x,y,z)=>(x&y)|(~x&z), G=(x,y,z)=>(x&z)|(y&~z), H=(x,y,z)=>x^y^z, I=(x,y,z)=>y^(x|~z);
+  const S=[7,12,17,22,7,12,17,22,7,12,17,22,7,12,17,22,5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21];
+  const K=[...Array(64)].map((_,i)=>Math.floor(Math.abs(Math.sin(i+1))*4294967296)>>>0);
+  let h0=1732584193, h1=-271733879, h2=-1732584194, h3=271733878;
+  for(let i=0;i<bl;i+=16){
+    const M=word.slice(i,i+16);
+    let A=h0,B=h1,C=h2,D=h3;
+    for(let j=0;j<64;j++){
+      let f,g;
+      if(j<16){ f=F(B,C,D); g=j; }
+      else if(j<32){ f=G(B,C,D); g=(5*j+1)%16; }
+      else if(j<48){ f=H(B,C,D); g=(3*j+5)%16; }
+      else { f=I(B,C,D); g=(7*j)%16; }
+      const t=(A+f+K[j]+M[g])>>>0;
+      const temp=D;
+      D=C; C=B; B=(B+rotl(t,S[j]))>>>0; A=temp;
+    }
+    h0=(h0+A)>>>0; h1=(h1+B)>>>0; h2=(h2+C)>>>0; h3=(h3+D)>>>0;
+  }
+  const hexW=x=>{ let s=''; for(let i=0;i<4;i++) s+=((x>>(i*8))&0xff).toString(16).padStart(2,'0'); return s; };
+  return hexW(h0)+hexW(h1)+hexW(h2)+hexW(h3);
+}
+// init
+genPW(); genUUID(); genNick();
+</script>
+</body>
+</html>
