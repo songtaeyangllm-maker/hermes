@@ -254,5 +254,13 @@
     "path": "C:/hermes/projects/greact",
     "created": "2026-09-01",
     "updated": "2026-09-01 10:12"
+  },
+  {
+    "name": "CubeLanding",
+    "status": "active",
+    "description": "3D 큐브 쇼케이스 랜딩",
+    "path": "C:/hermes/projects/landing",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 10:15"
   }
 ]

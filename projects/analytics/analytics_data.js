@@ -1,5 +1,5 @@
 window.HERMES_ANALYTICS = {
-  "generated": "2026-09-01 10:02",
+  "generated": "2026-09-01 10:15",
   "diary": [
     {
       "date": "2026-08-20",
@@ -324,9 +324,72 @@ window.HERMES_ANALYTICS = {
       "path": "C:/hermes/projects/breath",
       "created": "2026-08-31",
       "updated": "2026-08-31 18:37"
+    },
+    {
+      "name": "Analytics",
+      "status": "active",
+      "description": "데이터 분석 대시보드",
+      "path": "C:/hermes/projects/analytics",
+      "created": "2026-09-01",
+      "updated": "2026-09-01 10:05"
+    },
+    {
+      "name": "2048",
+      "status": "active",
+      "description": "2048 퍼즐 게임",
+      "path": "C:/hermes/projects/g2048",
+      "created": "2026-09-01",
+      "updated": "2026-09-01 10:10"
+    },
+    {
+      "name": "TicTacToe",
+      "status": "active",
+      "description": "틱택토 (미니맥스 AI)",
+      "path": "C:/hermes/projects/gttt",
+      "created": "2026-09-01",
+      "updated": "2026-09-01 10:10"
+    },
+    {
+      "name": "GameHub",
+      "status": "active",
+      "description": "미니게임 컬렉션 허브",
+      "path": "C:/hermes/projects/gamehub",
+      "created": "2026-09-01",
+      "updated": "2026-09-01 10:10"
+    },
+    {
+      "name": "Memory",
+      "status": "active",
+      "description": "기억력 카드 맞추기",
+      "path": "C:/hermes/projects/gmem",
+      "created": "2026-09-01",
+      "updated": "2026-09-01 10:12"
+    },
+    {
+      "name": "Reflex",
+      "status": "active",
+      "description": "반응속도 테스트",
+      "path": "C:/hermes/projects/greact",
+      "created": "2026-09-01",
+      "updated": "2026-09-01 10:12"
     }
   ],
   "git": [
+    {
+      "hash": "d53fa50",
+      "date": "2026-09-01",
+      "msg": "게임: 메모리카드 + 반응속도 테스트 추가"
+    },
+    {
+      "hash": "fd8d068",
+      "date": "2026-09-01",
+      "msg": "게임: 2048 + 틱택토(미니맥스) + 게임허브 + 분석대시보드"
+    },
+    {
+      "hash": "3bb9f5c",
+      "date": "2026-09-01",
+      "msg": "분석: 데이터 대시보드(감정추이/분포/git/키워드 SVG)"
+    },
     {
       "hash": "08f9f23",
       "date": "2026-08-31",

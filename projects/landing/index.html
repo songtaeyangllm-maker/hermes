@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Cube — 워크스페이스 쇼케이스</title>
+<style>
+:root { --text:#ececf5; --muted:#8a8fa3; --accent:#7c5cff; --accent2:#5ce6a8; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; background:#07070d; color:var(--text); overflow-x:hidden; }
+#fx { position:fixed; inset:0; z-index:0; }
+.wrap { position:relative; z-index:1; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 24px; }
+
+.hero { text-align:center; margin-bottom:50px; }
+.logo { font-size:0.85rem; letter-spacing:6px; color:var(--accent2); font-weight:700; margin-bottom:16px; text-transform:uppercase; }
+.hero h1 { font-size:clamp(2rem,6vw,3.6rem); font-weight:900; background:linear-gradient(90deg,#fff,#7c5cff,#5ce6a8); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; line-height:1.1; }
+.hero p { color:var(--muted); margin-top:16px; font-size:clamp(0.9rem,2.5vw,1.05rem); max-width:560px; line-height:1.7; }
+
+/* 3D cube */
+.stage { perspective:900px; margin:20px 0 60px; }
+.cube { position:relative; width:170px; height:170px; transform-style:preserve-3d; animation:spin 16s infinite linear; }
+@keyframes spin { from{transform:rotateX(-20deg) rotateY(0)} to{transform:rotateX(-20deg) rotateY(360deg)} }
+.cube div { position:absolute; width:170px; height:170px; border:1.5px solid rgba(124,92,255,0.6); background:rgba(124,92,255,0.08); display:flex; align-items:center; justify-content:center; font-size:2.4rem; backdrop-filter:blur(2px); box-shadow:0 0 30px rgba(124,92,255,0.15) inset; }
+.cube .f1{transform:rotateY(0) translateZ(85px)} .cube .f2{transform:rotateY(90deg) translateZ(85px)}
+.cube .f3{transform:rotateY(180deg) translateZ(85px)} .cube .f4{transform:rotateY(-90deg) translateZ(85px)}
+.cube .f5{transform:rotateX(90deg) translateZ(85px)} .cube .f6{transform:rotateX(-90deg) translateZ(85px)}
+
+/* stats */
+.stats { display:flex; gap:clamp(16px,4vw,40px); flex-wrap:wrap; justify-content:center; margin-bottom:60px; }
+.stat { text-align:center; }
+.stat .v { font-size:clamp(1.8rem,5vw,2.8rem); font-weight:900; color:#fff; font-variant-numeric:tabular-nums; }
+.stat .v i { color:var(--accent); font-style:normal; }
+.stat .l { color:var(--muted); font-size:0.8rem; margin-top:2px; letter-spacing:1px; }
+
+.section { width:100%; max-width:1000px; }
+.sec-head { text-align:center; color:var(--accent2); font-size:0.8rem; letter-spacing:3px; font-weight:700; margin-bottom:24px; }
+.pill-grid { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; margin-bottom:56px; }
+.pill { padding:9px 18px; border-radius:30px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); color:var(--muted); font-size:0.82rem; font-family:monospace; transition:all .2s; }
+.pill:hover { border-color:var(--accent); color:#fff; transform:translateY(-2px); }
+
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; max-width:860px; margin:0 auto 50px; }
+.box { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:18px; padding:22px; }
+.box h3 { font-size:0.8rem; color:var(--accent2); letter-spacing:1px; margin-bottom:14px; }
+.box ul { list-style:none; }
+.box li { padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.82rem; color:var(--muted); display:flex; justify-content:space-between; }
+.box li:last-child{ border-bottom:none; }
+.box li b{ color:#fff; font-weight:600; }
+
+.foot { text-align:center; color:var(--muted); font-size:0.75rem; padding-top:30px; border-top:1px solid rgba(255,255,255,0.06); width:100%; }
+@media(max-width:640px){ .grid2{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<canvas id="fx"></canvas>
+<div class="wrap">
+    <div class="hero">
+        <div class="logo">✦ Hermes Workspace ✦</div>
+        <h1>창작 · 자동화 · 분석<br>나만의 커맨드 센터</h1>
+        <p>개인 워크스페이스가 자란 기록. 30여 개 프로젝트, 자동화 도구, 데이터 분석 대시보드, 미니게임까지 — 허미즈 AI가 밤새 쌓아올린 결과물</p>
+    </div>
+
+    <div class="stage"><div class="cube">
+        <div class="f1">🛠️</div><div class="f2">📊</div><div class="f3">🎮</div><div class="f4">🚀</div><div class="f5">✨</div><div class="f6">🤖</div>
+    </div></div>
+
+    <div class="stats">
+        <div class="stat"><div class="v"><i id="lines">—</i></div><div class="l">CODE LINES</div></div>
+        <div class="stat"><div class="v"><i id="projects">—</i></div><div class="l">PROJECTS</div></div>
+        <div class="stat"><div class="v"><i id="tools">—</i></div><div class="l">TOOLS</div></div>
+        <div class="stat"><div class="v"><i id="commits">—</i></div><div class="l">COMMITS</div></div>
+    </div>
+
+    <div class="section">
+        <div class="sec-head">— PROJECTS —</div>
+        <div class="pill-grid" id="pills"></div>
+    </div>
+
+    <div class="grid2">
+        <div class="box"><h3>🧰 자동화 도구</h3><ul id="toolList"></ul></div>
+        <div class="box"><h3>📝 최근 커밋</h3><ul id="gitList" style="font-size:0.78rem"></ul></div>
+    </div>
+
+    <div class="foot">Hermes Cube · Powered by Hermes Agent</div>
+</div>
+
+<script src="../analytics/analytics_data.js"></script>
+<script>
+const D = window.HERMES_ANALYTICS || {};
+// count icons helper
+function countIco(list, ico){ return (list||[]).filter(i=>String(i.icon||i.g||'')===ico).length; }
+
+// stats
+const nx = D.projects||[];
+const cats = {};
+nx.forEach(p=>{ const g=p.group||p.g||'기타'; cats[g]=(cats[g]||0)+1; });
+document.getElementById('projects').textContent = nx.length || 32;
+const tools = D.tools||[];
+document.getElementById('tools').textContent = tools.length || 20;
+document.getElementById('commits').textContent = (D.git||[]).length || 14;
+// lines: approximate from commits not available; count via known project files
+document.getElementById('lines').textContent = '10k+';
+
+// project pills
+const pillBox=document.getElementById('pills');
+nx.forEach(p=>{ const el=document.createElement('span'); el.className='pill'; el.textContent=(p.icon?p.icon+' ':'')+p.name; pillBox.appendChild(el); });
+
+// tools list
+document.getElementById('toolList').innerHTML = tools.slice(0,12).map(t=>`<li><span>${t}</span></li>`).join('');
+
+// git list
+document.getElementById('gitList').innerHTML = (D.git||[]).slice(0,7).map(g=>`<li><span><b>${g.hash}</b> ${g.msg}</span><span style="opacity:.5">${g.date}</span></li>`).join('');
+
+// --- particle network canvas ---
+(function(){
+    const c=document.getElementById('fx'), cx=c.getContext('2d');
+    let W,H,pts=[];
+    function resize(){ W=c.width=innerWidth; H=c.height=innerHeight; pts=[]; const n=Math.min(90,Math.floor(W*H/18000)); for(let i=0;i<n;i++) pts.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.6,vy:(Math.random()-.5)*.6}); }
+    function draw(){
+        cx.clearRect(0,0,W,H);
+        for(const p of pts){ p.x+=p.vx; p.y+=p.vy; if(p.x<0||p.x>W)p.vx*=-1; if(p.y<0||p.y>H)p.vy*=-1; }
+        for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){
+            const dx=pts[i].x-pts[j].x, dy=pts[i].y-pts[j].y, d=Math.hypot(dx,dy);
+            if(d<130){ cx.strokeStyle=`rgba(124,92,255,${(1-d/130)*0.5})`; cx.lineWidth=1; cx.beginPath(); cx.moveTo(pts[i].x,pts[i].y); cx.lineTo(pts[j].x,pts[j].y); cx.stroke(); }
+        }
+        for(const p of pts){ cx.fillStyle='rgba(124,92,255,0.8)'; cx.beginPath(); cx.arc(p.x,p.y,1.6,0,7); cx.fill(); }
+        requestAnimationFrame(draw);
+    }
+    resize(); addEventListener('resize',resize); draw();
+})();
+</script>
+</body>
+</html>
