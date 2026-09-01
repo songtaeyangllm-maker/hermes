@@ -286,5 +286,13 @@
     "path": "C:/hermes/projects/drum",
     "created": "2026-09-01",
     "updated": "2026-09-01 10:22"
+  },
+  {
+    "name": "Synth",
+    "status": "active",
+    "description": "Web Audio 신디사이저(파형/서스테인/녹음재생)",
+    "path": "C:/hermes/projects/synth",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 10:25"
   }
 ]

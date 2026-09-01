@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Synth</title>
+<style>
+:root { --bg:#0b0b12; --card:#13131c; --border:#23233a; --text:#ececf5; --muted:#6b6f82; --accent:#7c5cff; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; }
+h1 { font-size:1.3rem; font-weight:800; } h1 span{color:var(--accent);}
+.sub { color:var(--muted); font-size:0.8rem; margin:5px 0 22px; }
+
+.ctrl { display:flex; align-items:center; gap:14px; flex-wrap:wrap; justify-content:center; margin-bottom:22px; }
+.group { display:flex; align-items:center; gap:6px; }
+.glab { color:var(--muted); font-size:0.72rem; margin-right:4px; }
+.wbtn { padding:7px 15px; border-radius:20px; border:1.5px solid var(--border); background:transparent; color:var(--muted); font-size:0.75rem; font-weight:700; cursor:pointer; transition:all .2s; }
+.wbtn.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+.action { padding:9px 20px; border-radius:24px; border:none; font-weight:800; font-size:0.8rem; cursor:pointer; transition:all .2s; }
+.rec { background:#ff6b6b; color:#fff; } .rec.recording { animation:blink 1s infinite; }
+.pl { background:var(--pos,#5ce6a8); color:#0a2e1e; }
+@keyframes blink { 50%{opacity:.5;} }
+.sustain { padding:7px 14px; border-radius:20px; border:1.5px solid var(--border); background:transparent; color:var(--muted); font-size:0.75rem; cursor:pointer; }
+.sustain.on { border-color:var(--accent); color:var(--accent); }
+
+/* keyboard */
+.kbd { display:flex; position:relative; width:min(94vw,680px); height:190px; background:#0e0e17; border:1px solid var(--border); border-radius:16px; padding:10px; overflow:hidden; }
+.key { position:relative; flex:1; }
+.key .white { position:absolute; inset:0; background:linear-gradient(180deg,#f5f5fa,#d9d9e4); border-radius:0 0 6px 6px; border:1px solid #aaa; box-shadow:0 3px 0 #999; cursor:pointer; transition:all .08s; }
+.key .white.active { background:#c9c9ff; }
+.key .black { position:absolute; top:0; right:-11px; width:22px; height:60%; background:linear-gradient(180deg,#2a2a3a,#111); border-radius:0 0 4px 4px; z-index:2; cursor:pointer; color:transparent; box-shadow:0 3px 0 #000; }
+.key .black.active { background:#5c5cFF; }
+.key .lbl { position:absolute; bottom:6px; left:0; right:0; text-align:center; font-size:0.6rem; color:#999; z-index:3; }
+.key .black + .lbl { color:#888; }
+.note { color:#5ce6a8; font-size:0.7rem; padding:2px 8px; border-radius:10px; background:rgba(92,230,168,0.1); font-family:monospace; }
+.foot { margin-top:20px; color:var(--muted); font-size:0.72rem; text-align:center; }
+.kbdhint { margin-top:10px; color:var(--muted); font-size:0.75rem; }
+</style>
+</head>
+<body>
+    <h1>🎹 <span>SYNTH PAD</span></h1>
+    <div class="sub">Web Audio 신디사이저 · 마우스 또는 키보드 연주</div>
+
+    <div class="ctrl">
+        <div class="group">
+            <span class="glab">파형</span>
+            <button class="wbtn" data-w="sawtooth" onclick="setWave(this)">톱니</button>
+            <button class="wbtn on" data-w="square" onclick="setWave(this)">사각</button>
+            <button class="wbtn" data-w="triangle" onclick="setWave(this)">삼각</button>
+            <button class="wbtn" data-w="sine" onclick="setWave(this)">사인</button>
+        </div>
+        <button class="sustain" id="sus" onclick="toggleSustain()">🎚️ 서스테인</button>
+        <div class="group">
+            <button class="action rec" id="recBtn" onclick="toggleRec()">● 녹음</button>
+            <button class="action pl" id="playBtn" onclick="playRecord()">▶ 재생</button>
+        </div>
+    </div>
+
+    <div class="kbd" id="kbd"></div>
+    <div class="kbdhint">키보드: <b>A</b> <b>S</b> <b>D</b> <b>F</b> <b>G</b> <b>H</b> <b>J</b> <b>K</b> <b>L</b> + <b>W</b> <b>E</b> <b>T</b> <b>Y</b> <b>U</b> (검은건반)</div>
+    <div class="foot" id="noteLabel" class="note">Hermes Synth</div>
+
+<script>
+// ---- audio ----
+let AC=null, master=null;
+const NOTES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const KEYMAP={a:0,w:1,s:2,e:3,d:4,f:5,t:6,g:7,y:8,h:9,u:10,j:11,k:12,o:13,l:14};
+let currentVol=[];
+let wave='square', sustain=false, sustainOn=[];
+let recording=[], recStart=0, recOn=false;
+
+function ac(){ if(!AC){ AC=new (window.AudioContext||window.webkitAudioContext)(); master=AC.createGain(); master.gain.value=0.5; master.connect(AC.destination); } if(AC.state==='suspended') AC.resume(); return AC; }
+function freqFrom(n){ return 261.63*Math.pow(2,n/12); } // n relative to C4
+
+function play(noteIdx){
+    const c=ac(); const f=freqFrom(noteIdx);
+    const o=c.createOscillator(); o.type=wave; o.frequency.value=f;
+    const g=c.createGain();
+    // ADSR-ish envelope
+    const now=c.currentTime;
+    g.gain.setValueAtTime(0,now);
+    g.gain.linearRampToValueAtTime(0.4,now+0.01);
+    g.gain.exponentialRampToValueAtTime(0.001,now+1.2);
+    o.connect(g).connect(master);
+    o.start(now); o.stop(now+1.3);
+    currentVol.push({o,g});
+    // visual
+    highlight(noteIdx);
+    document.getElementById('noteLabel').textContent='♪ '+NOTES[noteIdx%12]+(Math.floor(noteIdx/12)+4);
+    // record
+    if(recOn) recording.push({t: performance.now()-recStart, n:noteIdx, on:true});
+}
+function release(noteIdx){
+    if(!sustain && sustainOn.includes(noteIdx)){ return; }
+    clearTimeout;
+}
+function highlight(idx){
+    const el=document.querySelectorAll('.note-el')[idx];
+    if(el) el.classList.add('active');
+    setTimeout(()=>{ if(el) el.classList.remove('active'); },150);
+}
+
+// build keyboard: 2 octaves C4..C6 = 15 keys
+function buildKbd(){
+    const kbd=document.getElementById('kbd');
+    kbd.innerHTML='';
+    // white keys notes
+    const whites=[]; for(let n=0;n<24;n++){ if(NOTES[n%12].length===1) whites.push(n); }
+    whites.forEach((n,i)=>{
+        const d=document.createElement('div'); d.className='key note-el';
+        d.innerHTML=`<div class="white" data-n="${n}"></div>`;
+        d.querySelector('.white').addEventListener('pointerdown',e=>{ e.preventDefault(); play(n); });
+        kbd.appendChild(d);
+    });
+    // black keys overlays on their preceding white
+    const blacks=[]; for(let n=1;n<24;n++){ if(NOTES[n%12].length===2) blacks.push(n); }
+    const keys=kbd.querySelectorAll('.key');
+    let whiteIndex=0;
+    blacks.forEach(n=>{
+        // black sits between white i and i+1 -> on white index = position
+        const wi = whites.filter(w=>w<n).length;
+        const keyEl=keys[wi];
+        const b=document.createElement('div'); b.className='black note-el'; b.dataset.n=n;
+        b.addEventListener('pointerdown',e=>{ e.preventDefault(); play(n); });
+        keyEl.appendChild(b);
+    });
+    // labels on white keys
+    keys.forEach((k,i)=>{
+        const wn=whites[i];
+        const lbl=document.createElement('div'); lbl.className='lbl'; lbl.textContent=NOTES[wn%12];
+        k.appendChild(lbl);
+    });
+}
+
+// keyboard input
+document.addEventListener('keydown',e=>{
+    const k=e.key.toLowerCase();
+    if(KEYMAP[k]===undefined){ return; }
+    if(e.repeat){ return; }
+    e.preventDefault();
+    const n=KEYMAP[k];
+    play(n);
+});
+document.addEventListener('keyup',e=>{
+    const k=e.key.toLowerCase();
+    if(KEYMAP[k]===undefined) return;
+});
+
+function setWave(btn){
+    wave=btn.dataset.w;
+    document.querySelectorAll('.wbtn').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+}
+function toggleSustain(){
+    sustain=!sustain;
+    document.getElementById('sus').classList.toggle('on',sustain);
+}
+// record/play
+function toggleRec(){
+    recOn=!recOn;
+    document.getElementById('recBtn').classList.toggle('recording',recOn);
+    if(recOn){ recording=[]; recStart=performance.now(); }
+}
+function playRecord(){
+    if(!recording.length) return;
+    ac();
+    const start=performance.now();
+    recording.forEach(note=>{
+        setTimeout(()=>{ playNoteRecord(note.n); }, note.t);
+    });
+}
+function playNoteRecord(n){ // for playback reuse
+    const c=AC; const f=freqFrom(n);
+    const o=c.createOscillator(); o.type=wave; o.frequency.value=f;
+    const g=c.createGain(); const now=c.currentTime;
+    g.gain.setValueAtTime(0,now); g.gain.linearRampToValueAtTime(0.4,now+0.01); g.gain.exponentialRampToValueAtTime(0.001,now+0.7);
+    o.connect(g).connect(master); o.start(now); o.stop(now+0.75);
+    highlight(n);
+}
+buildKbd();
+</script>
+</body>
+</html>
