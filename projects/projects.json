@@ -390,5 +390,13 @@
     "path": "C:/hermes/projects/qlearn",
     "created": "2026-09-01",
     "updated": "2026-09-01 11:06"
+  },
+  {
+    "name": "GeneticAlgo",
+    "status": "active",
+    "description": "유전 알고리즘 문장 진화",
+    "path": "C:/hermes/projects/ga",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 11:09"
   }
 ]

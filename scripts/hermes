@@ -117,6 +117,7 @@ sleep 2; curl -s http://127.0.0.1:8765/api/health || echo "  (curl로 상태 확
     kal)    start "$WS/projects/kal/index.html" ;;
     tarot)  start "$WS/projects/tarot/index.html" ;;
     qlearn) start "$WS/projects/qlearn/index.html" ;;
+    ga)     start "$WS/projects/ga/index.html" ;;
     conv)   start "$WS/projects/conv/index.html" ;;
     freedom) banner; echo "  내가 자유롭게 만든 워크스페이스 도구:"
 echo "  툴킷 / 진단 / 트래커 / 보고서 / 일기 / 파일유틸 / 네트워크 / md2html / 트리맵 / 배지 / autocommit / 검색 / 워드클라우드 / 타임라인"

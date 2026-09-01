@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Genetic Algorithm</title>
+<style>
+:root { --bg:#05070e; --text:#dbe4f0; --muted:#6b7686; --card:#0d1424; --border:#1c2a44; --accent:#5b8cff; --green:#4ade80; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Consolas','Segoe UI',monospace; display:flex; flex-direction:column; align-items:center; gap:14px; padding:20px; min-height:100vh; }
+h1{ font-size:19px; letter-spacing:2px; } h1 span{ color:var(--green); }
+.sub{ color:var(--muted); font-size:12px; font-family:'Segoe UI',sans-serif; }
+#target{ font-size:22px; letter-spacing:2px; color:#e9b45b; text-shadow:0 0 18px rgba(233,180,91,.3); padding:8px 18px; border:1px dashed var(--border); border-radius:10px; }
+#best{ font-size:19px; letter-spacing:2px; color:#7ee0a3; min-height:30px; word-break:break-all; max-width:640px; }
+.bar{ display:flex; gap:9px; flex-wrap:wrap; justify-content:center; align-items:center; }
+.btn{ background:#16223a; color:#dbe4f0; border:1px solid var(--border); border-radius:8px; padding:7px 14px; cursor:pointer; font-size:13px; font-family:'Segoe UI',sans-serif; }
+.btn:hover{ background:#1f3050; } .btn.active{ background:var(--green); color:#081020; font-weight:600; }
+.badge{ background:var(--card); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-size:12px; color:var(--muted); font-family:'Segoe UI',sans-serif; display:flex; align-items:center; gap:6px; }
+.badge b{ color:var(--text); }
+input[type=range]{ accent-color:var(--green); width:100px; }
+canvas{ border:1px solid var(--border); border-radius:10px; background:#0a0f1e; max-width:640px; width:100%; }
+.help{ font-size:12px; color:#55606f; max-width:640px; text-align:center; line-height:1.7; font-family:'Segoe UI',sans-serif; }
+.help b{ color:#9aa7bd; }
+</style>
+</head>
+<body>
+<h1>GENETIC <span>· ALGORITHM</span></h1>
+<div class="sub">자연선택으로 문장을 진화시키는 유전자 알고리즘 — 적합도 · 선택 · 교차 · 돌연변이</div>
+<div id="target"></div>
+<div id="best"></div>
+<canvas id="cv" height="200"></canvas>
+<div class="bar">
+  <button class="btn" id="run" >⏸ 정지</button>
+  <button class="btn" id="reset">🔄 재진화</button>
+  <span class="badge">돌연변이 <input type="range" id="mut" min="0.5" max="12" step="0.5" value="3"> <b id="mutV">3%</b></span>
+  <span class="badge">속도 <input type="range" id="sp" min="1" max="30" step="1" value="10"> </span>
+  <span class="badge">세대 <b id="gen">0</b> · 정확도 <b id="acc">0%</b></span>
+</div>
+<div class="help">
+  임의의 글자들이 <b>돌연변이</b>와 <b>선택</b>을 거듭하며 목표 문장에 가까워져요.
+  적합도 = 일치하는 글자 수 · <b>토너먼트 선택</b> → <b>교차</b> → <b>돌연변이</b>의 반복. 그래프는 세대별 평균 적합도(파랑)와 최고 적합도(초록).
+  완성까지 걸린 세대가 이 목표문장의 "진화 비용"이에요.
+</div>
+<script>
+const TARGET="HERMES 2026 무한 자유의 창작실 ✨";
+const cxt=document.getElementById('cv').getContext('2d');
+document.getElementById('target').textContent='🎯 '+TARGET;
+const POP=200;
+let mutRate=0.03, running=true, speed=10;
+let gen=0, bestStr='', bestFit=0;
+let history=[];
+const mut=document.getElementById('mut'), mutV=document.getElementById('mutV');
+mut.addEventListener('input',e=>{mutRate=+e.target.value/100; mutV.textContent=e.target.value+'%';});
+document.getElementById('sp').addEventListener('input',e=>speed=+e.target.value);
+document.getElementById('run').addEventListener('click',e=>{running=!running;e.target.textContent=running?'⏸ 정지':'▶ 시작';e.target.classList.toggle('active',running);});
+document.getElementById('reset').addEventListener('click',()=>init());
+function rndChar(){ const pool=Array.from(TARGET).filter(c=>c!==' '&&c!=='✨'&&c!=='•'); return pool[Math.floor(Math.random()*pool.length)]; }
+let pool;
+function init(){ pool=Array.from({length:POP},()=>Array(TARGET.length).fill(0).map(()=>rndChar())); gen=0; history=[]; bestStr=''; bestFit=0; }
+function fitness(ind){ let f=0; for(let i=0;i<TARGET.length;i++) if(ind[i]===TARGET[i]) f++; return f; }
+function tournament(){ const a=Math.floor(Math.random()*POP),b=Math.floor(Math.random()*POP); return fitness(pool[a])>fitness(pool[b])?pool[a]:pool[b]; }
+function crossover(p1,p2){ const pt=Math.floor(Math.random()*(TARGET.length+1)); const c1=p1.slice(0,pt).concat(p2.slice(pt)); const c2=p2.slice(0,pt).concat(p1.slice(pt)); return [c1,c2]; }
+function mutate(ind){ const r=ind.slice(); for(let i=0;i<r.length;i++) if(Math.random()<mutRate) r[i]=rndChar(); return r; }
+function stepGen(){
+  let bestF=-1,bestIdx=-1,sum=0;
+  for(let i=0;i<POP;i++){ const f=fitness(pool[i]); sum+=f; if(f>bestF){bestF=f;bestIdx=i;} }
+  bestFit=bestF; bestStr=pool[bestIdx].join('');
+  history.push({best:bestF/POP*100, avg:sum/POP/POP*100});
+  if(bestF===TARGET.length) running=false;
+  const next=[];
+  while(next.length<POP){ const a=tournament(), b=tournament(); const [c1,c2]=crossover(a,b); next.push(mutate(c1),mutate(c2)); }
+  pool=next; gen++;
+  document.getElementById('gen').textContent=gen;
+  document.getElementById('acc').textContent=Math.round(bestFit/TARGET.length*100)+'%';
+  document.getElementById('best').textContent=bestStr;
+}
+function draw(){
+  const W=cv.width=Math.min(640,(cv.clientWidth||640)), H=200;
+  cxt.fillStyle='#0a0f1e'; cxt.fillRect(0,0,W,H);
+  cxt.strokeStyle='#1c2a44'; cxt.beginPath(); cxt.moveTo(0,H-20); cxt.lineTo(W,H-20); cxt.stroke();
+  if(history.length>1){
+    const maxGen=history.length, ymax=100;
+    // avg (blue)
+    cxt.strokeStyle='#5b8cff'; cxt.lineWidth=2; cxt.beginPath();
+    for(let i=0;i<maxGen;i++){ const x=i/(maxGen-1)*(W-10)+5, y=H-20-history[i].avg/ymax*(H-40); if(i===0)cxt.moveTo(x,y); else cxt.lineTo(x,y); }
+    cxt.stroke();
+    // best (green)
+    cxt.strokeStyle='#4ade80'; cxt.beginPath();
+    for(let i=0;i<maxGen;i++){ const x=i/(maxGen-1)*(W-10)+5, y=H-20-history[i].best/ymax*(H-40); if(i===0)cxt.moveTo(x,y); else cxt.lineTo(x,y); }
+    cxt.stroke();
+    cxt.fillStyle='#7c8aa0'; cxt.font='10px sans'; cxt.fillText('평균(파랑)·최고(초록) 적합도',8,14);
+  }
+}
+let stepAcc=0;
+function loop(){
+  if(running){ if(stepAcc>=speed){ stepGen(); stepAcc=0; } stepAcc++; }
+  draw(); requestAnimationFrame(loop);
+}
+init(); requestAnimationFrame(loop);
+</script>
+</body>
+</html>
