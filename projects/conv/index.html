@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Converter</title>
+<style>
+:root { --bg:#0b0b12; --card:#13131c; --border:#23233a; --text:#ececf5; --muted:#6b6f82; --accent:#7c5cff; --pos:#5ce6a8; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; }
+h1 { font-size:1.3rem; font-weight:800; } h1 span{color:var(--accent);}
+.sub { color:var(--muted); font-size:0.8rem; margin:5px 0 22px; }
+
+.cats { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-bottom:24px; }
+.cat { padding:8px 18px; border-radius:30px; border:1.5px solid var(--border); background:transparent; color:var(--muted); font-size:0.8rem; font-weight:700; cursor:pointer; transition:all .2s; }
+.cat.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+
+.card { background:var(--card); border:1px solid var(--border); border-radius:20px; padding:26px; width:min(92vw,480px); }
+.vrow { display:flex; gap:10px; align-items:center; margin-bottom:18px; }
+.vin { flex:1; }
+.vin .lab { font-size:0.68rem; color:var(--muted); margin-bottom:6px; letter-spacing:1px; }
+.vin input { width:100%; background:var(--bg); border:1.5px solid var(--border); border-radius:12px; padding:13px 14px; color:var(--text); font-size:1.3rem; font-weight:700; outline:none; font-variant-numeric:tabular-nums; }
+.vin input:focus{ border-color:var(--accent); }
+.vin select { width:100%; background:var(--bg); border:1.5px solid var(--border); border-radius:10px; padding:8px 10px; color:var(--text); font-size:0.82rem; margin-top:8px; outline:none; }
+
+.swap { width:44px; height:44px; border-radius:50%; border:1.5px solid var(--border); background:var(--bg); color:var(--accent); font-size:1.2rem; cursor:pointer; flex-shrink:0; transition:all .2s; }
+.swap:hover { border-color:var(--accent); transform:rotate(180deg); }
+
+.result { background:var(--bg); border:1.5px solid var(--pos); border-radius:14px; padding:18px; text-align:center; }
+.result .eq { font-size:1.5rem; font-weight:800; }
+.result .eq span { color:var(--pos); }
+.result .formula { color:var(--muted); font-size:0.78rem; margin-top:6px; }
+.quick { display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; justify-content:center; }
+.qbtn { padding:8px 14px; border-radius:16px; border:1px solid var(--border); background:var(--bg); color:var(--muted); font-size:0.72rem; cursor:pointer; transition:all .2s; }
+.qbtn:hover { border-color:var(--accent); color:var(--text); }
+.foot { margin-top:20px; color:var(--muted); font-size:0.72rem; }
+</style>
+</head>
+<body>
+    <h1>🔁 <span>CONVERTER</span></h1>
+    <div class="sub">단위 변환기 · 실시간 양방향 변환</div>
+
+    <div class="cats" id="cats"></div>
+
+    <div class="card">
+        <div class="vrow">
+            <div class="vin">
+                <div class="lab">입력</div>
+                <input id="fromVal" type="number" value="1" oninput="conv()">
+                <select id="fromUnit" onchange="conv()"></select>
+            </div>
+            <button class="swap" onclick="swap()">⇄</button>
+            <div class="vin">
+                <div class="lab">변환</div>
+                <input id="toVal" type="number" readonly>
+                <select id="toUnit" onchange="conv()"></select>
+            </div>
+        </div>
+        <div class="result">
+            <div class="eq" id="eq">—</div>
+            <div class="formula" id="formula"></div>
+        </div>
+        <div class="quick" id="quick"></div>
+    </div>
+    <div class="foot">Hermes Converter · 온도는 수식 변환, 나머지는 비율</div>
+
+<script>
+const CATS={
+    length:{ name:'📏 길이', units:{ m:1, km:0.001, cm:100, mm:1000, in:39.3701, ft:3.28084, yd:1.09361, mi:0.000621371, '해리':0.000539957 } },
+    weight:{ name:'⚖️ 무게', units:{ kg:1, g:1000, mg:1e6, t:0.001, lb:2.20462, oz:35.274, st:0.157473 } },
+    temp:{ name:'🌡️ 온도', units:{ '°C':'C', '°F':'F', 'K':'K' }, special:tempConv },
+    speed:{ name:'🚀 속도', units:{ 'm/s':1, 'km/h':3.6, mph:2.23694, knot:1.94384, 'ft/s':3.28084 } },
+    area:{ name:'🗺️ 면적', units:{ 'm²':1, 'km²':1e-6, 'cm²':10000, 'ft²':10.7639, 'yd²':1.19599, ac:0.000247105, ha:1e-4 } },
+    volume:{ name:'🧪 부피', units:{ L:1, mL:1000, 'm³':0.001, gal:0.264172, qt:1.05669, pt:2.11338, cup:4.22675 } },
+    data:{ name:'💾 데이터', units:{ B:1, KB:0.001, MB:1e-6, GB:1e-9, TB:1e-12, b:8, Kb:0.008, Mb:8e-6 } },
+};
+let cat='length';
+
+// custom temp conversion
+function tempConv(v, from, to){
+    const toC={C:v, F:(v-32)*5/9, K:v-273.15};
+    const c=toC[from];
+    if(to==='C') return c;
+    if(to==='F') return c*9/5+32;
+    if(to==='K') return c+273.15;
+}
+function conv(){
+    const catDef=CATS[cat];
+    const from=document.getElementById('fromUnit').value;
+    const to=document.getElementById('toUnit').value;
+    const v=parseFloat(document.getElementById('fromVal').value);
+    if(isNaN(v)){ document.getElementById('toVal').value=''; document.getElementById('eq').textContent='—'; return; }
+    let r;
+    if(catDef.special) r=catDef.special(v, from, to);
+    else r=v*(catDef.units[to]/catDef.units[from]);
+    document.getElementById('toVal').value=fmt(r);
+    document.getElementById('eq').innerHTML=`${fmt(v)} ${from} = <span>${fmt(r)} ${to}</span>`;
+    const uName=catDef.units;
+    const mul = catDef.special? '' : `1 ${from} = ${fmt(catDef.units[to]/catDef.units[from])} ${to}`;
+    document.getElementById('formula').textContent = catDef.special? '온도 환산 공식 적용' : mul;
+}
+function fmt(n){
+    if(!isFinite(n)) return String(n);
+    if(Math.abs(n)>=1e6||Math.abs(n)<1e-6) return n.toExponential(4);
+    const s=n.toPrecision(6); return parseFloat(s).toString();
+}
+function renderCats(){
+    document.getElementById('cats').innerHTML=Object.entries(CATS).map(([k,c])=>`<button class="cat ${k===cat?'on':''}" onclick="setCat('${k}')">${c.name}</button>`).join('');
+}
+function setCat(k){
+    cat=k; renderCats();
+    const units=Object.keys(CATS[k].units);
+    document.getElementById('fromUnit').innerHTML=units.map(u=>`<option value="${u}">${u}</option>`).join('');
+    document.getElementById('toUnit').innerHTML=units.map(u=>`<option value="${u}">${u}</option>`).join('');
+    document.getElementById('toUnit').selectedIndex=Math.min(1,units.length-1);
+    document.getElementById('fromVal').value=1;
+    renderQuick(); conv();
+}
+function swap(){
+    const f=document.getElementById('fromUnit').value, t=document.getElementById('toUnit').value;
+    document.getElementById('fromUnit').value=t; document.getElementById('toUnit').value=f;
+    conv();
+}
+function renderQuick(){
+    const units=Object.keys(CATS[cat].units);
+    document.getElementById('quick').innerHTML=units.map(u=>`<button class="qbtn" onclick="document.getElementById('toUnit').value='${u}';conv()">→ ${u}</button>`).join('');
+}
+setCat('length');
+</script>
+</body>
+</html>

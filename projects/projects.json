@@ -302,5 +302,13 @@
     "path": "C:/hermes/projects/viz",
     "created": "2026-09-01",
     "updated": "2026-09-01 10:27"
+  },
+  {
+    "name": "Converter",
+    "status": "active",
+    "description": "단위 변환기(길이/무게/온도/속도/면적/부피/데이터)",
+    "path": "C:/hermes/projects/conv",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 10:29"
   }
 ]
