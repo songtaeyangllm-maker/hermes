@@ -51,7 +51,22 @@ body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; backgroun
         <span>MEM <b id="sMem">―</b>%</span>
         <span id="sTime">--:--:--</span>
         <span id="sDate"></span>
+        <span id="sInfo" style="cursor:pointer;color:var(--accent);font-weight:600;">ℹ️ 정보</span>
     </div>
+</div>
+<div id="infoModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:40;align-items:center;justify-content:center;">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:26px 30px;max-width:440px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.5);">
+    <h2 style="margin-bottom:4px;">◈ HERMES <span style="color:var(--accent)">WORKSPACE</span></h2>
+    <div style="color:var(--muted);font-size:0.85rem;margin-bottom:16px;">2026-08-31 ~ 09-01 · 무한 자유 · 자율 확장</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div style="background:#0a0e1a;border-radius:12px;padding:14px;text-align:center;"><b style="font-size:1.5rem;color:var(--accent2);">13.3K</b><div style="color:var(--muted);font-size:0.75rem;">코드줄</div></div>
+      <div style="background:#0a0e1a;border-radius:12px;padding:14px;text-align:center;"><b style="font-size:1.5rem;color:var(--accent2);">47</b><div style="color:var(--muted);font-size:0.75rem;">프로젝트</div></div>
+      <div style="background:#0a0e1a;border-radius:12px;padding:14px;text-align:center;"><b style="font-size:1.5rem;color:var(--accent2);">14/14</b><div style="color:var(--muted);font-size:0.75rem;">스모크테스트</div></div>
+      <div style="background:#0a0e1a;border-radius:12px;padding:14px;text-align:center;"><b style="font-size:1.5rem;color:var(--accent2);">24+</b><div style="color:var(--muted);font-size:0.75rem;">git 커밋</div></div>
+    </div>
+    <div style="margin-top:16px;color:var(--muted);font-size:0.8rem;line-height:1.7;">게임 · 시뮬레이션 · AI · 오디오 · 생산성 · 시각화 도구 —<br>순수 JS/Python으로 만든 나만의 디지털 창작실 ✨</div>
+    <div style="margin-top:16px;text-align:right;"><button onclick="document.getElementById('infoModal').style.display='none'" style="background:var(--accent);color:#081020;border:none;border-radius:8px;padding:8px 18px;cursor:pointer;font-weight:600;">닫기</button></div>
+  </div>
 </div>
 
 <div class="desktop" id="desktop"></div>
@@ -191,6 +206,8 @@ async function refreshSys(){
     }catch(e){}
 }
 refreshSys(); setInterval(refreshSys, 5000);
+document.getElementById('sInfo').addEventListener('click',()=>{const m=document.getElementById('infoModal');m.style.display='flex';});
+document.getElementById('infoModal').addEventListener('click',e=>{if(e.target.id==='infoModal')e.target.style.display='none';});
 </script>
 </body>
 </html>
