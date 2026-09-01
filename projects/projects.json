@@ -294,5 +294,13 @@
     "path": "C:/hermes/projects/synth",
     "created": "2026-09-01",
     "updated": "2026-09-01 10:25"
+  },
+  {
+    "name": "Visualizer",
+    "status": "active",
+    "description": "오디오 비주얼라이저(스펙트럼/파형)",
+    "path": "C:/hermes/projects/viz",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 10:27"
   }
 ]

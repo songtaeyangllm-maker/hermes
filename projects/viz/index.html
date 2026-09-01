@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Visualizer</title>
+<style>
+:root { --text:#ececf5; --muted:#8a8fa3; --accent:#7c5cff; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; background:#05050a; color:var(--text); min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; }
+h1 { font-size:1.3rem; font-weight:800; } h1 span{color:var(--accent);}
+.sub { color:var(--muted); font-size:0.8rem; margin:5px 0 22px; }
+.ctrl { display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center; margin-bottom:20px; }
+.btn { padding:10px 22px; border-radius:24px; border:none; font-weight:800; font-size:0.82rem; cursor:pointer; transition:all .2s; }
+.btn.demo { background:var(--accent); color:#fff; } .btn.demo.playing{ background:#5ce6a8; color:#032; }
+.btn.file { background:#14141f; border:1.5px solid #2a2a40; color:var(--text); }
+canvas { width:min(94vw,760px); height:280px; background:#07070f; border:1px solid #1c1c30; border-radius:18px; }
+.viewbar { display:flex; gap:8px; margin-top:14px; }
+.vbtn { padding:7px 16px; border-radius:16px; border:1.5px solid #2a2a40; background:transparent; color:var(--muted); font-size:0.74rem; cursor:pointer; }
+.vbtn.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+.foot { margin-top:16px; color:var(--muted); font-size:0.72rem; }
+.fileinfo { color:var(--muted); font-size:0.78rem; margin-bottom:14px; min-height:18px; }
+</style>
+</head>
+<body>
+    <h1>📊 <span>VISUALIZER</span></h1>
+    <div class="sub">실시간 오디오 주파수 스펙트럼 + 파형</div>
+
+    <div class="ctrl">
+        <button class="btn demo" id="demoBtn" onclick="toggleDemo()">🔊 데모 사운드</button>
+        <label class="btn file">🎵 파일 업로드<input type="file" accept="audio/*" style="display:none" onchange="loadFile(this)"></label>
+    </div>
+    <div class="fileinfo" id="fileinfo">오디오 파일을 올리거나 데모 사운드를 재생하세요</div>
+
+    <canvas id="c"></canvas>
+    <div class="viewbar">
+        <button class="vbtn on" data-v="freq" onclick="setView(this)">주파수</button>
+        <button class="vbtn" data-v="wave" onclick="setView(this)">파형</button>
+        <button class="vbtn" data-v="both" onclick="setView(this)">둘 다</button>
+    </div>
+    <div class="foot">Hermes Visualizer · Web Audio AnalyserNode 기반</div>
+
+<script>
+const cv=document.getElementById('c'), cx=cv.getContext('2d');
+let W,H; function resize(){ W=cv.width=cv.clientWidth||900; H=cv.height=cv.clientHeight||280; } resize(); addEventListener('resize',resize); setTimeout(resize,50);
+
+let AC=null, analyser=null, source=null, demoNodes=[];
+let view='freq', demoOn=false;
+
+function ac(){ if(!AC){ AC=new (window.AudioContext||window.webkitAudioContext)(); analyser=AC.createAnalyser(); analyser.fftSize=1024; analyser.connect(AC.destination); } if(AC.state==='suspended')AC.resume(); return AC; }
+
+function setView(b){ view=b.dataset.v; document.querySelectorAll('.vbtn').forEach(x=>x.classList.toggle('on',x===b)); }
+
+// demo: swept tone oscillator -> analyser
+function toggleDemo(){
+    if(demoOn){ stopDemo(); return; }
+    const c=ac();
+    // stop existing source/file
+    if(source) source.disconnect();
+    demoStop=false;
+    const o=c.createOscillator(); o.type='sawtooth'; o.frequency.value=220;
+    const g=c.createGain(); g.gain.value=0.25;
+    const lfo=c.createOscillator(); lfo.frequency.value=0.5;
+    const lg=c.createGain(); lg.gain.value=180;
+    lfo.connect(lg).connect(o.frequency);
+    o.connect(g).connect(analyser);
+    o.start();
+    demoNodes=[o,g,lfo,lg];
+    demoOn=true; demoStop=false;
+    document.getElementById('demoBtn').textContent='⏹ 정지';
+    document.getElementById('demoBtn').classList.add('playing');
+    document.getElementById('fileinfo').textContent='데모 사운드 재생 중 (스윕 톤)';
+    // freq sweep via interval
+    sweep();
+}
+let demoStop=false, sweepIdx=0;
+function sweep(){
+    if(!demoOn||demoStop){ return; }
+    const c=AC; const freqs=[220,277,330,392,440,523,587,659,440,330];
+    try{ demoNodes[0].frequency.setValueAtTime(freqs[sweepIdx%freqs.length],c.currentTime+0.01); }catch(e){}
+    sweepIdx++;
+    setTimeout(sweep, 280);
+}
+function stopDemo(){
+    demoOn=false; demoStop=true;
+    demoNodes.forEach(n=>{ try{ n.stop(); }catch(e){} try{ n.disconnect(); }catch(e){} });
+    demoNodes=[];
+    document.getElementById('demoBtn').textContent='🔊 데모 사운드';
+    document.getElementById('demoBtn').classList.remove('playing');
+    document.getElementById('fileinfo').textContent='데모 정지';
+}
+
+// file upload
+function loadFile(input){
+    const file=input.files[0]; if(!file) return;
+    if(demoOn) stopDemo();
+    const objUrl=URL.createObjectURL(file);
+    ac();
+    if(source) source.disconnect();
+    const audio=new Audio(objUrl);
+    const src=AC.createMediaElementSource(audio);
+    src.connect(analyser);
+    source=src;
+    audio.play();
+    document.getElementById('fileinfo').textContent='🎵 '+file.name+' 재생 중';
+    document.getElementById('demoBtn').textContent='🔊 데모 사운드';
+    document.getElementById('demoBtn').classList.remove('playing');
+}
+
+// draw loop
+const freqData=new Uint8Array(2048);
+const waveData=new Uint8Array(2048);
+function draw(){
+    requestAnimationFrame(draw);
+    if(!AC) return;
+    cx.clearRect(0,0,W,H);
+    const fc=analyser.frequencyBinCount;
+
+    if(view==='freq'||view==='both'){
+        analyser.getByteFrequencyData(freqData);
+        const bars=Math.min(96,fc);
+        const bw=W/bars, gap=1;
+        for(let i=0;i<bars;i++){
+            const v=freqData[Math.floor(i*fc/bars)]/255;
+            const bh=Math.max(2,v*H);
+            const hue=(i/bars)*220+200;
+            cx.fillStyle=`hsl(${hue},90%,${40+v*40}%)`;
+            cx.fillRect(i*bw+gap/2, H-bh, bw-gap, bh);
+        }
+    }
+    if(view==='wave'||view==='both'){
+        if(view==='both'){ // split: top half wave, bottom half freq
+            cx.fillStyle='rgba(0,0,10,0.25)';
+            cx.fillRect(0,0,W,H/2);
+        }
+        analyser.getByteTimeDomainData(waveData);
+        cx.strokeStyle='#5ce6a8'; cx.lineWidth=2; cx.beginPath();
+        const n=analyser.fftSize;
+        const top = view==='both'? 0 : 0;
+        const hgt = view==='both'? H/2 : H;
+        for(let i=0;i<n;i++){
+            const x=i/n*W;
+            const y=top+(waveData[i]/255)*hgt;
+            i===0?cx.moveTo(x,y):cx.lineTo(x,y);
+        }
+        cx.stroke();
+        if(view==='both'){ drawFreqBottom(); }
+    }
+}
+function drawFreqBottom(){
+    analyser.getByteFrequencyData(freqData);
+    const bars=48, fc=analyser.frequencyBinCount, bw=W/bars;
+    for(let i=0;i<bars;i++){
+        const v=freqData[Math.floor(i*fc/bars)]/255;
+        const y=H/2 + (1-v)*H/2;
+        cx.fillStyle=`hsl(${190+i*1.5},90%,60%)`;
+        cx.fillRect(i*bw, y, bw*0.9, H/2-y);
+    }
+}
+draw();
+</script>
+</body>
+</html>

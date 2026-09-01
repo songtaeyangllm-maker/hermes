@@ -1,15 +1,20 @@
 {
   "name": "hermes",
-  "size": 1329926,
+  "size": 1367263,
   "children": [
     {
       "name": "projects",
-      "size": 591084,
+      "size": 602218,
       "children": [
         {
           "name": "poster",
-          "size": 161946,
+          "size": 163511,
           "children": [
+            {
+              "name": "poster_dark.png",
+              "size": 41310,
+              "children": []
+            },
             {
               "name": "poster_sunset.png",
               "size": 40859,
@@ -23,11 +28,6 @@
             {
               "name": "poster_neon.png",
               "size": 40626,
-              "children": []
-            },
-            {
-              "name": "poster_dark.png",
-              "size": 39745,
               "children": []
             }
           ]
@@ -50,27 +50,27 @@
         },
         {
           "name": "wordcloud",
-          "size": 54682,
+          "size": 54532,
           "children": [
             {
               "name": "wc.png",
-              "size": 54682,
+              "size": 54532,
               "children": []
             }
           ]
         },
         {
           "name": "treemap",
-          "size": 42991,
+          "size": 43330,
           "children": [
             {
               "name": "tree_data.json",
-              "size": 24242,
+              "size": 24481,
               "children": []
             },
             {
               "name": "tree_data.js",
-              "size": 10785,
+              "size": 10885,
               "children": []
             },
             {
@@ -98,7 +98,7 @@
         },
         {
           "name": "timeline",
-          "size": 17138,
+          "size": 17541,
           "children": [
             {
               "name": "index.html",
@@ -107,12 +107,12 @@
             },
             {
               "name": "timeline_data.json",
-              "size": 5819,
+              "size": 6037,
               "children": []
             },
             {
               "name": "timeline_data.js",
-              "size": 4868,
+              "size": 5053,
               "children": []
             }
           ]
@@ -258,11 +258,11 @@
         },
         {
           "name": "hermes_os",
-          "size": 9692,
+          "size": 9770,
           "children": [
             {
               "name": "index.html",
-              "size": 9692,
+              "size": 9770,
               "children": []
             }
           ]
@@ -285,6 +285,17 @@
             {
               "name": "index.html",
               "size": 8683,
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "synth",
+          "size": 8652,
+          "children": [
+            {
+              "name": "index.html",
+              "size": 8652,
               "children": []
             }
           ]
@@ -323,6 +334,11 @@
           ]
         },
         {
+          "name": "projects.json",
+          "size": 8119,
+          "children": []
+        },
+        {
           "name": "regex",
           "size": 7925,
           "children": [
@@ -332,11 +348,6 @@
               "children": []
             }
           ]
-        },
-        {
-          "name": "projects.json",
-          "size": 7872,
-          "children": []
         },
         {
           "name": "landing",
@@ -441,12 +452,17 @@
     },
     {
       "name": ".git",
-      "size": 503672,
+      "size": 529723,
       "children": [
         {
           "name": "objects",
-          "size": 457686,
+          "size": 483193,
           "children": [
+            {
+              "name": "d2",
+              "size": 13205,
+              "children": []
+            },
             {
               "name": "2e",
               "size": 13100,
@@ -463,18 +479,13 @@
               "children": []
             },
             {
-              "name": "d2",
-              "size": 10478,
-              "children": []
-            },
-            {
               "name": "ae",
               "size": 8527,
               "children": []
             },
             {
               "name": "6e",
-              "size": 8098,
+              "size": 8342,
               "children": []
             },
             {
@@ -523,6 +534,11 @@
               "children": []
             },
             {
+              "name": "75",
+              "size": 5603,
+              "children": []
+            },
+            {
               "name": "49",
               "size": 5574,
               "children": []
@@ -564,7 +580,7 @@
             },
             {
               "name": "eb",
-              "size": 4834,
+              "size": 4889,
               "children": []
             },
             {
@@ -603,6 +619,11 @@
               "children": []
             },
             {
+              "name": "58",
+              "size": 4075,
+              "children": []
+            },
+            {
               "name": "6c",
               "size": 3943,
               "children": []
@@ -635,16 +656,6 @@
             {
               "name": "61",
               "size": 3812,
-              "children": []
-            },
-            {
-              "name": "da",
-              "size": 3794,
-              "children": []
-            },
-            {
-              "name": "1b",
-              "size": 3775,
               "children": []
             }
           ]
@@ -727,21 +738,21 @@
         },
         {
           "name": "index",
-          "size": 9525,
+          "size": 9643,
           "children": []
         },
         {
           "name": "logs",
-          "size": 9092,
+          "size": 9518,
           "children": [
             {
               "name": "HEAD",
-              "size": 4546,
+              "size": 4759,
               "children": []
             },
             {
               "name": "refs",
-              "size": 4546,
+              "size": 4759,
               "children": []
             }
           ]
@@ -908,7 +919,7 @@
     },
     {
       "name": "dashboard",
-      "size": 52272,
+      "size": 52344,
       "children": [
         {
           "name": "index.html",
@@ -922,7 +933,7 @@
         },
         {
           "name": "history.json",
-          "size": 1687,
+          "size": 1759,
           "children": []
         },
         {
@@ -939,15 +950,15 @@
     },
     {
       "name": "notes",
-      "size": 21759,
+      "size": 21786,
       "children": [
         {
           "name": "reports",
-          "size": 8572,
+          "size": 8599,
           "children": [
             {
               "name": "summary_2026-09-01.html",
-              "size": 2655,
+              "size": 2659,
               "children": []
             },
             {
@@ -957,7 +968,7 @@
             },
             {
               "name": "summary_2026-09-01.md",
-              "size": 1301,
+              "size": 1324,
               "children": []
             },
             {
@@ -1052,11 +1063,11 @@
     },
     {
       "name": "scripts",
-      "size": 6279,
+      "size": 6332,
       "children": [
         {
           "name": "hermes",
-          "size": 6279,
+          "size": 6332,
           "children": []
         }
       ]
