@@ -446,5 +446,13 @@
     "path": "C:/hermes/projects/tx",
     "created": "2026-09-01",
     "updated": "2026-09-01 11:27"
+  },
+  {
+    "name": "Lorenz",
+    "status": "active",
+    "description": "로렌츠 어트랙터 RK4",
+    "path": "C:/hermes/projects/lor",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 11:29"
   }
 ]

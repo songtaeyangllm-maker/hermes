@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Lorenz</title>
+<style>
+:root { --bg:#05060d; --text:#dbe4f0; --muted:#6b7686; --card:#0d1220; --border:#1c2440; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-serif; display:flex; flex-direction:column; align-items:center; gap:12px; padding:16px; }
+h1{ font-size:19px; letter-spacing:2px; } h1 span{ color:#ff7ab0; }
+.sub{ color:var(--muted); font-size:12px; }
+canvas{ border:1px solid var(--border); border-radius:10px; background:radial-gradient(circle at 50% 40%, #0e1530, #04050c); }
+.bar{ display:flex; gap:10px; flex-wrap:wrap; justify-content:center; align-items:center; }
+.badge{ background:var(--card); border:1px solid var(--border); border-radius:8px; padding:5px 11px; font-size:12px; color:var(--muted); display:flex; align-items:center; gap:5px; }
+.badge b{ color:var(--text); }
+input[type=range]{ accent-color:#ff7ab0; width:90px; }
+</style>
+</head>
+<body>
+<h1>LORENZ <span>· ATTRACTOR</span></h1>
+<div class="sub">카오스 이론 — RK4 수치적분으로 나비 효과를 그리다</div>
+<canvas id="cv" width="760" height="520"></canvas>
+<div class="bar">
+  <span class="badge">σ <b id="sv">10</b> <input type="range" id="s" min="0" max="30" value="10"></span>
+  <span class="badge">ρ <b id="rv">28</b> <input type="range" id="r" min="0" max="60" value="28"></span>
+  <span class="badge">β <b id="bv">2.667</b> <input type="range" id="b" min="1" max="6" step="0.1" value="2.7"></span>
+  <span class="badge">회전 <b id="yv">auto</b></span>
+  <button class="btn" id="spin">⏸ 회전</button>
+  <button class="btn" id="reset">🔄 초기화</button>
+</div>
+<style>.btn{ background:#16223a;color:#dbe4f0;border:1px solid var(--border);border-radius:8px;padding:7px 14px;cursor:pointer;font-size:12px;} .btn:hover{background:#1f3050;}</style>
+<script>
+const cv=document.getElementById('cv'), g=cv.getContext('2d');
+let sigma=10, rho=28, beta=2.667, spin=true, yaw=0;
+// Lorenz ODE
+const dxdt=(x,y,z)=>sigma*(y-x);
+const dydt=(x,y,z)=>x*(rho-z)-y;
+const dzdt=(x,y,z)=>x*y-beta*z;
+function rk4(x,y,z,h){
+  const k1x=dxdt(x,y,z), k1y=dydt(x,y,z), k1z=dzdt(x,y,z);
+  const k2x=dxdt(x+h/2*k1x,y+h/2*k1y,z+h/2*k1z);
+  const k2y=dydt(x+h/2*k1x,y+h/2*k1y,z+h/2*k1z);
+  const k2z=dzdt(x+h/2*k1x,y+h/2*k1y,z+h/2*k1z);
+  const k3x=dxdt(x+h/2*k2x,y+h/2*k2y,z+h/2*k2z);
+  const k3y=dydt(x+h/2*k2x,y+h/2*k2y,z+h/2*k2z);
+  const k3z=dzdt(x+h/2*k2x,y+h/2*k2y,z+h/2*k2z);
+  const k4x=dxdt(x+h*k3x,y+h*k3y,z+h*k3z);
+  const k4y=dydt(x+h*k3x,y+h*k3y,z+h*k3z);
+  const k4z=dzdt(x+h*k3x,y+h*k3y,z+h*k3z);
+  return [
+    x+h/6*(k1x+2*k2x+2*k3x+k4x),
+    y+h/6*(k1y+2*k2y+2*k3y+k4y),
+    z+h/6*(k1z+2*k2z+2*k3z+k4z)
+  ];
+}
+let pts=[];
+function init(){ pts=[]; let x=1,y=1,z=1; const h=0.01; for(let i=0;i<4000;i++){ pts.push([x,y,z]); [x,y,z]=rk4(x,y,z,h); } }
+init();
+const scale=14, cx=cv.width/2, cy=cv.height/2-10;
+function draw(){
+  g.fillStyle='rgba(4,5,12,0.12)'; g.fillRect(0,0,cv.width,cv.height);
+  const cosY=Math.cos(yaw), sinY=Math.sin(yaw);
+  const ox=pts[0][0], oy=pts[0][1], oz=pts[0][2];
+  for(let i=0;i<pts.length-1;i++){
+    const [ax,ay,az]=pts[i], [bx,by,bz]=pts[i+1];
+    // project 3D->2D with yaw rotation (y-axis)
+    const a1x=ax*cosY+az*sinY, a1z=-ax*sinY+az*cosY;
+    const b1x=bx*cosY+bz*sinY, b1z=-bx*sinY+bz*cosY;
+    const sx=cx+(a1x-ox)*scale, sy=cy-(ay-oy)*scale;
+    const ex=cx+(b1x-ox)*scale, ey=cy-(by-oy)*scale;
+    // depth-based size: closer (a1z) = brighter/wider
+    const dep=(a1z+40)/60;
+    g.strokeStyle=`hsla(${(i%360)},80%,65%,${0.15+dep*0.5})`;
+    g.lineWidth=0.5+dep*1.5;
+    g.beginPath(); g.moveTo(sx,sy); g.lineTo(ex,ey); g.stroke();
+  }
+}
+let raf;
+function loop(){
+  draw();
+  if(spin) yaw+=0.006;
+  raf=requestAnimationFrame(loop);
+}
+loop();
+// controls
+document.getElementById('s').addEventListener('input',e=>{ sigma=+e.target.value; document.getElementById('sv').textContent=e.target.value; });
+document.getElementById('r').addEventListener('input',e=>{ rho=+e.target.value; document.getElementById('rv').textContent=e.target.value; });
+document.getElementById('b').addEventListener('input',e=>{ beta=+e.target.value; document.getElementById('bv').textContent=(+e.target.value).toFixed(1); });
+document.getElementById('spin').addEventListener('click',e=>{ spin=!spin; document.getElementById('yv').textContent=spin?'auto':'정지'; e.target.textContent=spin?'⏸ 회전':'▶ 회전'; });
+document.getElementById('reset').addEventListener('click',()=>{ init(); pts_shown=pts.length; });
+let pts_shown=0;
+</script>
+</body>
+</html>
