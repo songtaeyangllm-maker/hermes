@@ -470,5 +470,13 @@
     "path": "C:/hermes/projects/mine",
     "created": "2026-09-01",
     "updated": "2026-09-01 11:37"
+  },
+  {
+    "name": "Tetris",
+    "status": "active",
+    "description": "테트리스 게임",
+    "path": "C:/hermes/projects/tet",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 11:40"
   }
 ]

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Tetris</title>
+<style>
+:root { --bg:#0a0c14; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-serif; display:flex; flex-direction:column; align-items:center; gap:10px; padding:14px; }
+h1{ font-size:18px; letter-spacing:2px; } h1 span{ color:#5ce6a8; }
+.sub{ color:var(--muted); font-size:11px; }
+.wrap{ display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap; justify-content:center; }
+.side{ display:flex; flex-direction:column; gap:10px; min-width:110px; }
+.panel{ background:var(--card); border:1px solid var(--border); border-radius:10px; padding:10px; text-align:center; }
+.panel h4{ font-size:11px; color:var(--muted); margin-bottom:6px; }
+canvas#board{ background:#0d1220; border:1px solid var(--border); border-radius:10px; }
+.btn{ background:#16223a; color:#e5e7eb; border:1px solid var(--border); border-radius:8px; padding:6px 12px; cursor:pointer; font-size:12px; }
+.btn:hover{ background:#1f3050; }
+.controls{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; font-size:11px; color:var(--muted); margin-top:6px; }
+</style>
+</head>
+<body>
+<h1>HERMES <span>TETRIS</span></h1>
+<div class="sub">완성도 높은 고전 — 7-bag · 홀드 · 고스트 · 레벨</div>
+<div class="wrap">
+  <div class="side">
+    <div class="panel"><h4>다음</h4><canvas id="next" width="80" height="80"></canvas></div>
+    <div class="panel"><h4>홀드</h4><canvas id="holdc" width="80" height="80"></canvas></div>
+    <div class="panel"><h4>점수</h4><div style="font-size:20px;color:#5ce6a8" id="score">0</div></div>
+    <div class="panel"><h4>레벨 / 라인</h4><div id="lvl">1 / 0</div></div>
+  </div>
+  <canvas id="board" width="240" height="480"></canvas>
+  <div class="side">
+    <button class="btn" id="restart" style="width:100%">🔄 새 게임</button>
+    <div class="panel"><h4>최고점수</h4><div id="best" style="font-size:16px">0</div></div>
+    <div class="controls">←→ 이동 · ↑ 회전<br>↓ 소프트 · Space 하드드랍<br>C 홀드 · P 일시정지</div>
+  </div>
+</div>
+<script>
+const CW=24, GH=20;
+const board=document.getElementById('board'), g=board.getContext('2d');
+const nx=document.getElementById('next').getContext('2d');
+const hc=document.getElementById('holdc').getContext('2d');
+const COLORS={'I':'#4dd0ff','J':'#5b8cff','L':'#ff8a5b','O':'#ffd54d','S':'#4ade80','T':'#b58bff','Z':'#ff5b5b'};
+const SHAPES={I:[[0,1,0,0],[0,1,0,0],[0,1,0,0],[0,1,0,0]],J:[[1,0,0],[1,1,1],[0,0,0]],L:[[0,0,1],[1,1,1],[0,0,0]],O:[[1,1],[1,1]],S:[[0,1,1],[1,1,0],[0,0,0]],T:[[0,1,0],[1,1,1],[0,0,0]],Z:[[1,1,0],[0,1,1],[0,0,0]]};
+const SEQ=['I','J','L','O','S','T','Z'];
+let grid=Array.from({length:GH},()=>Array(10).fill(''));
+let cur=null, hold=null, held=false, bag=[], score=0, lines=0, level=1, over=false, paused=false, dropInt=null;
+let best=+localStorage.getItem('hermes_tetris_best')||0; document.getElementById('best').textContent=best;
+function newBag(){ bag=[...SEQ]; for(let i=bag.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[bag[i],bag[j]]=[bag[j],bag[i]];} }
+function spawn(){
+  if(!bag.length)newBag();
+  const p=bag.shift(); cur={p,p2:JSON.parse(JSON.stringify(SHAPES[p])),x:3,y:0,rot:0};
+  held=false;
+  if(collide(cur.p2,cur.x,cur.y)) gameOver();
+}
+function rotate(){ const s=cur.p2.length; const r=JSON.parse(JSON.stringify(cur.p2)); const nr=Array.from({length:s},()=>Array(s).fill(0)); for(let i=0;i<s;i++)for(let j=0;j<s;j++)nr[j][s-1-i]=r[i][j];
+  const kicks=[[0,0],[-1,0],[1,0],[0,-1],[-2,0],[2,0]];
+  for(const [dx,dy] of kicks){ if(!collide(nr,cur.x+dx,cur.y+dy)){ cur.p2=nr; cur.x+=dx; cur.y+=dy; return; } }
+}
+function collide(shape,x,y){ for(let r=0;r<shape.length;r++)for(let c=0;c<shape.length;c++){ if(shape[r][c]){ const gx=x+c, gy=y+r; if(gx<0||gx>=10||gy>=GH)return true; if(gy>=0&&grid[gy][gx])return true; } } return false; }
+function lock(){ const sh=cur.p2; for(let r=0;r<sh.length;r++)for(let c=0;c<sh.length;c++){ if(sh[r][c]){ const gx=cur.x+c, gy=cur.y+r; if(gy<0){gameOver();return;} grid[gy][gx]=cur.p; } } clearLines(); spawn(); }
+function ghostY(){ let y=cur.y; while(!collide(cur.p2,cur.x,y+1))y++; return y; }
+function clearLines(){
+  let cleared=0;
+  for(let y=GH-1;y>=0;y--){ if(grid[y].every(c=>c)){ grid.splice(y,1); grid.unshift(Array(10).fill('')); cleared++; y++; } }
+  if(cleared){ const pts=[0,100,300,500,800]; score+=pts[cleared]*level; lines+=cleared; if(lines>=level*10){level++; dropSpeed(); } document.getElementById('score').textContent=score; document.getElementById('lvl').textContent=level+' / '+lines; if(score>best){best=score;localStorage.setItem('hermes_tetris_best',best);document.getElementById('best').textContent=best;} }
+}
+function dropSpeed(){ const sp=Math.max(150,1000-((level-1)*90)); clearInterval(dropInt); dropInt=setInterval(()=>{ if(!over&&!paused){ if(!collide(cur.p2,cur.x,cur.y+1))cur.y++; else lock(); render(); } },sp); }
+function hardDrop(){ let gy=ghostY(); cur.y=gy; lock(); render(); }
+function doMove(dx){ if(!collide(cur.p2,cur.x+dx,cur.y))cur.x+=dx; }
+function holdPiece(){ if(held)return; const prev=cur.p;
+  if(hold){ const tmp=hold; hold=prev; cur={p:tmp,p2:JSON.parse(JSON.stringify(SHAPES[tmp])),x:3,y:0,rot:0}; }
+  else { hold=prev; spawn(); } held=true; drawHold();
+  if(collide(cur.p2,cur.x,cur.y))gameOver();
+}
+function drawGhostPiece(){ const gy=ghostY(); const sh=cur.p2; g.globalAlpha=.25; g.fillStyle=COLORS[cur.p]; for(let r=0;r<sh.length;r++)for(let c=0;c<sh.length;c++){ if(sh[r][c])g.fillRect((cur.x+c)*CW,(gy+r)*CW,CW,CW); } g.globalAlpha=1; }
+function render(){
+  g.clearRect(0,0,240,480);
+  for(let y=0;y<GH;y++)for(let x=0;x<10;x++){ if(grid[y][x]){ g.fillStyle=COLORS[grid[y][x]]; g.fillRect(x*CW,y*CW,CW,CW); g.strokeStyle='rgba(0,0,0,.3)'; g.strokeRect(x*CW,y*CW,CW,CW); } }
+  if(cur&&!over){ drawGhostPiece(); const sh=cur.p2; for(let r=0;r<sh.length;r++)for(let c=0;c<sh.length;c++){ if(sh[r][c]){ g.fillStyle=COLORS[cur.p]; g.fillRect((cur.x+c)*CW,(cur.y+r)*CW,CW,CW); g.strokeStyle='rgba(0,0,0,.3)'; g.strokeRect((cur.x+c)*CW,(cur.y+r)*CW,CW,CW); } } }
+  if(over){ g.fillStyle='rgba(0,0,0,.65)'; g.fillRect(0,0,240,480); g.fillStyle='#fff'; g.font='bold 20px sans-serif'; g.textAlign='center'; g.fillText('GAME',120,220); g.fillText('OVER',120,250); }
+  if(paused){ g.fillStyle='rgba(0,0,0,.6)'; g.fillRect(0,0,240,480); g.fillStyle='#ffd54d'; g.font='bold 16px sans-serif'; g.textAlign='center'; g.fillText('PAUSED',120,240); }
+}
+function drawNext(){ nx.clearRect(0,0,80,80); const n=bag[0]; if(!n)return; const sh=SHAPES[n]; nx.fillStyle=COLORS[n]; const off=Math.floor((4-sh.length)/2); for(let r=0;r<sh.length;r++)for(let c=0;c<sh.length;c++){ if(sh[r][c])nx.fillRect((off+c)*16,(r)*16,14,14); } }
+function drawHold(){ hc.clearRect(0,0,80,80); if(!hold)return; const sh=SHAPES[hold]; hc.fillStyle=COLORS[hold]; const off=Math.floor((4-sh.length)/2); for(let r=0;r<sh.length;r++)for(let c=0;c<sh.length;c++){ if(sh[r][c])hc.fillRect((off+c)*16,(r)*16,14,14); } }
+function gameOver(){ over=true; clearInterval(dropInt); render(); }
+function reset(){ grid=Array.from({length:GH},()=>Array(10).fill('')); score=0; lines=0; level=1; hold=null; held=false; over=false; paused=false; bag=[]; document.getElementById('score').textContent=0; document.getElementById('lvl').textContent='1 / 0'; dropSpeed(); spawn(); render(); drawNext(); drawHold(); }
+document.addEventListener('keydown',e=>{
+  if(over)return;
+  if(e.key==='p'||e.key==='P'){ paused=!paused; render(); return; }
+  if(paused)return;
+  switch(e.key){
+    case 'ArrowLeft': doMove(-1); break;
+    case 'ArrowRight': doMove(1); break;
+    case 'ArrowDown': if(!collide(cur.p2,cur.x,cur.y+1))cur.y++; break;
+    case 'ArrowUp': rotate(); break;
+    case ' ': hardDrop(); break;
+    case 'c': case 'C': holdPiece(); break;
+    default: return;
+  }
+  render();
+});
+document.getElementById('restart').addEventListener('click',reset);
+reset(); render(); drawNext();
+</script>
+</body>
+</html>
