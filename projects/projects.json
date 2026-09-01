@@ -438,5 +438,13 @@
     "path": "C:/hermes/projects/quote",
     "created": "2026-09-01",
     "updated": "2026-09-01 11:25"
+  },
+  {
+    "name": "TextAnalyzer",
+    "status": "active",
+    "description": "텍스트 분석기",
+    "path": "C:/hermes/projects/tx",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 11:27"
   }
 ]
