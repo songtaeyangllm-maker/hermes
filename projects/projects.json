@@ -430,5 +430,13 @@
     "path": "C:/hermes/projects/sec",
     "created": "2026-09-01",
     "updated": "2026-09-01 11:24"
+  },
+  {
+    "name": "QuoteCard",
+    "status": "active",
+    "description": "감성 인용 카드 생성기",
+    "path": "C:/hermes/projects/quote",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 11:25"
   }
 ]

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Quote Card</title>
+<style>
+:root { --bg:#05070e; --text:#dbe4f0; --muted:#6b7686; --card:#0d1424; --border:#1c2a44; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-serif; padding:20px; display:flex; flex-direction:column; align-items:center; gap:16px; }
+h1{ font-size:19px; letter-spacing:2px; } h1 span{ color:#f0a6d0; }
+.sub{ color:var(--muted); font-size:12px; }
+.wrap{ display:flex; gap:18px; flex-wrap:wrap; justify-content:center; align-items:flex-start; }
+#cv{ border-radius:14px; box-shadow:0 10px 40px rgba(0,0,0,.5); width:330px; height:412px; }
+.panel{ background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; display:flex; flex-direction:column; gap:12px; width:300px; }
+.panel h3{ font-size:13px; color:#9fb0c8; }
+label{ font-size:12px; color:var(--muted); }
+textarea{ width:100%; background:#0a0f1e; border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px; font-size:13px; resize:vertical; min-height:70px; font-family:inherit; }
+.row{ display:flex; gap:6px; flex-wrap:wrap; }
+.bg{ width:34px; height:34px; border-radius:8px; cursor:pointer; border:2px solid transparent; }
+.bg.sel{ border-color:#fff; }
+input[type=text]{ width:100%; background:#0a0f1e; border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px; font-size:13px; }
+.btn{ background:#f0a6d0; color:#1a0d1e; border:none; border-radius:9px; padding:10px; cursor:pointer; font-weight:600; font-size:13px; }
+.btn:hover{ filter:brightness(1.1); }
+.quote-list{ display:flex; flex-direction:column; gap:6px; }
+.qit{ background:#16223a; border:1px solid var(--border); border-radius:7px; padding:8px; font-size:12px; cursor:pointer; color:#c8d2e4; }
+.qit:hover{ background:#1f3050; }
+</style>
+</head>
+<body>
+<h1>QUOTE <span>· CARD</span></h1>
+<div class="sub">감성 그라데이션 + 명언 = SNS 공유용 카드</div>
+<div class="wrap">
+  <canvas id="cv" width="540" height="675"></canvas>
+  <div class="panel">
+    <h3>🎨 배경 선택</h3>
+    <div class="row" id="bgrow"></div>
+    <h3>✍️ 명언</h3>
+    <textarea id="qText">무한한 자유 속에서, 창작은 끝나지 않는다.</textarea>
+    <input type="text" id="qAuth" placeholder="— 저자" value="— Hermes">
+    <h3>💬 명언 모음</h3>
+    <div class="quote-list" id="qlist"></div>
+    <button class="btn" id="save">💾 PNG로 저장</button>
+  </div>
+</div>
+<script>
+const QUOTES=[
+  ['무한한 자유 속에서, 창작은 끝나지 않는다.','— Hermes'],
+  ['별은 아무리 어두워도 그 자리를 지킨다.','— 밤하늘'],
+  ['작은 습관이 쌓이면 인생이 달라진다.','— 시드니'],
+  ['지금 이 순간이 가장 어린 나이다.','— 어록'],
+  ['바다는 늘 같은 너울처럼 보여도 매일 다르다.','— 오마르'],
+  ['노력은 배신하지 않는다.','— 아멜'],
+  ['꿈을 지키는 사람은 결국 길을 찾는다.','— 여행자'],
+  ['당신의 이야기는 아직 시작되지 않았다.','— 새벽'],
+];
+const BGS=[
+  ['#ff9a9e','#fecfef'],['#a18cd1','#fbc2eb'],['#fccb90','#d57eeb'],['#84fab0','#8fd3f4'],['#f6d365','#fda085'],['#89f7fe','#66a6ff'],['#f093fb','#f5576c'],['#5ee7df','#b490ca']
+];
+const cv=document.getElementById('cv'), g=cv.getContext('2d');
+let bgIdx=0;
+const bgrow=document.getElementById('bgrow');
+BGS.forEach((bg,i)=>{ const d=document.createElement('div'); d.className='bg'+(i===0?' sel':''); d.style.background=`linear-gradient(135deg,${bg[0]},${bg[1]})`; d.onclick=()=>{ bgIdx=i; document.querySelectorAll('.bg').forEach(b=>b.classList.remove('sel')); d.classList.add('sel'); draw(); }; bgrow.appendChild(d); });
+function wrapText(text,maxW){
+  const fs=30; g.font=`bold ${fs}px 'Segoe UI','Noto Sans KR',sans-serif`;
+  const words=text.split(' '); const lines=[]; let line='';
+  for(const w of words){ const t=line?line+' '+w:w; if(g.measureText(t).width>maxW){lines.push(line);line=w;}else line=t; }
+  if(line)lines.push(line);
+  return lines;
+}
+function draw(){
+  const bg=BGS[bgIdx];
+  const gr=g.createLinearGradient(0,0,cv.width,cv.height); gr.addColorStop(0,bg[0]); gr.addColorStop(1,bg[1]);
+  g.fillStyle=gr; g.fillRect(0,0,cv.width,cv.height);
+  // decorative circles
+  g.globalAlpha=.18;
+  g.fillStyle='#fff'; g.beginPath(); g.arc(80,120,60,0,7); g.fill();
+  g.fillStyle='#000'; g.beginPath(); g.arc(cv.width-70,cv.height-90,46,0,7); g.fill();
+  g.globalAlpha=1;
+  // quote mark
+  g.font='80px serif'; g.fillStyle='rgba(255,255,255,.5)'; g.fillText('“',42,110);
+  // text
+  const text=document.getElementById('qText').value;
+  g.fillStyle='#fff';
+  g.font=`bold 28px 'Segoe UI','Noto Sans KR',sans-serif`;
+  g.textBaseline='middle';
+  const maxW=cv.width-120; let y=170;
+  const lines=wrapText(text,maxW);
+  lines.forEach(line=>{ g.fillText(line,60,y); y+=44; });
+  // author
+  const auth=document.getElementById('qAuth').value;
+  if(auth){ g.font=`18px 'Segoe UI',sans-serif`; g.fillStyle='rgba(255,255,255,.85)'; g.textAlign='right'; g.fillText(auth,cv.width-60,cv.height-60); g.textAlign='left'; }
+  // brand
+  g.font=`13px sans-serif`; g.fillStyle='rgba(255,255,255,.6)'; g.textAlign='right'; g.fillText('♡ Hermes Workspace',cv.width-24,cv.height-26);
+}
+document.getElementById('qText').addEventListener('input',draw);
+document.getElementById('qAuth').addEventListener('input',draw);
+const qlist=document.getElementById('qlist');
+QUOTES.forEach(([t,a])=>{ const d=document.createElement('div'); d.className='qit'; d.textContent=t; d.onclick=()=>{ document.getElementById('qText').value=t; document.getElementById('qAuth').value=a; draw(); }; qlist.appendChild(d); });
+document.getElementById('save').addEventListener('click',()=>{ const a=document.createElement('a'); a.download='hermes-quote.png'; a.href=cv.toDataURL('image/png'); a.click(); });
+draw();
+</script>
+</body>
+</html>
