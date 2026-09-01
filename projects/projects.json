@@ -374,5 +374,13 @@
     "path": "C:/hermes/projects/grav",
     "created": "2026-09-01",
     "updated": "2026-09-01 10:56"
+  },
+  {
+    "name": "Tarot",
+    "status": "active",
+    "description": "인터랙티브 타로 카드",
+    "path": "C:/hermes/projects/tarot",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 11:03"
   }
 ]

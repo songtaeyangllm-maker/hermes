@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Tarot</title>
+<style>
+:root { --bg:#0a0710; --text:#e8d9f5; --muted:#8f7fa8; --card:#1a1030; --border:#3a2560; --accent:#c084fc; --gold:#e9b45b; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:radial-gradient(1200px 800px at 50% -10%, #1c1240 0%, #0a0710 60%); color:var(--text); font-family:'Segoe UI',Georgia,serif; min-height:100vh; display:flex; flex-direction:column; align-items:center; gap:18px; padding:26px 18px; }
+h1{ font-size:24px; letter-spacing:4px; font-weight:600; color:var(--gold); text-shadow:0 0 22px rgba(233,180,91,.35); }
+.sub{ color:var(--muted); font-size:13px; letter-spacing:1px; }
+.deck{ display:flex; align-items:center; justify-content:center; perspective:1400px; }
+.card{ width:210px; height:320px; position:relative; transform-style:preserve-3d; transition:transform .9s cubic-bezier(.2,.8,.2,1); cursor:pointer; }
+.card.face-up{ transform:rotateY(180deg); }
+.card .face{ position:absolute; inset:0; border-radius:16px; backface-visibility:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; border:1px solid var(--border); box-shadow:0 18px 50px rgba(0,0,0,.55); }
+.card .back{ background:linear-gradient(145deg,#231447,#120a24); transform:rotateY(180deg); }
+.card .back .pat{ width:150px;height:230px;border:2px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:52px;color:var(--gold);box-shadow:inset 0 0 30px rgba(233,180,91,.15); }
+.card .front{ background:linear-gradient(160deg,var(--g1,#3b1d6b),#150a28); }
+.card.rev .front{ transform:rotateY(180deg) rotate(180deg); }
+.card .front .ico{ font-size:64px; filter:drop-shadow(0 4px 14px rgba(0,0,0,.5)); }
+.card .front .nm{ font-size:15px; font-weight:600; letter-spacing:2px; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,.6); }
+.card .front .tag{ font-size:12px; color:var(--muted); }
+.msgbox{ min-height:74px; max-width:520px; text-align:center; color:#cbb; font-size:14.5px; line-height:1.7; opacity:0; transition:opacity .6s; }
+.msgbox.show{ opacity:1; }
+.msgbox b{ color:var(--gold); }
+.bar{ display:flex; gap:10px; }
+.btn{ background:rgba(192,132,252,.12); color:#e4c7ff; border:1px solid var(--border); border-radius:10px; padding:9px 20px; cursor:pointer; font-size:13px; letter-spacing:1px; transition:.2s; }
+.btn:hover{ background:rgba(192,132,252,.25); border-color:var(--accent); }
+.hint{ color:var(--muted); font-size:12px; }
+</style>
+</head>
+<body>
+<h1>✦ TAROT ✦</h1>
+<div class="sub">오늘의 카드를 뽑아 나침반을 찾으세요</div>
+<div class="deck">
+  <div class="card" id="card">
+    <div class="face back"><div class="pat">✦</div></div>
+    <div class="face front"></div>
+  </div>
+</div>
+<div class="msgbox" id="msg"></div>
+<div class="bar">
+  <button class="btn" id="draw">🃏 새 카드 뽑기</button>
+  <button class="btn" id="flip">🔮 카드 뒤집기</button>
+</div>
+<div class="hint">카드를 클릭해 뒤집으세요 · 정방/역방은 메시지의 방향을 달리해요</div>
+<script>
+const CARDS=[
+ ["0","바보", "🌅","새로운 시작, 모험이 당신을 부른다"],
+ ["I","마법사", "🪄","의지와 기술로 현실을 창조할 때"],
+ ["II","여사제", "🌙","직관과 내면의 목소리를 들어라"],
+ ["III","여황제", "🌸","풍요와 창조력, 돌봄의 에너지"],
+ ["IV","황제", "👑","질서와 통제력, 안정의 기반"],
+ ["V","교황", "🕊️","지혜와 가르침을 따르라"],
+ ["VI","연인", "💞","선택과 조화, 진심의 연결"],
+ ["VII","전차", "🗡","의지로 전진, 승리의 역동성"],
+ ["VIII","힘", "🦁","온화한 힘으로 난관을 다스린다"],
+ ["IX","은자", "🏮","고요 속에서 내면의 빛을 찾아라"],
+ ["X","운명의 수레바퀴", "🎡","변화의 순환, 흐름에 몸을 맡겨라"],
+ ["XI","정의", "⚖️","공정성, 균형, 책임의 판단"],
+ ["XII","매달린 사람", "🙃","새로운 시각, 내려놓음의 지혜"],
+ ["XIII","죽음", "💀","단절과 재생, 올바른 변화"],
+ ["XIV","절제", "⚗️","조화와 균형, 신중한 혼합"],
+ ["XV","악마", "😈","집착과 유혹을 직시하라"],
+ ["XVI","탑", "🗼","전복과 해방, 흔들린 뒤의 개안"],
+ ["XVII","별", "⭐","희망과 영감, 치유의 빛"],
+ ["XVIII","달", "🌘","환상과 불안, 진실을 비추는 밤"],
+ ["XIX","태양", "☀️","성공과 기쁨, 밝은 확신"],
+ ["XX","심판", "🎺","부활과 각성, 결정적 순간"],
+ ["XXI","세계", "🌍","완성과 성취, 여정의 결실"],
+];
+const colors=[["#b33762","#5a1030"],["#4e7bd4","#1a2a66"],["#7b5bd6","#2a1450"],["#d07a3b","#5a2a10"],["#3aa05a","#0f3320"],["#8a63c0","#2d1a50"],["#d44a5a","#4a1020"],["#3b8fb0","#123344"],["#c9983b","#4a3610"],["#5a7bd0","#161f4a"]];
+const card=document.getElementById('card'), front=card.querySelector('.front'), msg=document.getElementById('msg');
+let idx=-1, rev=false, flipped=false, last=[];
+function pick(){ idx=Math.floor(Math.random()*CARDS.length); rev=Math.random()<0.4; flipped=false; }
+function render(){
+  const [num,name,ico,//uid
+    text]=CARDS[idx];
+  const [g1,g2]=colors[idx%colors.length];
+  front.style.setProperty('--g1',g1); front.style.setProperty('--g2',g2);
+  front.innerHTML='<div class="ico">'+ico+'</div><div class="nm">'+name+'</div><div class="tag">'+num+' · '+(rev?'REVERSE':'UPRIGHT')+'</div>';
+  card.classList.toggle('rev',rev);
+  if(flipped) card.classList.add('face-up'); else card.classList.remove('face-up');
+  const dir=rev? '방향이 반전되어 — ' : '';
+  msg.innerHTML='<b>'+name+(rev?' (역방)':'')+'</b> · '+dir+text;
+  msg.classList.add('show');
+}
+draw.addEventListener('click',()=>{ pick(); render(); msg.classList.remove('show'); setTimeout(()=>msg.classList.add('show'),200); });
+flip.addEventListener('click',()=>{ flipped=true; card.classList.add('face-up'); });
+card.addEventListener('click',()=>{ flipped=!flipped; card.classList.toggle('face-up',flipped); });
+// initial
+pick(); render(); 
+</script>
+</body>
+</html>
