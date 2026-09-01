@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Raycaster</title>
+<style>
+:root { --bg:#000; --card:#0f1420; --text:#e5e7eb; --border:#233043; --accent:#4ade80; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; display:flex; flex-direction:column; align-items:center; gap:14px; padding:20px; min-height:100vh; }
+h1{ font-size:20px; letter-spacing:1px; }
+h1 span{ color:var(--accent); }
+.sub{ color:#8b96a8; font-size:13px; margin-top:2px; }
+.wrap{ display:flex; gap:14px; flex-wrap:wrap; justify-content:center; align-items:flex-start; }
+#view{ width:640px; height:400px; background:#000; border:1px solid var(--border); border-radius:10px; cursor:crosshair; display:block; }
+#mini{ width:180px; height:180px; background:#05070c; border:1px solid var(--border); border-radius:10px; display:block; }
+.panel{ background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px; }
+.hud{ display:flex; gap:18px; align-items:center; font-size:13px; color:#a9b4c4; flex-wrap:wrap; }
+.hud b{ color:#fff; }
+.btn{ background:#1c2a3f; color:#dbe4f0; border:1px solid var(--border); border-radius:8px; padding:7px 14px; cursor:pointer; font-size:13px; }
+.btn:hover{ background:#243650; }
+.btn.primary{ background:var(--accent); color:#06240f; border:none; font-weight:600; }
+.help{ font-size:12px; color:#6b7686; line-height:1.7; max-width:640px; text-align:center; }
+.help kbd{ background:#1c2a3f; color:#cfe0f5; border-radius:4px; padding:1px 6px; font-family:inherit; font-size:11px; }
+</style>
+</head>
+<body>
+<h1>HERMES <span>RAYCASTER</span></h1>
+<div class="sub">순수 JS 레이캐스팅 3D 엔진 · DDA 알고리즘 · Wolfenstein 스타일</div>
+<div class="panel"><div class="hud">
+  <span>위치 <b id="pos">-</b></span>
+  <span>방향각 <b id="dir">-</b></span>
+  <span>FPS <b id="fps">-</b></span>
+  <span>셀 <b id="cell">-</b></span>
+</div></div>
+<div class="wrap">
+  <canvas id="view" width="640" height="400"></canvas>
+  <div style="display:flex;flex-direction:column;gap:10px;align-items:center">
+    <canvas id="mini" width="180" height="180"></canvas>
+    <button class="btn" id="retry">🔄 초기 위치로</button>
+    <button class="btn" id="swapmap">🗺️ 맵 전환</button>
+  </div>
+</div>
+<div class="help">
+  이동: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · 회전: <kbd>←</kbd><kbd>→</kbd> (또는 마우스 드래그) · 대시: <kbd>Shift</kbd><br>
+  벽에 부딪히면 밀리지 않아요 — 코너를 돌 때는 S로 후진하세요.
+</div>
+<script>
+const cv=document.getElementById('view'), cx=cv.getContext('2d');
+const mc=document.getElementById('mini'), mx=mc.getContext('2d');
+const W=cv.width, H=cv.height;
+const MAP1=[
+[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+[1,0,2,0,2,0,2,0,2,0,2,0,2,0,0,1],
+[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+[1,0,2,0,2,3,2,0,2,3,2,0,2,0,0,1],
+[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+[1,0,2,0,2,0,2,0,2,0,2,0,2,0,0,1],
+[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+[1,0,2,0,2,0,2,0,2,0,2,4,2,0,0,1],
+[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+];
+const MAP2=[
+[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+[1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,1],
+[1,0,1,1,0,1,0,1,1,1,0,1,0,1,0,1],
+[1,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1],
+[1,0,1,1,1,0,1,1,0,1,1,1,0,1,0,1],
+[1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1],
+[1,1,1,1,0,1,1,0,1,1,1,1,1,1,0,1],
+[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+];
+let MAP=MAP1, mapW=MAP[0].length, mapH=MAP.length;
+function swap(){ MAP=(MAP===MAP1)?MAP2:MAP1; mapW=MAP[0].length; mapH=MAP.length;
+  p.x=2.5; p.y=3.5; p.a=0; }
+document.getElementById('swapmap').addEventListener('click',()=>{swap(); render();});
+// player
+const p={ x:2.5, y:3.5, a:0, vx:0, vy:0 };
+const keys={};
+addEventListener('keydown',e=>{ keys[e.key.toLowerCase()]=true; if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase()))e.preventDefault(); });
+addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; });
+let mx2=0,my2=0,mdrag=false;
+cv.addEventListener('mousedown',e=>{mdrag=true;mx2=e.clientX;my2=e.clientY;});
+addEventListener('mouseup',()=>mdrag=false);
+addEventListener('mousemove',e=>{ if(!mdrag)return; p.a+=(e.clientX-mx2)*0.005; mx2=e.clientX; });
+document.getElementById('retry').addEventListener('click',()=>{p.x=2.5;p.y=3.5;p.a=0;});
+// frame
+let last=performance.now(),fps=60,frames=0,facc=0;
+function frame(now){
+  const dt=Math.min((now-last)/1000,0.05); last=now;
+  const spd=(keys['shift']?5.5:3.0)*dt;
+  const cos=Math.cos(p.a), sin=Math.sin(p.a);
+  let dx=0,dy=0;
+  if(keys['w']){ dx+=cos; dy+=sin; }
+  if(keys['s']){ dx-=cos; dy-=sin; }
+  if(keys['a']){ dx+=sin; dy-=cos; }
+  if(keys['d']){ dx-=sin; dy+=cos; }
+  if(keys['arrowleft']) p.a-=2.2*dt;
+  if(keys['arrowright']) p.a+=2.2*dt;
+  const nx=p.x+dx*spd, ny=p.y+dy*spd;
+  if(MAP[Math.floor(p.y)][Math.floor(nx)]===0) p.x=nx;
+  if(MAP[Math.floor(ny)][Math.floor(p.x)]===0) p.y=ny;
+  render();
+  // fps
+  frames++; facc+=dt; if(facc>=0.5){ fps=Math.round(frames/facc); frames=0; facc=0; document.getElementById('fps').textContent=fps; }
+  document.getElementById('pos').textContent=Math.round(p.x*10)/10+', '+Math.round(p.y*10)/10;
+  document.getElementById('dir').textContent=Math.round(p.a*180/Math.PI)+'°';
+  document.getElementById('cell').textContent='['+Math.floor(p.x)+','+Math.floor(p.y)+']';
+  drawMini();
+  requestAnimationFrame(frame);
+}
+// color per cell type
+const wallColor={1:'#4a5a72',2:'#7a4a3a',3:'#3a5a3a',4:'#aa8844'};
+const wallDark ={1:'#2a3648',2:'#4a2a20',3:'#203a20',4:'#6a5520'};
+function render(){
+  // floor/ceiling
+  cx.fillStyle='#1a1f2e'; cx.fillRect(0,0,W,H/2);
+  cx.fillStyle='#2a2020'; cx.fillRect(0,H/2,W,H/2);
+  const fov=Math.PI/3;
+  const cos=Math.cos(p.a), sin=Math.sin(p.a);
+  // DDA per column
+  const planeX=-sin*fov*1.0, planeY=cos*fov*1.0;
+  for(let x=0;x<W;x++){
+    const camX=2*x/W-1;
+    const rdx=cos+planeX*camX;
+    const rdy=sin+planeY*camX;
+    let mapX=Math.floor(p.x), mapY=Math.floor(p.y);
+    const deltaX=Math.abs(rdx)>=1e-9?Math.abs(1/rdx):1e9;
+    const deltaY=Math.abs(rdy)>=1e-9?Math.abs(1/rdy):1e9;
+    let side, stepX, stepY, perp;
+    let sdx,sdy;
+    if(rdx<0){stepX=-1;sdx=(p.x-mapX)*deltaX;}else{stepX=1;sdx=(mapX+1-p.x)*deltaX;}
+    if(rdy<0){stepY=-1;sdy=(p.y-mapY)*deltaY;}else{stepY=1;sdy=(mapY+1-p.y)*deltaY;}
+    let guard=0;
+    while(guard++<256){
+      if(sdx<sdy){sdx+=deltaX;mapX+=stepX;side=0;}else{sdy+=deltaY;mapY+=stepY;side=1;}
+      const cell=MAP[mapY]?MAP[mapY][mapX]:1;
+      if(cell!==0)break;
+    }
+    const cell=MAP[mapY]?MAP[mapY][mapX]:1;
+    perp = side===0 ? (sdx-deltaX) : (sdy-deltaY);
+    if(perp<1e-6)perp=1e-6;
+    const lineH=Math.min(H/perp, 10000);
+    const drawS=Math.max(0,(H-lineH)/2), drawE=Math.min(H,(H+lineH)/2);
+    const base=wallColor[cell]||'#666';
+    const shade=side===1?0.7:1.0;
+    cx.fillStyle=shadeRGB(base,shade);
+    cx.fillRect(x,drawS,1,drawE-drawS);
+    // fog: far walls darker
+    const fog=Math.min(1, perp/12);
+    cx.fillStyle='rgba(0,0,10,'+fog*0.55+')';
+    cx.fillRect(x,drawS,1,drawE-drawS);
+  }
+}
+function shadeRGB(hex,f){ const n=parseInt(hex.slice(1),16); const r=Math.floor((n>>16&255)*f), g=Math.floor((n>>8&255)*f), b=Math.floor((n&255)*f); return 'rgb('+r+','+g+','+b+')'; }
+function drawMini(){
+  mx.fillStyle='#05070c'; mx.fillRect(0,0,180,180);
+  const s=180/Math.max(mapW,mapH);
+  for(let y=0;y<mapH;y++)for(let x=0;x<mapW;x++){
+    const c=MAP[y][x];
+    mx.fillStyle=c===0?'#0e1420':(c===2?'#6a4030':(c===3?'#2a4a2a':'#9a7a3a'));
+    if(c!==0){ mx.fillRect(x*s,y*s,s-1,s-1);}
+  }
+  mx.strokeStyle='#4ade80'; mx.beginPath();
+  mx.arc(p.x*s,p.y*s,3,0,7); mx.stroke();
+  mx.strokeStyle='#4ade80'; mx.beginPath();
+  mx.moveTo(p.x*s,p.y*s); mx.lineTo((p.x+Math.cos(p.a)*1.2)*s,(p.y+Math.sin(p.a)*1.2)*s); mx.stroke();
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

@@ -318,5 +318,13 @@
     "path": "C:/hermes/projects/lang",
     "created": "2026-09-01",
     "updated": "2026-09-01 10:38"
+  },
+  {
+    "name": "Raycaster",
+    "status": "active",
+    "description": "레이캐스팅 3D 미로 엔진(DDA)",
+    "path": "C:/hermes/projects/ray",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 10:43"
   }
 ]
