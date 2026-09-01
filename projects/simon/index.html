@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Simon</title>
+<style>
+:root { --bg:#05070e; --text:#e5e7eb; --muted:#6b7686; --card:#0d1424; --border:#1c2a44; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-serif; display:flex; flex-direction:column; align-items:center; gap:14px; padding:20px; min-height:100vh; }
+h1{ font-size:20px; letter-spacing:3px; } h1 span{ color:#ffd54d; }
+.sub{ color:var(--muted); font-size:12px; }
+.stage{ position:relative; width:340px; height:340px; }
+.pad{ position:absolute; width:158px; height:158px; border-radius:16px; cursor:pointer; transition:filter .08s, transform .05s; opacity:.82; }
+.pad.lit{ opacity:1; filter:brightness(1.7) drop-shadow(0 0 22px currentColor); transform:scale(.97); }
+.p1{ top:0; left:0; background:#ff5b5b; color:#ff5b5b; }
+.p2{ top:0; right:0; background:#4ade80; color:#4ade80; }
+.p3{ bottom:0; left:0; background:#5b8cff; color:#5b8cff; }
+.p4{ bottom:0; right:0; background:#ffd54d; color:#ffd54d; }
+.center{ position:absolute; inset:0; margin:auto; width:96px; height:96px; border-radius:50%; background:#0a0f1e; border:2px solid var(--border); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; pointer-events:auto; cursor:pointer; z-index:2; }
+.center b{ font-size:26px; color:#ffd54d; } .center span{ font-size:10px; color:var(--muted); }
+.bar{ display:flex; gap:10px; align-items:center; }
+.badge{ background:var(--card); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-size:12px; color:var(--muted); }
+.badge b{ color:var(--text); }
+.btn{ background:#16223a; color:#e5e7eb; border:1px solid var(--border); border-radius:8px; padding:7px 16px; cursor:pointer; font-size:13px; }
+.btn:hover{ background:#1f3050; }
+.msg{ min-height:18px; font-size:13px; color:#9fb0c8; }
+</style>
+</head>
+<body>
+<h1>SIMON <span>SAYS</span></h1>
+<div class="sub">색상 시퀀스를 기억하고 따라 눌러라</div>
+<div class="stage">
+  <div class="pad p1"></div><div class="pad p2"></div>
+  <div class="pad p3"></div><div class="pad p4"></div>
+  <div class="center"><b id="lv">0</b><span>LEVEL</span></div>
+</div>
+<div class="msg" id="msg">시작하면 완전 집중!</div>
+<div class="bar">
+  <button class="btn" id="start">▶ 시작</button>
+  <span class="badge">최고기록 <b id="best">0</b></span>
+</div>
+<script>
+const pads=[...document.querySelectorAll('.pad')];
+const lvEl=document.getElementById('lv'), msgEl=document.getElementById('msg'), bestEl=document.getElementById('best');
+let best=+localStorage.getItem('hermes_simon_best')||0; bestEl.textContent=best;
+let seq=[], player=0, level=0, lock=false;
+const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+const notes=[220,330,440,550];
+function beep(f){ const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type='square'; o.frequency.value=f; g.gain.value=.12; o.connect(g); g.connect(audioCtx.destination); o.start(); g.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+.22); o.stop(audioCtx.currentTime+.23); }
+function flash(i,on){ pads[i].classList.toggle('lit',on); if(on)beep(notes[i]); else audioCtx.resume(); }
+async function showSeq(){
+  lock=true; msgEl.textContent='기억하세요…';
+  for(let i=0;i<seq.length;i++){ await sleep(420); flash(seq[i],true); await sleep(320); flash(seq[i],false); }
+  msgEl.textContent='당신의 차례!';
+  lock=false; player=0;
+}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function nextTurn(){
+  seq.push(Math.floor(Math.random()*4)); level=seq.length; lvEl.textContent=level;
+  if(level>best){ best=level; bestEl.textContent=best; localStorage.setItem('hermes_simon_best',best); }
+  showSeq();
+}
+function gameOver(){
+  flash(-1); msgEl.textContent='💥 실패! 다시 도전'; lock=true;
+  setTimeout(()=>{ seq=[]; level=0; player=0; lvEl.textContent=0; lock=false; msgEl.textContent='시작하면 완전 집중!'; },1200);
+}
+pads.forEach((p,i)=>p.addEventListener('click',()=>{
+  if(lock||!seq.length)return;
+  flash(i,true); setTimeout(()=>flash(i,false),180);
+  if(i===seq[player]){ player++; if(player===seq.length){ msgEl.textContent='✅ 통과! 다음 레벨'; setTimeout(nextTurn,700); } }
+  else gameOver();
+}));
+document.getElementById('start').addEventListener('click',()=>{ audioCtx.resume(); seq=[]; level=0; player=0; nextTurn(); });
+</script>
+</body>
+</html>

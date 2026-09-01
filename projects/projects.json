@@ -414,5 +414,13 @@
     "path": "C:/hermes/projects/ca",
     "created": "2026-09-01",
     "updated": "2026-09-01 11:16"
+  },
+  {
+    "name": "Simon",
+    "status": "active",
+    "description": "Simon Says 시퀀스 기억 게임",
+    "path": "C:/hermes/projects/simon",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 11:18"
   }
 ]
