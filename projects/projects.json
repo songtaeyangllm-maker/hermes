@@ -478,5 +478,13 @@
     "path": "C:/hermes/projects/tet",
     "created": "2026-09-01",
     "updated": "2026-09-01 11:40"
+  },
+  {
+    "name": "PixelArt",
+    "status": "active",
+    "description": "픽셀 아트 에디터",
+    "path": "C:/hermes/projects/pix",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 11:42"
   }
 ]

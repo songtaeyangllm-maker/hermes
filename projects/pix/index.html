@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Pixel Art</title>
+<style>
+:root { --bg:#0a0c14; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; --accent:#ff8a5b; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-serif; padding:18px; display:flex; flex-direction:column; align-items:center; gap:12px; }
+h1{ font-size:19px; letter-spacing:2px; } h1 span{ color:var(--accent); }
+.sub{ color:var(--muted); font-size:12px; }
+.wrap{ display:flex; gap:16px; flex-wrap:wrap; justify-content:center; align-items:flex-start; }
+.canvas-wrap{ position:relative; }
+canvas#main{ background:#1a2134; border:1px solid var(--border); border-radius:8px; image-rendering:pixelated; cursor:crosshair; }
+.tools{ background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px; display:flex; flex-direction:column; gap:10px; width:230px; }
+.tools h4{ font-size:12px; color:#9fb0c8; }
+.pal{ display:grid; grid-template-columns:repeat(8,1fr); gap:4px; }
+.sw{ width:22px; height:22px; border-radius:5px; cursor:pointer; border:2px solid transparent; }
+.sw.sel{ border-color:#fff; box-shadow:0 0 8px rgba(255,255,255,.4); }
+.row{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+.btn{ background:#16223a; color:#e5e7eb; border:1px solid var(--border); border-radius:7px; padding:5px 11px; cursor:pointer; font-size:11px; }
+.btn:hover{ background:#1f3050; } .btn.acc{ background:var(--accent); color:#1a0a04; font-weight:600; }
+input[type=color]{ width:28px; height:28px; border:none; background:none; cursor:pointer; }
+input[type=range]{ accent-color:var(--accent); width:100px; }
+hint{ color:var(--muted); font-size:11px; }
+</style>
+</head>
+<body>
+<h1>PIXEL <span>ART</span></h1>
+<div class="sub">픽셀 하나하나 그리는 창작 — PNG로 저장</div>
+<div class="wrap">
+  <div class="canvas-wrap">
+    <canvas id="main" width="320" height="320"></canvas>
+  </div>
+  <div class="tools">
+    <h4>🎨 팔레트</h4>
+    <div class="pal" id="pal"></div>
+    <div class="row"><input type="color" id="custom" value="#ff8a5b"><button class="btn" id="addCus">+ 추가</button></div>
+    <h4>🔧 도구</h4>
+    <div class="row">
+      <button class="btn acc" id="tPen">✏️ 연필</button>
+      <button class="btn" id="tErase">🧽 지우개</button>
+      <button class="btn" id="tFill">🪣 채우기</button>
+    </div>
+    <h4>📐 크기</h4>
+    <div class="row">
+      <span class="badge" style="color:var(--muted);font-size:12px">격자 <b id="sizeV">16</b></span>
+      <input type="range" id="size" min="8" max="48" value="16">
+    </div>
+    <div class="row">
+      <button class="btn" id="grid">▦ 그리드</button>
+      <button class="btn" id="clear">🗑️ 지우기</button>
+    </div>
+    <h4>💾 저장</h4>
+    <div class="row">
+      <button class="btn acc" id="save">⬇ PNG 저장</button>
+      <button class="btn" id="export">🔳 확대 미리보기</button>
+    </div>
+    <hint>자동 저장됨 · 우클릭으로 현재색 피킹</hint>
+  </div>
+</div>
+<script>
+const DEFPAL=['#000000','#ffffff','#ff5b5b','#ff8a5b','#ffd54d','#4ade80','#5b8cff','#b58bff','#ff6b9d','#4dd0ff','#8d6e63','#9aa7bd','#a5d6a7','#fff3e0','#ffab91','#90caf9'];
+let N=16, cells=[], cell=16, tool='pen', color='#000000', showGrid=true;
+const cv=document.getElementById('main'), g=cv.getContext('2d');
+let pal=JSON.parse(localStorage.getItem('hermes_pixel_pal')||JSON.stringify(DEFPAL));
+function init(){ cells=Array(N*N).fill(''); for(let i=0;i<N*N;i++)cells[i]=''; }
+function resizeCanvas(){ const px=Math.min(480,Math.max(240,N*8)); cv.width=px; cv.height=px; cell=Math.floor(px/N); draw(); }
+function draw(){
+  const px=cv.width; g.clearRect(0,0,px,px);
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){ const c=cells[y*N+x]; if(c){ g.fillStyle=c; g.fillRect(x*cell,y*cell,cell,cell); } }
+  if(showGrid){ g.strokeStyle='rgba(255,255,255,0.06)'; g.lineWidth=1; for(let i=0;i<=N;i++){ g.beginPath(); g.moveTo(i*cell,0); g.lineTo(i*cell,px); g.stroke(); g.beginPath(); g.moveTo(0,i*cell); g.lineTo(px,i*cell); g.stroke(); } }
+}
+function pos(e){ const r=cv.getBoundingClientRect(); const x=Math.floor((e.clientX-r.left)/cell*(1)); const y=Math.floor((e.clientY-r.top)/cell); return [Math.min(N-1,Math.max(0,x)),Math.min(N-1,Math.max(0,y))]; }
+let drawing=false;
+cv.addEventListener('mousedown',e=>{ drawing=true; paint(pos(e)); });
+cv.addEventListener('mousemove',e=>{ if(drawing) paint(pos(e)); });
+window.addEventListener('mouseup',()=>drawing=false);
+cv.addEventListener('contextmenu',e=>{ e.preventDefault(); const [x,y]=pos(e); color=cells[y*N+x]||'#000000'; document.getElementById('custom').value=color; markSel(color); });
+function paint([x,y]){
+  if(tool==='pen'){ cells[y*N+x]=color; }
+  else if(tool==='erase'){ cells[y*N+x]=''; }
+  else if(tool==='fill'){ flood(x,y,color); }
+  save(); draw();
+}
+function flood(x0,y0,newc){ const oldc=cells[y0*N+x0]; if(oldc===newc)return; const q=[[x0,y0]]; cells[y0*N+x0]=newc; while(q.length){ const [x,y]=q.shift(); [[x+1,y],[x-1,y],[x,y+1],[x,y-1]].forEach(([nx,ny])=>{ if(nx>=0&&ny>=0&&nx<N&&ny<N&&cells[ny*N+nx]===oldc){ cells[ny*N+nx]=newc; q.push([nx,ny]); } }); } }
+const palEl=document.getElementById('pal');
+function renderPal(){ palEl.innerHTML=''; pal.forEach(c=>{ const s=document.createElement('div'); s.className='sw'; s.style.background=c; s.onclick=()=>{color=c;markSel(c);document.getElementById('custom').value=c;}; palEl.appendChild(s); }); markSel(color); }
+function markSel(c){ document.querySelectorAll('.sw').forEach(s=>s.classList.toggle('sel',s.style.background===c)); }
+document.getElementById('addCus').addEventListener('click',()=>{ const v=document.getElementById('custom').value; if(!pal.includes(v)){ pal.push(v); localStorage.setItem('hermes_pixel_pal',JSON.stringify(pal)); renderPal(); } });
+document.getElementById('tPen').addEventListener('click',e=>{tool='pen';toolBtn(e.target);});
+document.getElementById('tErase').addEventListener('click',e=>{tool='erase';toolBtn(e.target);});
+document.getElementById('tFill').addEventListener('click',e=>{tool='fill';toolBtn(e.target);});
+function toolBtn(el){ document.querySelectorAll('#tPen,#tErase,#tFill').forEach(b=>b.classList.remove('acc')); el.classList.add('acc'); }
+document.getElementById('grid').addEventListener('click',e=>{ showGrid=!showGrid; e.target.textContent=showGrid?'▦ 그리드':'▤ 숨김'; draw(); });
+document.getElementById('clear').addEventListener('click',()=>{ cells=Array(N*N).fill(''); save(); draw(); });
+document.getElementById('size').addEventListener('input',e=>{ N=+e.target.value; document.getElementById('sizeV').textContent=N; const prev=cells; cells=Array(N*N).fill(''); for(let y=0;y<Math.min(N,prev.length?Math.sqrt(prev.length):16);y++)for(let x=0;x<N;x++){ const pv=prev[y*N+x]||prev[y*16+x]; if(pv)cells[y*N+x]=pv; } resizeCanvas(); });
+document.getElementById('save').addEventListener('click',()=>{ const out=document.createElement('canvas'); out.width=N; out.height=N; const og=out.getContext('2d'); for(let y=0;y<N;y++)for(let x=0;x<N;x++){ if(cells[y*N+x]){ og.fillStyle=cells[y*N+x]; og.fillRect(x,y,1,1); } } const a=document.createElement('a'); a.download='pixel-art.png'; a.href=out.toDataURL(); a.click(); });
+document.getElementById('export').addEventListener('click',()=>{ draw(); });
+function save(){ localStorage.setItem('hermes_pixel_cells',JSON.stringify({n:N,cells})); }
+function load(){ const d=JSON.parse(localStorage.getItem('hermes_pixel_cells')||'null'); if(d){ N=d.n; cells=d.cells||Array(N*N).fill(''); document.getElementById('size').value=N; document.getElementById('sizeV').textContent=N; resizeCanvas(); } }
+init(); renderPal(); load(); draw();
+</script>
+</body>
+</html>
