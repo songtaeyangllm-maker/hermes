@@ -1,14 +1,14 @@
 {
   "name": "hermes",
-  "size": 1430065,
+  "size": 1456144,
   "children": [
     {
       "name": "projects",
-      "size": 703699,
+      "size": 706180,
       "children": [
         {
           "name": "poster",
-          "size": 169662,
+          "size": 168750,
           "children": [
             {
               "name": "poster_ocean.png",
@@ -22,7 +22,7 @@
             },
             {
               "name": "poster_dark.png",
-              "size": 42204,
+              "size": 41292,
               "children": []
             },
             {
@@ -61,16 +61,16 @@
         },
         {
           "name": "treemap",
-          "size": 46183,
+          "size": 46342,
           "children": [
             {
               "name": "tree_data.json",
-              "size": 26500,
+              "size": 26596,
               "children": []
             },
             {
               "name": "tree_data.js",
-              "size": 11719,
+              "size": 11782,
               "children": []
             },
             {
@@ -109,16 +109,16 @@
         },
         {
           "name": "timeline",
-          "size": 21475,
+          "size": 22259,
           "children": [
             {
               "name": "timeline_data.json",
-              "size": 8169,
+              "size": 8594,
               "children": []
             },
             {
               "name": "timeline_data.js",
-              "size": 6855,
+              "size": 7214,
               "children": []
             },
             {
@@ -135,6 +135,17 @@
             {
               "name": "index.html",
               "size": 13432,
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "hermes_os",
+          "size": 12981,
+          "children": [
+            {
+              "name": "index.html",
+              "size": 12981,
               "children": []
             }
           ]
@@ -208,17 +219,6 @@
             {
               "name": "status_flat.svg",
               "size": 914,
-              "children": []
-            }
-          ]
-        },
-        {
-          "name": "hermes_os",
-          "size": 10531,
-          "children": [
-            {
-              "name": "index.html",
-              "size": 10531,
               "children": []
             }
           ]
@@ -529,15 +529,25 @@
     },
     {
       "name": ".git",
-      "size": 487514,
+      "size": 508572,
       "children": [
         {
           "name": "objects",
-          "size": 435118,
+          "size": 455837,
           "children": [
             {
               "name": "pack",
               "size": 310868,
+              "children": []
+            },
+            {
+              "name": "8c",
+              "size": 4976,
+              "children": []
+            },
+            {
+              "name": "48",
+              "size": 4556,
               "children": []
             },
             {
@@ -553,11 +563,6 @@
             {
               "name": "41",
               "size": 4280,
-              "children": []
-            },
-            {
-              "name": "48",
-              "size": 4276,
               "children": []
             },
             {
@@ -591,13 +596,13 @@
               "children": []
             },
             {
-              "name": "c8",
-              "size": 3436,
+              "name": "39",
+              "size": 3659,
               "children": []
             },
             {
-              "name": "39",
-              "size": 3216,
+              "name": "c8",
+              "size": 3436,
               "children": []
             },
             {
@@ -621,8 +626,18 @@
               "children": []
             },
             {
+              "name": "d3",
+              "size": 2896,
+              "children": []
+            },
+            {
               "name": "93",
               "size": 2871,
+              "children": []
+            },
+            {
+              "name": "3a",
+              "size": 2848,
               "children": []
             },
             {
@@ -658,6 +673,21 @@
             {
               "name": "a3",
               "size": 2273,
+              "children": []
+            },
+            {
+              "name": "22",
+              "size": 2262,
+              "children": []
+            },
+            {
+              "name": "67",
+              "size": 2260,
+              "children": []
+            },
+            {
+              "name": "51",
+              "size": 2255,
               "children": []
             },
             {
@@ -703,36 +733,6 @@
             {
               "name": "7c",
               "size": 1976,
-              "children": []
-            },
-            {
-              "name": "3a",
-              "size": 1925,
-              "children": []
-            },
-            {
-              "name": "d1",
-              "size": 1501,
-              "children": []
-            },
-            {
-              "name": "52",
-              "size": 1458,
-              "children": []
-            },
-            {
-              "name": "e4",
-              "size": 1452,
-              "children": []
-            },
-            {
-              "name": "73",
-              "size": 1444,
-              "children": []
-            },
-            {
-              "name": "a9",
-              "size": 1222,
               "children": []
             }
           ]
@@ -815,16 +815,16 @@
         },
         {
           "name": "logs",
-          "size": 14086,
+          "size": 14442,
           "children": [
             {
               "name": "HEAD",
-              "size": 7043,
+              "size": 7221,
               "children": []
             },
             {
               "name": "refs",
-              "size": 7043,
+              "size": 7221,
               "children": []
             }
           ]
@@ -861,11 +861,6 @@
           "children": []
         },
         {
-          "name": "COMMIT_EDITMSG",
-          "size": 56,
-          "children": []
-        },
-        {
           "name": "refs",
           "size": 41,
           "children": [
@@ -877,6 +872,11 @@
           ]
         },
         {
+          "name": "COMMIT_EDITMSG",
+          "size": 39,
+          "children": []
+        },
+        {
           "name": "HEAD",
           "size": 23,
           "children": []
@@ -885,7 +885,7 @@
     },
     {
       "name": "tools",
-      "size": 144073,
+      "size": 146511,
       "children": [
         {
           "name": "note_tf.json",
@@ -968,13 +968,13 @@
           "children": []
         },
         {
-          "name": "analytics.py",
-          "size": 4159,
+          "name": "smoke.py",
+          "size": 4184,
           "children": []
         },
         {
-          "name": "smoke.py",
-          "size": 4117,
+          "name": "analytics.py",
+          "size": 4159,
           "children": []
         },
         {
@@ -993,6 +993,11 @@
           "children": []
         },
         {
+          "name": "validate_widgets.py",
+          "size": 2371,
+          "children": []
+        },
+        {
           "name": "autocommit.py",
           "size": 2217,
           "children": []
@@ -1001,7 +1006,7 @@
     },
     {
       "name": "dashboard",
-      "size": 53061,
+      "size": 53133,
       "children": [
         {
           "name": "index.html",
@@ -1010,7 +1015,7 @@
         },
         {
           "name": "history.json",
-          "size": 2476,
+          "size": 2548,
           "children": []
         },
         {
@@ -1032,15 +1037,15 @@
     },
     {
       "name": "notes",
-      "size": 21695,
+      "size": 21675,
       "children": [
         {
           "name": "reports",
-          "size": 8508,
+          "size": 8488,
           "children": [
             {
               "name": "summary_2026-09-01.html",
-              "size": 2573,
+              "size": 2570,
               "children": []
             },
             {
@@ -1050,7 +1055,7 @@
             },
             {
               "name": "summary_2026-09-01.md",
-              "size": 1319,
+              "size": 1302,
               "children": []
             },
             {
@@ -1145,11 +1150,11 @@
     },
     {
       "name": "scripts",
-      "size": 6850,
+      "size": 6900,
       "children": [
         {
           "name": "hermes",
-          "size": 6850,
+          "size": 6900,
           "children": []
         }
       ]
