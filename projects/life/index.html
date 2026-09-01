@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Game of Life</title>
+<style>
+:root { --bg:#05070e; --text:#dbe4f0; --muted:#6b7686; --card:#0d1424; --border:#1c2a44; --accent:#5bff8c; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; display:flex; flex-direction:column; align-items:center; gap:14px; padding:20px; min-height:100vh; }
+h1{ font-size:20px; letter-spacing:2px; } h1 span{ color:var(--accent); }
+.sub{ color:var(--muted); font-size:13px; }
+#cv{ border:1px solid var(--border); border-radius:12px; background:#080b14; display:block; cursor:pointer; }
+.bar{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; align-items:center; }
+.btn{ background:#16223a; color:#dbe4f0; border:1px solid var(--border); border-radius:8px; padding:7px 13px; cursor:pointer; font-size:13px; }
+.btn:hover{ background:#1f3050; } .btn.active{ background:var(--accent); color:#06240f; font-weight:600; }
+.badge{ background:var(--card); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-size:12px; color:var(--muted); }
+.badge b{ color:var(--text); }
+input[type=range]{ accent-color:var(--accent); width:120px; }
+.help{ font-size:12px; color:#55606f; max-width:620px; text-align:center; line-height:1.6; }
+.help kbd{ background:#16223a; border-radius:4px; padding:1px 6px; font-size:11px; }
+</style>
+</head>
+<body>
+<h1>CONWAY <span>· LIFE</span></h1>
+<div class="sub">생명의 규칙 — 살아있는 세포가 태어나고 죽는 무한한 패턴</div>
+<canvas id="cv" width="720" height="520"></canvas>
+<div class="bar">
+  <button class="btn active" id="run">▶ 시작</button>
+  <button class="btn" id="step">⏭ 1세대</button>
+  <button class="btn" id="reset">🧹 지우기</button>
+  <span class="badge">세대 <b id="gen">0</b></span>
+  <span class="badge">세포 <b id="alive">0</b></span>
+  <span class="badge">속도 <input type="range" id="spd" min="1" max="30" value="10"></span>
+</div>
+<div class="bar">
+  <span class="badge">패턴:</span>
+  <button class="btn" data-p="glider">🛩 글라이더</button>
+  <button class="btn" data-p="pulsar">💫 펄서</button>
+  <button class="btn" data-p="gun">🔫 글라이더건</button>
+  <button class="btn" data-p="exploder">💥 폭발</button>
+  <button class="btn" data-p="random">🎲 랜덤</button>
+</div>
+<div class="help">
+  * 그리드를 <b>클릭/드래그</b>해서 세포를 직접 그려보세요 · 세포는 색이 밝을수록 오래 살아있어요 ·
+  인기 패턴: <kbd>글라이더</kbd>는 대각선으로 영원히 이동, <kbd>글라이더건</kbd>은 글라이더를 무한 생성
+</div>
+<script>
+const cv=document.getElementById('cv'), c=cv.getContext('2d');
+const W=cv.width,H=cv.height, CELL=8;
+const COLS=Math.floor(W/CELL), ROWS=Math.floor(H/CELL);
+let grid=Uint8Array.from({length:COLS*ROWS},()=>0);
+let age=Float32Array.from({length:COLS*ROWS},()=>0);
+let running=true, gen=0;
+const genEl=document.getElementById('gen'), aliveEl=document.getElementById('alive'), spd=document.getElementById('spd');
+function idx(x,y){ return (y*COLS+x); }
+function seed(pattern,cx,cy){
+  grid.fill(0); age.fill(0); gen=0; genEl.textContent=0;
+  const pats={
+    glider:[[0,1],[1,2],[2,0],[2,1],[2,2]],
+    blinker:[[0,0],[0,1],[0,2]],
+    pulsar:[[2,0],[3,0],[4,0],[8,0],[9,0],[10,0],[0,2],[5,2],[6,2],[11,2],[0,3],[5,3],[6,3],[11,3],[0,4],[5,4],[6,4],[11,4],[2,5],[3,5],[4,5],[8,5],[9,5],[10,5],[2,7],[3,7],[4,7],[8,7],[9,7],[10,7],[0,8],[5,8],[6,8],[11,8],[0,9],[5,9],[6,9],[11,9],[0,10],[5,10],[6,10],[11,10],[2,12],[3,12],[4,12],[8,12],[9,12],[10,12]],
+    gun:[[0,4],[0,5],[1,4],[1,5],[10,4],[10,5],[10,6],[11,3],[11,7],[12,2],[12,8],[13,2],[13,8],[14,5],[15,3],[15,7],[16,4],[16,5],[16,6],[17,5],[20,2],[20,3],[20,4],[21,2],[21,3],[21,4],[22,1],[22,5],[24,0],[24,1],[24,5],[24,6],[34,2],[34,3],[35,2],[35,3]],
+    exploder:[[0,0],[2,0],[4,0],[0,2],[4,2],[0,4],[2,4],[4,4]],
+  };
+  const p=pats[pattern]||pats.glider;
+  for(const [dx,dy] of p){ const x=cx+dx, y=cy+dy; if(x>=0&&x<COLS&&y>=0&&y<ROWS){ grid[idx(x,y)]=1; } }
+}
+function random(){ grid=Uint8Array.from({length:COLS*ROWS},()=>Math.random()<0.28?1:0); age.fill(0); gen=0; genEl.textContent=0; }
+document.querySelectorAll('[data-p]').forEach(b=>b.addEventListener('click',()=>{
+  const p=b.dataset.p;
+  if(p==='random'){ random(); } else { seed(p,Math.floor(COLS/2),Math.floor(ROWS/2)); }
+}));
+function step(){
+  const ng=Uint8Array.from(grid), na=Float32Array.from(age);
+  let cnt=0;
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+    let n=0;
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      if(dx===0&&dy===0)continue;
+      const nx=(x+dx+COLS)%COLS, ny=(y+dy+ROWS)%ROWS;
+      n+=grid[idx(nx,ny)];
+    }
+    const i=idx(x,y);
+    if(grid[i]===1){ na[i]=Math.min(255,age[i]+4); if(n<2||n>3){ng[i]=0;} else cnt++; }
+    else { if(n===3){ ng[i]=1; na[i]=0; cnt++; } else { na[i]=Math.max(0,age[i]-2);} }
+  }
+  grid=ng; age=na; gen++; genEl.textContent=gen; aliveEl.textContent=cnt;
+}
+function draw(){
+  c.fillStyle='#080b14'; c.fillRect(0,0,W,H);
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+    const i=idx(x,y);
+    if(grid[i]===1){
+      const a=age[i];
+      const r=Math.min(120+a,255), g=Math.min(200+a,255), bl=Math.min(100+a/2,200);
+      c.fillStyle='rgb('+r+','+g+','+bl+')';
+      c.fillRect(x*CELL,y*CELL,CELL-1,CELL-1);
+    }
+  }
+}
+// pointer draw
+let drawing=null;
+cv.addEventListener('mousedown',e=>{ const r=cv.getBoundingClientRect(); const x=Math.floor((e.clientX-r.left)/CELL), y=Math.floor((e.clientY-r.top)/CELL); if(x<0||y<0||x>=COLS||y>=ROWS)return; const i=idx(x,y); drawing={x,y,v:grid[i]?0:1}; grid[i]=drawing.v; });
+cv.addEventListener('mousemove',e=>{ if(!drawing)return; const r=cv.getBoundingClientRect(); const x=Math.floor((e.clientX-r.left)/CELL), y=Math.floor((e.clientY-r.top)/CELL); if(x<0||y<0||x>=COLS||y>=ROWS)return; grid[idx(x,y)]=drawing.v; });
+addEventListener('mouseup',()=>drawing=null);
+document.getElementById('run').addEventListener('click',e=>{ running=!running; e.target.textContent=running?'⏸ 정지':'▶ 시작'; e.target.classList.toggle('active',running); });
+document.getElementById('step').addEventListener('click',()=>{ step(); });
+document.getElementById('reset').addEventListener('click',()=>{ grid.fill(0); age.fill(0); gen=0; genEl.textContent=0; aliveEl.textContent=0; });
+let acc=0,lastFrame=performance.now();
+function loop(now){
+  const dt=(now-lastFrame)/1000; lastFrame=now;
+  if(running){ acc+=dt*spd.value; while(acc>=1){ step(); acc--; } }
+  draw();
+  requestAnimationFrame(loop);
+}
+// initial: random field + one glider for interest
+random();
+const gxy=[[0,1],[1,2],[2,0],[2,1],[2,2]];
+for(const [dx,dy] of gxy){ const x=Math.floor(COLS/2)+dx, y=Math.floor(ROWS/2)+dy; grid[idx(x,y)]=1; }
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
