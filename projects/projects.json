@@ -382,5 +382,13 @@
     "path": "C:/hermes/projects/tarot",
     "created": "2026-09-01",
     "updated": "2026-09-01 11:03"
+  },
+  {
+    "name": "QLearning",
+    "status": "active",
+    "description": "Q-러닝 강화학습 시각화",
+    "path": "C:/hermes/projects/qlearn",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 11:06"
   }
 ]

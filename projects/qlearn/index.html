@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Q-Learning</title>
+<style>
+:root { --bg:#05070e; --text:#dbe4f0; --muted:#6b7686; --card:#0d1424; --border:#1c2a44; --accent:#5b8cff; --gold:#e9b45b; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; display:flex; flex-direction:column; align-items:center; gap:14px; padding:20px; min-height:100vh; }
+h1{ font-size:20px; letter-spacing:2px; } h1 span{ color:var(--accent); }
+.sub{ color:var(--muted); font-size:13px; }
+.wrap{ display:flex; gap:18px; flex-wrap:wrap; justify-content:center; align-items:flex-start; }
+.cvbox{ display:flex; flex-direction:column; gap:8px; align-items:center; }
+#cv{ border:1px solid var(--border); border-radius:10px; background:#0a0f1e; }
+.bar{ display:flex; gap:9px; flex-wrap:wrap; justify-content:center; align-items:center; }
+.btn{ background:#16223a; color:#dbe4f0; border:1px solid var(--border); border-radius:8px; padding:7px 14px; cursor:pointer; font-size:13px; }
+.btn:hover{ background:#1f3050; } .btn.active{ background:var(--accent); color:#081020; font-weight:600; }
+.badge{ background:var(--card); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+.badge b{ color:var(--text); }
+input[type=range]{ accent-color:var(--accent); width:100px; }
+#chart{ border:1px solid var(--border); border-radius:10px; background:#0a0f1e; }
+.help{ font-size:12px; color:#55606f; max-width:620px; text-align:center; line-height:1.7; }
+.help b{ color:#9aa7bd; }
+</style>
+</head>
+<body>
+<h1>Q-LEARNING <span>· 에이전트 학습</span></h1>
+<div class="sub">에이전트가 시행착오로 젤리를 찾아가는 강화학습 — 진짜 벨만 방정식</div>
+<div class="wrap">
+  <div class="cvbox">
+    <canvas id="cv" width="400" height="400"></canvas>
+    <span class="badge">에피소드 <b id="ep">0</b> · 스텝 <b id="st">0</b></span>
+  </div>
+  <canvas id="chart" width="360" height="400"></canvas>
+</div>
+<div class="bar">
+  <button class="btn" id="run">⏸ 멈춤</button>
+  <button class="btn" id="reset">🔄 초기화</button>
+  <span class="badge">학습률 <input type="range" id="lr" min="0.05" max="1" step="0.05" value="0.2"></span>
+  <span class="badge">탐험 <input type="range" id="eps" min="0.05" max="1" step="0.05" value="0.4"></span>
+  <span class="badge">속도 <input type="range" id="sp" min="1" max="20" step="1" value="6"></span>
+</div>
+<div class="help">
+  <b>빨강 에이전트</b>가 매 에피소드 시작점에서 출발해 <b>🍬 젤리</b>를 찾아가요 · <b>🦴 해골</b>은 -보상, 벽은 통과 불가.
+  에이전트는 <b>ε-greedy</b>로 탐험하며 Q-테이블(각 칸에서 4방향의 가치)을 갱신해 점점 <b>최단 경로</b>를 배웁니다.
+  오른쪽 그래프가 에피소드당 소요 스텝 수(감소 = 학습 성공)를 보여줘요.
+</div>
+<script>
+const cv=document.getElementById('cv'), c=cv.getContext('2d');
+const ch=document.getElementById('chart'), g=ch.getContext('2d');
+const S=9, CELL=400/S;
+// grid: S x S {0:empty,1:wall,2:jelly,3:skull}
+const GRID=[
+[1,1,1,1,1,1,1,1,1],
+[1,0,0,0,1,0,0,0,2],
+[1,0,1,0,0,0,1,3,1],
+[1,0,1,1,1,0,1,0,1],
+[1,0,0,0,0,0,1,0,1],
+[1,1,1,0,1,1,1,0,1],
+[1,0,0,0,1,0,0,0,1],
+[1,0,1,0,0,0,1,0,1],
+[1,1,1,1,1,1,1,1,1],
+];
+const START={x:1,y:1};
+// find jelly
+let JELLY=null; for(let y=0;y<S;y++)for(let x=0;x<S;x++)if(GRID[y][x]===2)JELLY={x,y};
+// Q table: state(y*S+x) x 4 actions
+let Q=Array(S*S).fill(0).map(()=>Array(4).fill(0));
+let eps=0.4, alpha=0.2, gamma=0.9;
+let ep=0, pos={...START}, steps=0, running=true;
+let lastSteps=null, history=[];
+const DIRS=[{dx:0,dy:-1},{dx:1,dy:0},{dx:0,dy:1},{dx:-1,dy:0}]; // up,right,down,left
+document.getElementById('lr').addEventListener('input',e=>alpha=+e.target.value);
+document.getElementById('eps').addEventListener('input',e=>eps=+e.target.value);
+document.getElementById('sp').addEventListener('input',e=>SPEED=+e.target.value);
+let SPEED=6;
+document.getElementById('run').addEventListener('click',e=>{running=!running;e.target.textContent=running?'⏸ 멈춤':'▶ 시작';e.target.classList.toggle('active',running);});
+document.getElementById('reset').addEventListener('click',()=>{Q=Array(S*S).fill(0).map(()=>Array(4).fill(0));history=[];ep=0;pos={...START};steps=0;});
+function choose(sidx){
+  if(Math.random()<eps){ return Math.floor(Math.random()*4); }
+  let best=0; for(let a=1;a<4;a++) if(Q[sidx][a]>Q[sidx][best]) best=a; return best;
+}
+function stepOnce(){
+  const sidx=pos.y*S+pos.x;
+  const a=choose(sidx);
+  const nx=pos.x+DIRS[a].dx, ny=pos.y+DIRS[a].dy;
+  if(GRID[ny][nx]===1){ // hit wall — negative, stay
+    const ns=sidx;
+    Q[sidx][a]+=alpha*(-0.3+gamma*Math.max(...Q[ns])-Q[sidx][a]);
+    return {done:false};
+  }
+  const cell=GRID[ny][nx];
+  let rew=0, done=false;
+  if(cell===2){ rew=10; done=true; }       // jelly
+  else if(cell===3){ rew=-5; done=true; }   // skull
+  else rew=-0.04;                            // small time penalty
+  const ns=ny*S+nx;
+  Q[sidx][a]+=alpha*(rew+gamma*Math.max(...Q[ns])-Q[sidx][a]);
+  pos={x:nx,y:ny};
+  if(done){ lastSteps=steps; history.push(steps); pos={...START}; steps=0; ep++; }
+  return {done};
+}
+function draw(){
+  c.clearRect(0,0,400,400);
+  for(let y=0;y<S;y++)for(let x=0;x<S;x++){
+    const cell=GRID[y][x];
+    c.fillStyle='#0a0f1e'; c.fillRect(x*CELL,y*CELL,CELL,CELL);
+    if(cell===1){ c.fillStyle='#233'; c.fillRect(x*CELL+1,y*CELL+1,CELL-2,CELL-2); }
+    else if(cell===2){ c.font='26px serif'; c.textAlign='center'; c.textBaseline='middle'; c.fillText('🍬',x*CELL+CELL/2,y*CELL+CELL/2); }
+    else if(cell===3){ c.font='24px serif'; c.textAlign='center'; c.textBaseline='middle'; c.fillText('🦴',x*CELL+CELL/2,y*CELL+CELL/2); }
+    // draw arrow toward best action (Q heat hint)
+    let q=Q[y*S+x]; let best=0; for(let a=1;a<4;a++) if(q[a]>q[best])best=a;
+    const maxv=q[best];
+    if(maxv>0.5){ const cx2=x*CELL+CELL/2,cy2=y*CELL+CELL/2;
+      c.strokeStyle='rgba(91,140,255,'+Math.min(0.9,maxv/8)+')'; c.lineWidth=2;
+      c.beginPath(); c.moveTo(cx2,cy2); c.lineTo(cx2+DIRS[best].dx*CELL/2.6, cy2+DIRS[best].dy*CELL/2.6); c.stroke(); }
+  }
+  // agent
+  c.fillStyle='#ff5b6e'; c.beginPath(); c.arc(pos.x*CELL+CELL/2,pos.y*CELL+CELL/2,CELL*0.32,0,7); c.fill();
+  c.fillStyle='#fff'; c.font='14px sans'; c.textAlign='center'; c.textBaseline='middle'; c.fillText('🤖',pos.x*CELL+CELL/2,pos.y*CELL+CELL/2+1);
+  document.getElementById('ep').textContent=ep; document.getElementById('st').textContent=steps;
+  steps++;
+  // chart
+  g.fillStyle='#0a0f1e'; g.fillRect(0,0,360,400);
+  g.strokeStyle='#1c2a44'; g.beginPath(); for(let i=0;i<360;i+=40){g.moveTo(i,0);g.lineTo(i,400);}for(let j=0;j<400;j+=40){g.moveTo(0,j);g.lineTo(360,j);}g.stroke();
+  g.fillStyle='var(--muted)'; g.strokeStyle='#6b7686'; g.beginPath(); g.moveTo(20,20); g.lineTo(20,380); g.lineTo(345,380); g.stroke();
+  g.fillStyle='#6b7686'; g.font='11px sans'; g.textAlign='center'; g.fillText('에피소드',352,392); g.save(); g.translate(12,200); g.rotate(-Math.PI/2); g.fillText('걸린 스텝',0,0); g.restore();
+  if(history.length){
+    const w=310, h=320;
+    const mx=Math.max(...history.slice(0,60));
+    g.strokeStyle='#e9b45b'; g.lineWidth=2; g.beginPath();
+    const len=Math.min(history.length,60);
+    for(let i=0;i<len;i++){ const v=history[history.length-len+i]; const py=380-(v/(mx||1))*h; const pxb=20+i*(300/Math.max(1,len-1)); if(i===0)g.moveTo(pxb,py); else g.lineTo(pxb,py); }
+    g.stroke();
+  }
+}
+let acc=0, stepCounter=0;
+function loop(){ 
+  if(running){ if(stepCounter>=SPEED){ stepOnce(); stepCounter=0; } stepCounter++; draw(); }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
