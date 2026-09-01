@@ -262,5 +262,13 @@
     "path": "C:/hermes/projects/landing",
     "created": "2026-09-01",
     "updated": "2026-09-01 10:15"
+  },
+  {
+    "name": "DailyTracker",
+    "status": "active",
+    "description": "데일리 생산성 트래커(습관/할일/타이머/메모)",
+    "path": "C:/hermes/projects/daily",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 10:16"
   }
 ]

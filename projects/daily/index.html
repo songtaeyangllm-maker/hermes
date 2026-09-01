@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Daily Tracker</title>
+<style>
+:root { --bg:#0b0b12; --card:#13131c; --border:#23233a; --text:#ececf5; --muted:#6b6f82; --accent:#7c5cff; --pos:#5ce6a8; --warn:#ffd166; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; background:var(--bg); color:var(--text); padding:30px 18px; }
+.wrap { max-width:760px; margin:0 auto; }
+.head { display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:8px; margin-bottom:22px; }
+.head h1 { font-size:1.4rem; font-weight:800; } .head h1 span{color:var(--accent);}
+.head .date { color:var(--muted); font-size:0.85rem; text-align:right; line-height:1.5; }
+.head .date b { color:var(--text); }
+
+.grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:18px; padding:18px; }
+.card h3 { font-size:0.78rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; }
+.card.wide { grid-column:1/-1; }
+
+/* habits */
+.habit { display:flex; align-items:center; gap:11px; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.05); }
+.habit:last-child{border-bottom:none;}
+.habit .check { width:20px; height:20px; border-radius:7px; border:2px solid var(--border); flex-shrink:0; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.75rem; transition:all .2s; }
+.habit.done .check { background:var(--pos); border-color:var(--pos); color:#0a2e1e; }
+.habit .name { flex:1; font-size:0.88rem; transition:all .2s; }
+.habit.done .name { text-decoration:line-through; color:var(--muted); }
+.habit .del { color:var(--muted); cursor:pointer; opacity:.5; font-size:0.9rem; padding:0 4px; }
+.habit .del:hover { opacity:1; color:var(--warn); }
+.addrow { display:flex; gap:8px; margin-top:12px; }
+.addrow input { flex:1; background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:9px 12px; color:var(--text); font-size:0.85rem; outline:none; }
+.addrow input:focus{ border-color:var(--accent); }
+.addrow button { padding:9px 18px; border-radius:10px; border:none; background:var(--accent); color:#fff; font-weight:700; font-size:0.8rem; cursor:pointer; }
+
+/* timer */
+.timer { text-align:center; padding:6px 0; }
+.timer .t { font-size:2.6rem; font-weight:900; font-variant-numeric:tabular-nums; color:var(--accent); }
+.timer .ctrl { display:flex; gap:8px; justify-content:center; margin-top:12px; }
+.tbtn { padding:8px 22px; border-radius:30px; border:none; font-weight:700; font-size:0.8rem; cursor:pointer; transition:filter .2s; }
+.tbtn.run { background:var(--pos); color:#0a2e1e; } .tbtn.stop { background:var(--warn); color:#3a2c12; } .tbtn.reset { background:var(--bg); border:1px solid var(--border); color:var(--muted); }
+.todo { font-size:0.9rem; }
+.todo li { display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.05); list-style:none; }
+.todo li.done span{ text-decoration:line-through; color:var(--muted);}
+.todo .tck { cursor:pointer; opacity:.6; }
+
+/* heatmap */
+.heat { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; margin-top:10px; }
+.heat .day { aspect-ratio:1; border-radius:5px; background:#1d1d2c; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:0.55rem; color:var(--muted); }
+.heat .day.on { background:var(--accent); color:#fff; }
+.heat .day.part { background:rgba(124,92,255,0.4); }
+.heat .dl { font-size:0.5rem; opacity:.7; }
+.foot { text-align:center; color:var(--muted); font-size:0.72rem; margin-top:22px; }
+@media(max-width:600px){ .grid{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <div class="head">
+        <h1>📆 <span>DAILY TRACKER</span></h1>
+        <div class="date" id="dateStr"></div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h3>✅ 습관 체크</h3>
+            <div id="habits"></div>
+            <div class="addrow">
+                <input id="habitInput" placeholder="새 습관 추가..." onkeydown="if(event.key==='Enter')addHabit()">
+                <button onclick="addHabit()">추가</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>🎯 오늘의 할 일</h3>
+            <ul class="todo" id="todoList"></ul>
+            <div class="addrow">
+                <input id="todoInput" placeholder="할 일 추가..." onkeydown="if(event.key==='Enter')addTodo()">
+                <button onclick="addTodo()">추가</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>⏱️ 집중 타이머</h3>
+            <div class="timer">
+                <div class="t" id="timerDisplay">25:00</div>
+                <div class="ctrl">
+                    <button class="tbtn run" id="timerBtn" onclick="toggleTimer()">▶ 시작</button>
+                    <button class="tbtn reset" onclick="resetTimer()">↺</button>
+                </div>
+                <div style="font-size:0.72rem;color:var(--muted);margin-top:10px" id="sessionDone">오늘 0분 집중</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>📝 메모</h3>
+            <textarea id="memo" style="width:100%;height:110px;background:var(--bg);border:1px solid var(--border);border-radius:12px;color:var(--text);padding:12px;font-size:0.85rem;resize:vertical;outline:none" placeholder="오늘의 생각을 적어보세요..."></textarea>
+        </div>
+
+        <div class="card wide">
+            <h3>🔥 7일 습관 히트맵</h3>
+            <div class="heat" id="heat"></div>
+        </div>
+    </div>
+    <div class="foot">Hermes Daily Tracker · 데이터는 이 브라우저에 저장됩니다</div>
+</div>
+
+<script>
+const today = () => new Date().toISOString().slice(0,10);
+const todayStr = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+document.getElementById('dateStr').innerHTML = `<b>${todayStr}</b>`;
+
+// --- state ---
+const HABIT_KEY='dailyHabits';
+const DONE_KEY='dailyDone_'+today();
+let habits = JSON.parse(localStorage.getItem(HABIT_KEY)||'[]');
+let doneToday = new Set(JSON.parse(localStorage.getItem(DONE_KEY)||'[]'));
+
+// --- habits ---
+function saveHabits(){ localStorage.setItem(HABIT_KEY,JSON.stringify(habits)); }
+function saveDone(){ localStorage.setItem(DONE_KEY,JSON.stringify([...doneToday])); }
+function renderHabits(){
+    const box=document.getElementById('habits');
+    if(!habits.length){ box.innerHTML='<div style="color:var(--muted);font-size:0.82rem;padding:8px 0">습관을 추가해보세요</div>'; return; }
+    box.innerHTML=habits.map((h,i)=>`
+        <div class="habit ${doneToday.has(i)?'done':''}">
+            <div class="check" onclick="toggleHabit(${i})">${doneToday.has(i)?'✓':''}</div>
+            <div class="name">${h}</div>
+            <div class="del" onclick="delHabit(${i})">✕</div>
+        </div>`).join('');
+}
+function addHabit(){
+    const v=document.getElementById('habitInput').value.trim();
+    if(!v) return;
+    habits.push(v); saveHabits(); renderHabits(); document.getElementById('habitInput').value=''; updateHeat();
+}
+function delHabit(i){ habits.splice(i,1); doneToday.delete(i); saveHabits(); saveDone(); renderHabits(); updateHeat(); }
+function toggleHabit(i){
+    doneToday.has(i)?doneToday.delete(i):doneToday.add(i);
+    saveDone(); renderHabits(); updateHeat();
+}
+
+// --- todos ---
+const TODO_KEY='dailyTodos';
+let todos=JSON.parse(localStorage.getItem(TODO_KEY)||'[]');
+function saveTodos(){ localStorage.setItem(TODO_KEY,JSON.stringify(todos)); }
+function renderTodos(){
+    const box=document.getElementById('todoList');
+    if(!todos.length){ box.innerHTML='<li style="color:var(--muted);font-size:0.82rem">해야 할 일을 추가하세요</li>'; return; }
+    box.innerHTML=todos.map((t,i)=>`<li class="${t.done?'done':''}"><span class="tck" onclick="toggleTodo(${i})">${t.done?'☑':'☐'}</span><span style="flex:1">${t.text}</span><span class="del" onclick="delTodo(${i})">✕</span></li>`).join('');
+}
+function addTodo(){
+    const v=document.getElementById('todoInput').value.trim();
+    if(!v) return;
+    todos.push({text:v,done:false}); saveTodos(); renderTodos(); document.getElementById('todoInput').value='';
+}
+function toggleTodo(i){ todos[i].done=!todos[i].done; saveTodos(); renderTodos(); }
+function delTodo(i){ todos.splice(i,1); saveTodos(); renderTodos(); }
+
+// --- timer ---
+let timerSecs=25*60, timerInterval=null, running=false;
+const FOCUS_KEY='dailyFocus';
+let focusMin=parseInt(localStorage.getItem(FOCUS_KEY)||'0');
+function updateFocus(){ localStorage.setItem(FOCUS_KEY,String(focusMin)); document.getElementById('sessionDone').textContent=`오늘 ${focusMin}분 집중`; }
+function fmt(s){ return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }
+function toggleTimer(){
+    if(running){ clearInterval(timerInterval); running=false; document.getElementById('timerBtn').textContent='▶ 재개'; document.getElementById('timerBtn').className='tbtn run'; return; }
+    running=true; document.getElementById('timerBtn').textContent='⏸ 일시정지'; document.getElementById('timerBtn').className='tbtn stop';
+    timerInterval=setInterval(()=>{
+        timerSecs--;
+        if(timerSecs<0){ timerSecs=0; clearInterval(timerInterval); running=false; focusMin+=25; updateFocus(); document.getElementById('timerBtn').textContent='▶ 시작'; document.getElementById('timerBtn').className='tbtn run'; new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFhYeDgIKCgIWEg4WFiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhQ==').play(); return; }
+        document.getElementById('timerDisplay').textContent=fmt(timerSecs);
+    },1000);
+}
+function resetTimer(){ clearInterval(timerInterval); running=false; timerSecs=25*60; document.getElementById('timerDisplay').textContent='25:00'; document.getElementById('timerBtn').textContent='▶ 시작'; document.getElementById('timerBtn').className='tbtn run'; }
+updateFocus();
+
+// --- memo ---
+const MEMO_KEY='dailyMemo';
+document.getElementById('memo').value = localStorage.getItem(MEMO_KEY)||'';
+document.getElementById('memo').addEventListener('input',e=>localStorage.setItem(MEMO_KEY,e.target.value));
+
+// --- 7-day heatmap ---
+function updateHeat(){
+    const heat=document.getElementById('heat');
+    const days=[];
+    for(let i=6;i>=0;i--){
+        const d=new Date(); d.setDate(d.getDate()-i);
+        const key=d.toISOString().slice(0,10);
+        const store=JSON.parse(localStorage.getItem('dailyDone_'+key)||'[]');
+        const ratio = habits.length? store.filter(x=>x<habits.length).length/habits.length : 0;
+        days.push({dl:d.getDate(), ratio});
+    }
+    heat.innerHTML=days.map((d,i)=>{
+        const cls = d.ratio>=1?'on':(d.ratio>0?'part':'');
+        return `<div class="day ${cls}"><span class="dl">${d.dl}</span></div>`;
+    }).join('');
+}
+updateHeat();
+
+renderHabits(); renderTodos();
+</script>
+</body>
+</html>
