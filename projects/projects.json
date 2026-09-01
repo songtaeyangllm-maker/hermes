@@ -486,5 +486,13 @@
     "path": "C:/hermes/projects/pix",
     "created": "2026-09-01",
     "updated": "2026-09-01 11:42"
+  },
+  {
+    "name": "WorkspaceDeck",
+    "status": "active",
+    "description": "워크스페이스 소개 프레젠테이션",
+    "path": "C:/hermes/projects/deck",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 11:44"
   }
 ]

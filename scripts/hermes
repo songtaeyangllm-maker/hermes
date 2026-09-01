@@ -102,6 +102,7 @@ sleep 2; curl -s http://127.0.0.1:8765/api/health || echo "  (curl로 상태 확
     mem)    start "$WS/projects/gmem/index.html" ;;
     reflex) start "$WS/projects/greact/index.html" ;;
     cube)   start "$WS/projects/landing/index.html" ;;
+    deck)   start "$WS/projects/deck/index.html" ;;
     daily)  start "$WS/projects/daily/index.html" ;;
     eng3d)  start "$WS/projects/engine3d/index.html" ;;
     drum)   start "$WS/projects/drum/index.html" ;;
