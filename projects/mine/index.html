@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Minesweeper</title>
+<style>
+:root { --bg:#0b0e16; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; --accent:#5b8cff; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-serif; display:flex; flex-direction:column; align-items:center; gap:12px; padding:18px; }
+h1{ font-size:19px; letter-spacing:2px; } h1 span{ color:#ff5b5b; }
+.sub{ color:var(--muted); font-size:12px; }
+.hud{ display:flex; gap:14px; align-items:center; margin-bottom:4px; }
+.hud .badge{ background:var(--card); border:1px solid var(--border); border-radius:8px; padding:4px 10px; font-size:13px; font-family:Consolas,monospace; min-width:70px; text-align:center; }
+.bar{ display:flex; gap:8px; margin:6px 0; }
+.btn{ background:#16223a; color:#e5e7eb; border:1px solid var(--border); border-radius:8px; padding:7px 14px; cursor:pointer; font-size:12px; }
+.btn.active{ background:var(--accent); color:#041018; font-weight:600; }
+#grid{ display:grid; gap:2px; background:var(--border); padding:3px; border-radius:8px; }
+.cell{ width:26px; height:26px; background:#1a2236; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; cursor:pointer; user-select:none; border:none; border-radius:3px; color:var(--text); }
+.cell:hover{ background:#263153; }
+.cell.open{ background:#141b2c; cursor:default; }
+.cell.mine{ background:#ff5b5b; color:#fff; }
+.cell.flag{ color:#ffd54d; }
+.n1{color:#5b8cff}.n2{color:#4ade80}.n3{color:#ff5b5b}.n4{color:#7c5cff}.n5{color:#ff8a5b}.n6{color:#4dd0ff}.n7{color:#e0e0ff}.n8{color:#ffd54d}
+</style>
+</head>
+<body>
+<h1>MINE <span>SWEEPER</span></h1>
+<div class="sub">첫 클릭은 안전 · 오른클릭으로 깃발</div>
+<div class="hud">
+  <span class="badge">💣 <b id="mines">10</b></span>
+  <span class="badge" id="face" style="font-size:20px;cursor:pointer">🙂</span>
+  <span class="badge">⏱ <b id="timer">000</b></span>
+  <span class="badge">🏆 <b id="best">–</b></span>
+</div>
+<div class="bar">
+  <button class="btn active" id="dEasy">초급 9×9</button>
+  <button class="btn" id="dMed">중급 16×16</button>
+  <button class="btn" id="dHard">고급 16×30</button>
+</div>
+<div id="grid"></div>
+<script>
+const DIFF={ easy:{r:9,c:9,m:10}, med:{r:16,c:16,m:40}, hard:{r:16,c:30,m:99} };
+let diff='easy', ROWS=9,COLS=9,MINE=10;
+let board=[], shown=[], flags=[], first=true, over=false, started=false;
+let mineLeft=MINE, tSec=0, timerInt=null;
+const gridEl=document.getElementById('grid');
+function setDiff(d){ diff=d; const c=DIFF[d]; ROWS=c.r;COLS=c.c;MINE=c.m; resetGame(); }
+document.getElementById('dEasy').addEventListener('click',e=>{setDiff('easy');markBar(e.target)});
+document.getElementById('dMed').addEventListener('click',e=>{setDiff('med');markBar(e.target)});
+document.getElementById('dHard').addEventListener('click',e=>{setDiff('hard');markBar(e.target)});
+function markBar(el){ ['dEasy','dMed','dHard'].forEach(i=>document.getElementById(i).classList.remove('active')); el.classList.add('active'); }
+function resetGame(){
+  clearInterval(timerInt); tSec=0; started=false; first=true; over=false;
+  mineLeft=MINE; document.getElementById('mines').textContent=MINE; document.getElementById('timer').textContent='000'; document.getElementById('face').textContent='🙂';
+  board=Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  shown=Array.from({length:ROWS},()=>Array(COLS).fill(false));
+  flags=Array.from({length:ROWS},()=>Array(COLS).fill(false));
+  render();
+}
+function placeMines(sr,sc){
+  const safe=new Set();
+  for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){ const r=sr+dr,c=sc+dc; if(r>=0&&c>=0&&r<ROWS&&c<COLS)safe.add(r+','+c); }
+  let placed=0;
+  while(placed<MINE){ const r=Math.floor(Math.random()*ROWS), c=Math.floor(Math.random()*COLS); if(safe.has(r+','+c)||board[r][c]===9)continue; board[r][c]=9; placed++; }
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){ if(board[r][c]===9)continue; let n=0; for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){ const rr=r+dr,cc=c+dc; if(rr>=0&&cc>=0&&rr<ROWS&&cc<COLS&&board[rr][cc]===9)n++; } board[r][c]=n; }
+}
+function startTimer(){ started=true; timerInt=setInterval(()=>{ tSec++; document.getElementById('timer').textContent=String(tSec).padStart(3,'0'); },1000); }
+function render(){
+  gridEl.style.gridTemplateColumns=`repeat(${COLS},26px)`;
+  gridEl.innerHTML='';
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const b=document.createElement('button'); b.className='cell'; b.dataset.r=r; b.dataset.c=c;
+    b.addEventListener('click',()=>reveal(r,c));
+    b.addEventListener('contextmenu',e=>{ e.preventDefault(); toggleFlag(r,c); });
+    gridEl.appendChild(b);
+  }
+}
+function cellEl(r,c){ return gridEl.children[r*COLS+c]; }
+function reveal(r,c){
+  if(over||flags[r][c])return;
+  if(first){ placeMines(r,c); first=false; }
+  if(!started&&first===false)startTimer();
+  if(board[r][c]===9){ explode(r,c); return; }
+  flood(r,c); checkWin();
+}
+function flood(r,c){
+  const q=[[r,c]];
+  while(q.length){
+    const [cr,cc]=q.shift();
+    if(cr<0||cc<0||cr>=ROWS||cc>=COLS||shown[cr][cc]||flags[cr][cc])continue;
+    shown[cr][cc]=true;
+    const el=cellEl(cr,cc); el.classList.add('open');
+    el.textContent=board[cr][cc]>0?board[cr][cc]:'';
+    if(board[cr][cc]>0)el.className+=` cell n${board[cr][cc]}`;
+    if(board[cr][cc]===0){ for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){ const rr=cr+dr,cc=cc+dc; if(rr>=0&&cc>=0&&rr<ROWS&&cc<COLS&&!shown[rr][cc]&&!flags[rr][cc])q.push([rr,cc]); } }
+  }
+}
+function toggleFlag(r,c){
+  if(over||shown[r][c])return;
+  if(!started&&first)startTimer();
+  flags[r][c]=!flags[r][c];
+  const el=cellEl(r,c);
+  if(flags[r][c]){ el.textContent='🚩'; el.classList.add('flag'); mineLeft--; }
+  else { el.textContent=''; el.classList.remove('flag'); mineLeft++; }
+  document.getElementById('mines').textContent=mineLeft;
+}
+function explode(r,c){
+  over=true; clearInterval(timerInt); started=false; document.getElementById('face').textContent='😵';
+  for(let rr=0;rr<ROWS;rr++)for(let cc=0;cc<COLS;cc++){ if(board[rr][cc]===9){ const el=cellEl(rr,cc); el.classList.add('mine'); el.textContent='💣'; } }
+  const el=cellEl(r,c); el.textContent='💥';
+}
+function checkWin(){
+  let open=0; for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)if(shown[r][c])open++;
+  if(open===ROWS*COLS-MINE){ clearInterval(timerInt); over=true; document.getElementById('face').textContent='😎';
+    const m=document.getElementById('best'); const cur=tSec; m.textContent=cur;
+    // flag all mines
+    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){ if(board[r][c]===9&&!flags[r][c]){ const el=cellEl(r,c); el.textContent='🚩'; el.classList.add('flag'); } }
+    const key='hermes_mine_'+diff; if(!localStorage.getItem(key)||cur<+localStorage.getItem(key)){ localStorage.setItem(key,cur); m.textContent=cur+' ⭐'; }
+  }
+}
+document.getElementById('face').addEventListener('click',resetGame);
+resetGame();
+</script>
+</body>
+</html>

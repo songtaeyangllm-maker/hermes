@@ -462,5 +462,13 @@
     "path": "C:/hermes/projects/wave",
     "created": "2026-09-01",
     "updated": "2026-09-01 11:35"
+  },
+  {
+    "name": "Minesweeper",
+    "status": "active",
+    "description": "지뢰찾기 게임",
+    "path": "C:/hermes/projects/mine",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 11:37"
   }
 ]
