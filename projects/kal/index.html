@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Kaleidoscope</title>
+<style>
+:root { --bg:#05070e; --text:#dbe4f0; --muted:#6b7686; --card:#0d1424; --border:#1c2a44; --accent:#5b8cff; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; display:flex; flex-direction:column; align-items:center; gap:14px; padding:20px; min-height:100vh; }
+h1{ font-size:20px; letter-spacing:2px; } h1 span{ color:var(--accent); }
+.sub{ color:var(--muted); font-size:13px; }
+#cv{ border:1px solid var(--border); border-radius:12px; background:#000; display:block; cursor:crosshair; touch-action:none; }
+.bar{ display:flex; gap:9px; flex-wrap:wrap; justify-content:center; align-items:center; }
+.btn{ background:#16223a; color:#dbe4f0; border:1px solid var(--border); border-radius:8px; padding:7px 14px; cursor:pointer; font-size:13px; }
+.btn:hover{ background:#1f3050; } .btn.active{ background:var(--accent); color:#081020; font-weight:600; }
+.badge{ background:var(--card); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+.badge b{ color:var(--text); }
+input[type=range]{ accent-color:var(--accent); width:100px; }
+.help{ font-size:12px; color:#55606f; max-width:600px; text-align:center; line-height:1.7; }
+.help b{ color:#9aa7bd; }
+</style>
+</head>
+<body>
+<h1>KALEIDO <span>· SYMMETRY ART</span></h1>
+<div class="sub">대칭 미러로 피어나는 프랙탈 아트</div>
+<canvas id="cv" width="700" height="560"></canvas>
+<div class="bar">
+  <button class="btn" id="auto">✨ 자동</button>
+  <button class="btn" id="clear">🧹 지우기</button>
+  <button class="btn" id="save">💾 저장</button>
+  <span class="badge">대칭 <input type="range" id="sym" min="3" max="24" step="1" value="8"> <b id="symV">8</b></span>
+  <span class="badge">두께 <input type="range" id="w" min="1" max="14" step="1" value="4"></span>
+  <span class="badge">색상회전 <input type="range" id="hue" min="0" max="360" step="1" value="30"> <b id="hueV">30°</b></span>
+</div>
+<div class="help">
+  <b>캔버스에 드래그</b>하면 궤적이 방사상 대칭으로 반복 그려져요 · 대칭 수·두께·색상 회전을 바꿔보고
+  <b>✨ 자동</b>을 켜면 스스로 우주적인 패턴을 그립니다
+</div>
+<script>
+const cv=document.getElementById('cv'), c=cv.getContext('2d');
+const W=cv.width,H=cv.height; const CX=W/2, CY=H/2;
+let N=8, size=4, hueRot=30, hueBase=200;
+let auto=false, drawing=false, px=0, py=0;
+const sym=document.getElementById('sym'), symV=document.getElementById('symV');
+sym.addEventListener('input',e=>{N=+e.target.value; symV.textContent=N;});
+const wEl=document.getElementById('w'); wEl.addEventListener('input',e=>size=+e.target.value);
+const hueEl=document.getElementById('hue');
+const hueV=document.getElementById('hueV');
+hueEl.addEventListener('input',e=>{hueRot=+e.target.value; hueV.textContent=hueRot+'°';});
+function drawLine(x1,y1,x2,y2,weight,hue){
+  const seg=2*Math.PI/N;
+  for(let i=0;i<N;i++){
+    const a=i*seg;
+    const ca=Math.cos(a), sa=Math.sin(a);
+    // rotate both endpoints by a, then mirror x
+    for(const flip of [1,-1]){
+      const r1x=(x1*ca - y1*sa)*flip, r1y=(x1*sa + y1*ca);
+      const r2x=(x2*ca - y2*sa)*flip, r2y=(x2*sa + y2*ca);
+      c.strokeStyle='hsl('+((hue+ i*(360/N))%360)+',85%,62%)';
+      c.lineWidth=weight; c.lineCap='round';
+      c.beginPath(); c.moveTo(CX+r1x,CY+r1y); c.lineTo(CX+r2x,CY+r2y); c.stroke();
+    }
+  }
+}
+cv.addEventListener('mousedown',e=>{drawing=true;px=e.clientX-cv.getBoundingClientRect().left-CX;py=e.clientY-cv.getBoundingClientRect().top-CY;});
+addEventListener('mousemove',e=>{ if(!drawing) return; const r=cv.getBoundingClientRect(); const nx=e.clientX-r.left-CX, ny=e.clientY-r.top-CY; const len=Math.hypot(nx-px,ny-py); if(len>1){ drawLine(px,py,nx,ny,size,hueBase); px=nx;py=ny; } });
+addEventListener('mouseup',()=>drawing=false);
+cv.addEventListener('touchstart',e=>{e.preventDefault();const t=e.touches[0];const r=cv.getBoundingClientRect();px=t.clientX-r.left-CX;py=t.clientY-r.top-CY;drawing=true;},{passive:false});
+cv.addEventListener('touchmove',e=>{e.preventDefault();if(!drawing)return;const t=e.touches[0];const r=cv.getBoundingClientRect();const nx=t.clientX-r.left-CX,ny=t.clientY-r.top-CY;const len=Math.hypot(nx-px,ny-py);if(len>1){drawLine(px,py,nx,ny,size,hueBase);px=nx;py=ny;}},{passive:false});
+cv.addEventListener('touchend',()=>drawing=false);
+document.getElementById('clear').addEventListener('click',()=>{c.fillStyle='#000';c.fillRect(0,0,W,H);});
+const autoBtn=document.getElementById('auto');
+autoBtn.addEventListener('click',()=>{auto=!auto; autoBtn.classList.toggle('active',auto);});
+document.getElementById('save').addEventListener('click',()=>{const a=cv.toDataURL('image/png');const L=document.createElement('a');L.download='kaleido_'+Date.now()+'.png';L.href=a;L.click();});
+// Auto-draw mode: slowly draw evolving bezier-ish swooshes
+let t0=0;
+function autoStep(now){
+  if(auto){ const t=now/1000; const r=80+120*Math.sin(t*0.7)+40, a=t*0.9; 
+    const x=Math.cos(a)*r, y=Math.sin(a)*r*0.6;
+    const r2=100+90*Math.cos(t*0.5), a2=t*0.55;
+    drawLine(x,y,Math.cos(a2)*r2,Math.sin(a2)*r2,size,(hueBase+Math.floor(t*40))%360);
+  }
+  requestAnimationFrame(autoStep);
+}
+requestAnimationFrame(autoStep);
+// subtle intro
+c.fillStyle='#000'; c.fillRect(0,0,W,H);
+for(let i=0;i<60;i++){ const a=Math.random()*6.28,R=Math.random()*280; c.fillStyle='rgba(255,255,255,0.15)'; c.beginPath(); c.arc(CX+Math.cos(a)*R,CY+Math.sin(a)*R,1+Math.random()*1.4,0,7); c.fill(); }
+</script>
+</body>
+</html>
