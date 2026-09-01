@@ -310,5 +310,13 @@
     "path": "C:/hermes/projects/conv",
     "created": "2026-09-01",
     "updated": "2026-09-01 10:29"
+  },
+  {
+    "name": "MiniLang",
+    "status": "active",
+    "description": "순수JS 미니 언어 인터프리터",
+    "path": "C:/hermes/projects/lang",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 10:38"
   }
 ]

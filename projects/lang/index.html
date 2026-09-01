@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Lang — 미니 인터프리터</title>
+<style>
+:root { --bg:#0b0b12; --card:#13131c; --border:#23233a; --text:#ececf5; --muted:#6b6f82; --accent:#7c5cff; --pos:#5ce6a8; --err:#ff6b6b; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,'Segoe UI','Noto Sans KR',monospace; background:var(--bg); color:var(--text); padding:26px 18px; }
+.wrap { max-width:760px; margin:0 auto; }
+.head { display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+.head h1 { font-size:1.3rem; font-weight:800; } .head h1 span{color:var(--accent);}
+.head .sub { color:var(--muted); font-size:0.75rem; }
+.toolbar { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+.btn { padding:9px 22px; border-radius:24px; border:none; font-weight:800; font-size:0.8rem; cursor:pointer; transition:filter .2s; }
+.btn.run { background:var(--accent); color:#fff; } .btn.run:hover{filter:brightness(1.15);}
+.btn.ghost { background:var(--card); border:1px solid var(--border); color:var(--muted); }
+.sel { background:var(--card); border:1px solid var(--border); border-radius:20px; padding:8px 14px; color:var(--text); font-size:0.78rem; outline:none; }
+.sel:focus{ border-color:var(--accent); }
+
+.editor { background:#0d0d16; border:1px solid var(--border); border-radius:16px; overflow:hidden; }
+#code { width:100%; height:268px; background:transparent; border:none; resize:vertical; color:var(--text); padding:16px; font-size:0.86rem; font-family:monospace; line-height:1.6; outline:none; white-space:pre; }
+.console { background:#0a0a12; border:1px solid var(--border); border-radius:16px; margin-top:12px; min-height:130px; max-height:240px; overflow-y:auto; padding:14px 16px; font-size:0.82rem; line-height:1.7; }
+.console .line { white-space:pre-wrap; word-break:break-word; }
+.console .out { color:#b8c4f0; } .console .ok { color:var(--muted); font-size:0.72rem; }
+.console .err { color:var(--err); font-weight:700; }
+.console .empty { color:var(--muted); opacity:.6; }
+.stats { margin-top:10px; color:var(--muted); font-size:0.72rem; display:flex; gap:16px; }
+.stats b{ color:var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <div class="head">
+        <h1>📜 <span>HERMES LANG</span></h1>
+        <div class="sub">순수 JS 미니 언어 인터프리터 · 소스 → 토큰 → AST → 실행</div>
+    </div>
+
+    <div class="toolbar">
+        <select class="sel" id="example" onchange="loadExample(this.value)"></select>
+        <button class="btn run" onclick="runCode()">▶ 실행 (Ctrl+Enter)</button>
+        <button class="btn ghost" onclick="clearConsole()">🧹 콘솔 지우기</button>
+    </div>
+
+    <div class="editor"><textarea id="code" spellcheck="false"></textarea></div>
+    <div class="console" id="console"><div class="empty">▶ 실행을 누르면 출력이 여기에 표시됩니다</div></div>
+    <div class="stats"><span><b id="stTokens">0</b> 토큰</span><span><b id="stNodes">0</b> AST노드</span><span><b id="stMs">0</b> ms</span></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const con=$('console');
+
+const EXAMPLES={
+  basic:`// 변수와 산술
+let a = 10
+let b = 3
+print 'a+b =', a+b
+print 'a*b =', a*b
+let name = '허미즈'
+print '안녕,', name`,
+  loop:`// while 반복 — 1~10 합
+let i = 1
+let sum = 0
+while i <= 10 {
+  sum = sum + i
+  i = i + 1
+}
+print '1~10 합 =', sum`,
+  fn:`// 함수와 반환값
+fn square(x) {
+  return x * x
+}
+fn add(a, b) {
+  return a + b
+}
+let v = add(3, square(4))
+print '결과 =', v`,
+  arr:`// 배열
+let arr = [1, 2, 3, 4, 5]
+let total = 0
+let idx = 0
+while idx < len(arr) {
+  total = total + arr[idx]
+  idx = idx + 1
+}
+print '합 =', total
+print '길이 =', len(arr)`,
+  cond:`// 조건 분기
+fn grade(score) {
+  if score >= 90 { return 'A' }
+  if score >= 80 { return 'B' }
+  if score >= 70 { return 'C' }
+  return 'F'
+}
+print grade(95)
+print grade(72)`,
+  fib:`// 피보나치 (함수 호출)
+fn fib(n) {
+  if n <= 1 { return n }
+  return fib(n-1) + fib(n-2)
+}
+let i = 0
+while i <= 7 {
+  print 'fib(' + i + ') =', fib(i)
+  i = i + 1
+}`,
+};
+$('example').innerHTML=Object.keys(EXAMPLES).map(k=>`<option value="${k}">${k}</option>`).join('');
+
+// preload first
+$('code').value=EXAMPLES.basic;
+function loadExample(k){ $('code').value=EXAMPLES[k]||''; }
+
+function clog(html,cls){ const d=document.createElement('div'); d.className='line '+cls; d.innerHTML=html; con.appendChild(d); con.scrollTop=con.scrollHeight; }
+function clearConsole(){ con.innerHTML='<div class="empty">▶ 실행을 누르면 출력이 여기에 표시됩니다</div>'; }
+
+/* ================= LEXER ================= */
+function tokenize(src){
+  const toks=[]; let i=0; const n=src.length;
+  const isWs=c=>/\s/.test(c);
+  const isNum=c=>/[0-9]/.test(c);
+  const isId=c=>/[A-Za-z_가-힣]/.test(c);
+  const isIdc=c=>/[A-Za-z_0-9가-힣]/.test(c);
+  while(i<n){
+    const c=src[i];
+    if(isWs(c)){ i++; continue; }
+    if(c==='/'&&src[i+1]==='/'){ while(i<n&&src[i]!=='\n')i++; continue; }
+    if(isNum(c)){
+      let j=i; while(j<n&&isNum(src[j]))j++;
+      let num=src.slice(i,j);
+      if(src[j]==='.'&&isNum(src[j+1])){ j++; while(j<n&&isNum(src[j])){num+=src[j];j++;} }
+      toks.push({t:'num',v:parseFloat(num)}); i=j; continue;
+    }
+    if(isId(c)){
+      let j=i; while(j<n&&isIdc(src[j]))j++;
+      const word=src.slice(i,j);
+      if(['let','while','if','else','return','fn','print','len','true','false'].includes(word)) toks.push({t:'kw',v:word});
+      else toks.push({t:'id',v:word});
+      i=j; continue;
+    }
+    if(c==="'"||c==='"'){
+      const q=c; let j=i+1,str='';
+      while(j<n&&src[j]!==q){ str+=src[j]; j++; }
+      j++; toks.push({t:'str',v:str}); i=j; continue;
+    }
+    // operators / symbols
+    const two=src.slice(i,i+2);
+    if(['<=','>=','==','!=','&&','||'].includes(two)){ toks.push({t:'op',v:two}); i+=2; continue; }
+    if('+-*/%=<>!'.includes(c)){ toks.push({t:'op',v:c}); i++; continue; }
+    if('(){}[],'.includes(c)){ toks.push({t:'punc',v:c}); i++; continue; }
+    throw new Error(`알 수 없는 문자 '${c}' (위치 ${i})`);
+  }
+  return toks;
+}
+
+/* ================= PARSER (recursive descent) ================= */
+function parse(toks){
+  let pos=0; const P=toks[pos];
+  function peek(){ return toks[pos]; }
+  function next(){ return toks[pos++]; }
+  function expect(v){ const t=next(); if(!t||t.v!==v) throw new Error(`'${v}' 필요, '${t?t.v:'EOF'}' 발견`); return t; }
+
+  function parseExpr(){ return parseOr(); }
+  function parseOr(){ let e=parseAnd(); while(peek()&&peek().t==='op'&&peek().v==='||'){ next(); const r=parseAnd(); e={type:'binop',op:'||',l:e,r}; } return e; }
+  function parseAnd(){ let e=parseEq(); while(peek()&&peek().t==='op'&&peek().v==='&&'){ next(); const r=parseEq(); e={type:'binop',op:'&&',l:e,r}; } return e; }
+  function parseEq(){ let e=parseRel(); while(peek()&&peek().t==='op'&&['==','!='].includes(peek().v)){ const op=next().v; const r=parseRel(); e={type:'binop',op,l:e,r}; } return e; }
+  function parseRel(){ let e=parseAdd(); while(peek()&&peek().t==='op'&&['<','>','<=','>='].includes(peek().v)){ const op=next().v; const r=parseAdd(); e={type:'binop',op,l:e,r}; } return e; }
+  function parseAdd(){ let e=parseMul(); while(peek()&&peek().t==='op'&&['+','-'].includes(peek().v)){ const op=next().v; const r=parseMul(); e={type:'binop',op,l:e,r}; } return e; }
+  function parseMul(){ let e=parseUnary(); while(peek()&&peek().t==='op'&&['*','/','%'].includes(peek().v)){ const op=next().v; const r=parseUnary(); e={type:'binop',op,l:e,r}; } return e; }
+  function parseUnary(){
+    if(peek()&&peek().t==='op'&&(peek().v==='-'||peek().v==='!')){
+      const op=next().v; return {type:'unary',op,e:parseUnary()};
+    }
+    return parsePrimary();
+  }
+  function parsePrimary(){
+    const t=peek();
+    if(!t) throw new Error('식이 끝나지 않았습니다');
+    if(t.t==='num'){ next(); return {type:'num',v:t.v}; }
+    if(t.t==='str'){ next(); return {type:'str',v:t.v}; }
+    if(t.t==='kw'&&(t.v==='true'||t.v==='false')){ next(); return {type:'bool',v:t.v==='true'}; }
+    if(t.t==='punc'&&t.v==='['){ next(); const items=[]; if(peek()&&!(peek().t==='punc'&&peek().v===']')){ items.push(parseExpr()); while(peek()&&peek().t==='punc'&&peek().v===','){ next(); items.push(parseExpr()); } } expect(']'); return {type:'array',items}; }
+    if(t.t==='id'){
+      next();
+      if(peek()&&peek().t==='punc'&&peek().v==='('){ // call
+        next(); const args=[];
+        if(peek()&&!(peek().t==='punc'&&peek().v===')')){ args.push(parseExpr()); while(peek()&&peek().t==='punc'&&peek().v===','){ next(); args.push(parseExpr()); } }
+        expect(')');
+        return {type:'call',name:t.v,args};
+      }
+      if(peek()&&peek().t==='punc'&&peek().v==='['){ // index
+        next(); const idx=parseExpr(); expect(']');
+        return {type:'index',obj:{type:'id',name:t.v},idx};
+      }
+      return {type:'id',name:t.v};
+    }
+    if(t.t==='kw'&&t.v==='len'){ next(); expect('('); const a=parseExpr(); expect(')'); return {type:'call',name:'len',args:[a]}; }
+    if(t.t==='punc'&&t.v==='('){ next(); const e=parseExpr(); expect(')'); return e; }
+    throw new Error(`예상하지 못한 토큰 '${t.v}'`);
+  }
+
+  // statements
+  function parseStmt(){
+    const t=peek();
+    if(!t) throw new Error('stmt EOF');
+    if(t.t==='kw'){
+      if(t.v==='let'){ next(); const name=next(); if(name.t!=='id')throw new Error('변수명 필요'); expect('='); const val=parseExpr(); return {type:'let',name:name.v,val}; }
+      if(t.v==='print'){ next(); const args=[]; if(peek()&&!(peek().t==='punc'&&peek().v==='\n')){ args.push(parseExpr()); while(peek()&&peek().t==='punc'&&peek().v===','){ next(); args.push(parseExpr()); } } expect('\n'); return {type:'print',args}; }
+      if(t.v==='if'){ next(); const cond=parseExpr(); ifg=true; let body=parseBlock(); let els=null; if(peek()&&peek().t==='kw'&&peek().v==='else'){ next(); els={body:parseBlock()}; } return {type:'if',cond,body,els}; }
+      if(t.v==='while'){ next(); const cond=parseExpr(); const body=parseBlock(); return {type:'while',cond,body}; }
+      if(t.v==='return'){ next(); const val=parseExpr(); return {type:'return',val}; }
+      if(t.v==='fn'){ next(); const name=next(); const params=[]; expect('('); if(peek()&&!(peek().t==='punc'&&peek().v===')')){ params.push(next().v); while(peek()&&peek().t==='punc'&&peek().v===','){ next(); params.push(next().v); } } expect(')'); const body=parseBlock(); return {type:'fn',name:name.v,params,body}; }
+    }
+    // assignment or expr (ends at newline)
+    if(t.t==='id'){ const name=next().v; if(peek()&&peek().t==='op'&&peek().v==='='){ next(); const val=parseExpr(); expect('\n'); return {type:'assign',name,val}; } expect('\n'); return {type:'expr',e:{type:'id',name}}; }
+    if(t.t==='punc'&&t.v==='\n'){ next(); return {type:'noop'}; }
+    const e=parseExpr(); expect('\n'); return {type:'expr',e};
+  }
+  let ifg=false;
+  function parseBlock(){
+    // returns array of stmts; body may be {} block or single newline-terminated stmt
+    if(peek()&&peek().t==='punc'&&peek().v==='{'){
+      next(); const stmts=[];
+      while(peek()&&!(peek().t==='punc'&&peek().v==='}')){ stmts.push(parseStmt()); }
+      expect('}'); return {type:'block',stmts};
+    }
+    return {type:'block',stmts:[parseStmt()]};
+  }
+
+  const prog=[];
+  // preprocess: insert newline sentinel tokens for statement separation
+  const stmts=[]; let cur='';
+  // We'll handle newlines via tokens: treat '\n' as punc
+  const lines = splitStatements(toks);
+  return lines;
+}
+
+function splitStatements(toks){
+  // insert {t:'punc',v:'\n'} between newlines; also treat real \n
+  // but removed above; instead simpler: re-tokenize including newlines
+  // We'll just return toks and let parseStatement loop handle
+  return toks;
+}
+
+/* We'll re-approach: full program parser over tokens including newline token */
+/* --- REWRITE parser to proper statement loop --- */
+const srcTokensCache=[];
+function parseProgram(toks){
+  // toks already includes newline as punc '\n' from tokenize (we didn't add; let's treat end-of-line)
+  // Ensure newline tokens: re-tokenize with newline
+  return toks;
+}
+
+/* ============ main pipeline ============ */
+function runCode(){
+  clearConsole();
+  const src=$('code').value;
+  const t0=performance.now();
+  try {
+    const toks=tokenize(src);
+    $('stTokens').textContent=toks.length;
+    // build program with newline-aware statements
+    const prog=buildProgram(toks);
+    $('stNodes').textContent=countNodes(prog);
+    // execute
+    const env={ globals:{}, funcs:{} };
+    execProgram(prog, env);
+    $('stMs').textContent=Math.round((performance.now()-t0));
+    clog(`· ${toks.length} 토큰 · ${countNodes(prog)} AST노드 · ${Math.round((performance.now()-t0))}ms`, 'ok');
+  }catch(e){
+    $('stMs').textContent=Math.round((performance.now()-t0));
+    clog(`✖ 오류: ${e.message}`, 'err');
+  }
+}
+function countNodes(n){
+  if(!n||typeof n!=='object') return 0;
+  let c=1;
+  if(n.args) c+=n.args.reduce((a,x)=>a+countNodes(x),0);
+  if(n.items) c+=n.items.reduce((a,x)=>a+countNodes(x),0);
+  if(n.val) c+=countNodes(n.val);
+  if(n.e) c+=countNodes(n.e);
+  if(n.l) c+=countNodes(n.l); if(n.r) c+=countNodes(n.r);
+  if(n.cond) c+=countNodes(n.cond);
+  if(n.body&&n.body.stmts) c+=n.body.stmts.reduce((a,x)=>a+countNodes(x),0);
+  if(n.els&&n.els.body&&n.els.body.stmts) c+=n.els.body.stmts.reduce((a,x)=>a+countNodes(x),0);
+  return c;
+}
+
+/* exec */
+function makeEnv(parent){ return {parent, vars:{}, funcs:{}}; }
+function lookupVar(name,env){ let e=env; while(e){ if(name in e.vars) return e.vars[name]; e=e.parent; } return undefined; }
+function lookupFn(name,env){ let e=env; while(e){ if(name in e.funcs) return e.funcs[name]; e=e.parent; } return undefined; }
+function setVar(name,val,env){ let e=env; while(e){ if(name in e.vars){ e.vars[name]=val; return; } e=e.parent; } env.vars[name]=val; }
+
+function evalExpr(node,env){
+  switch(node.type){
+    case 'num': return node.v;
+    case 'str': return node.v;
+    case 'bool': return node.v;
+    case 'array': return node.items.map(x=>evalExpr(x,env));
+    case 'id': { const v=lookupVar(node.name,env); if(v===undefined) throw new Error(`정의되지 않은 변수 '${node.name}'`); return v; }
+    case 'index': { const o=evalExpr(node.obj,env); const i=evalExpr(node.idx,env); return o[i]; }
+    case 'unary': { const v=evalExpr(node.e,env); return node.op==='-'?-v:(node.op==='!'?!v:v); }
+    case 'binop': {
+      const l=evalExpr(node.l,env), r=evalExpr(node.r,env);
+      switch(node.op){ case '+':return l+r; case '-':return l-r; case '*':return l*r; case '/':return l/r; case '%':return l%r;
+        case '==':return l===r; case '!=':return l!==r; case '<':return l<r; case '>':return l>r; case '<=':return l<=r; case '>=':return l>=r;
+        case '&&':return l&&r; case '||':return l||r; }
+      throw new Error('알 수 없는 연산 '+node.op);
+    }
+    case 'call': {
+      if(node.name==='len'){ return evalExpr(node.args[0],env).length; }
+      const fn=lookupFn(node.name,env); if(!fn) throw new Error(`정의되지 않은 함수 '${node.name}'`);
+      const callEnv=makeEnv(env); callEnv.isCall=true;
+      node.args.forEach((a,i)=>{ callEnv.vars[fn.params[i]]=evalExpr(a,env); });
+      const r=execBody(fn.body, callEnv);
+      return (r===RETURN.SENTINEL)? callEnv._ret : undefined;
+    }
+  }
+  return null;
+}
+const RETURN={SENTINEL:{}};
+function execBody(block,env){
+  const child=makeEnv(env);
+  for(const st of block.stmts){ const r=execStmt(st,child); if(r===RETURN.SENTINEL) return RETURN.SENTINEL; }
+  return undefined;
+}
+function execStmt(node,env){
+  switch(node.type){
+    case 'noop': return;
+    case 'let': env.vars[node.name]=evalExpr(node.val,env); return;
+    case 'assign': setVar(node.name,evalExpr(node.val,env),env); return;
+    case 'expr': evalExpr(node.e,env); return;
+    case 'print': {
+      const parts=node.args.map(a=>{ const v=evalExpr(a,env); if(Array.isArray(v)) return '['+v.join(', ')+']'; return String(v); });
+      clog(parts.join(' '), 'out'); return;
+    }
+    case 'if': {
+      const c=evalExpr(node.cond,env);
+      if(c){ const r=execBody(node.body,env); if(r===RETURN.SENTINEL) return RETURN.SENTINEL; }
+      else if(node.els){ const r=execBody(node.els.body,env); if(r===RETURN.SENTINEL) return RETURN.SENTINEL; }
+      return;
+    }
+    case 'while': {
+      let guard=0;
+      while(evalExpr(node.cond,env)){ const r=execBody(node.body,env); if(r===RETURN.SENTINEL) return RETURN.SENTINEL; if(++guard>10000) throw new Error('반복 한도(10000) 초과'); }
+      return;
+    }
+    case 'return': {
+      // store value on the nearest function-call scope (isCall)
+      const val=evalExpr(node.val,env);
+      let t=env; while(t && !t.isCall){ t=t.parent; }
+      (t||env)._ret=val;
+      return RETURN.SENTINEL;
+    }
+    case 'fn': env.funcs[node.name]={params:node.params,body:node.body,env}; return;
+  }
+}
+function execProgram(prog,env){ for(const st of prog){ execStmt(st,env); } }
+
+/* --- proper program builder that handles newlines between stmts --- */
+function buildProgram(toks){
+  // Re-tokenize the original source with explicit newline tokens:
+  const src=$('code').value;
+  const nt=tokenizeNL(src);
+  return parseProgNL(nt);
+}
+// tokenize with newlines preserved
+function tokenizeNL(src){
+  const out=[]; let i=0; const n=src.length;
+  const isWs=c=>/\s/.test(c)&&c!=='\n';
+  const isNum=c=>/[0-9]/.test(c);
+  const isId=c=>/[A-Za-z_가-힣]/.test(c);
+  const isIdc=c=>/[A-Za-z_0-9가-힣]/.test(c);
+  const KEYS=['let','while','if','else','return','fn','print','len','true','false'];
+  while(i<n){
+    const c=src[i];
+    if(c==='\n'){ out.push({t:'punc',v:'\n'}); i++; continue; }
+    if(isWs(c)){ i++; continue; }
+    if(c==='/'&&src[i+1]==='/'){ while(i<n&&src[i]!=='\n')i++; continue; }
+    if(isNum(c)){ let j=i; while(j<n&&isNum(src[j]))j++; let num=src.slice(i,j); if(src[j]==='.'&&isNum(src[j+1])){ j++; while(j<n&&isNum(src[j])){num+=src[j];j++;} } out.push({t:'num',v:parseFloat(num)}); i=j; continue; }
+    if(isId(c)){ let j=i; while(j<n&&isIdc(src[j]))j++; const w=src.slice(i,j); out.push(KEYS.includes(w)?{t:'kw',v:w}:{t:'id',v:w}); i=j; continue; }
+    if(c==="'"||c==='"'){ const q=c; let j=i+1,str=''; while(j<n&&src[j]!==q){str+=src[j];j++;} j++; out.push({t:'str',v:str}); i=j; continue; }
+    const two=src.slice(i,i+2);
+    if(['<=','>=','==','!=','&&','||'].includes(two)){ out.push({t:'op',v:two}); i+=2; continue; }
+    if('+-*/%=<>!'.includes(c)){ out.push({t:'op',v:c}); i++; continue; }
+    if('(){}[],'.includes(c)){ out.push({t:'punc',v:c}); i++; continue; }
+    throw new Error(`알 수 없는 문자 '${c}'`);
+  }
+  return out;
+}
+// parse program from NL tokens
+function parseProgNL(toks){
+  let pos=0;
+  const peek=()=>toks[pos];
+  const next=()=>toks[pos++];
+  const peekIs=(p,v)=>peek()&&peek().t===p&&(v===undefined||peek().v===v);
+  const expectPunc=v=>{ const t=next(); if(!t||t.v!==v) throw new Error(`'${v}' 필요, '${t?t.v:'EOF'}'`); };
+  // expressions (same as before but bound to toks)
+  function expr(){ return or(); }
+  function or(){ let e=and(); while(peekIs('op','||')){ next(); e={type:'binop',op:'||',l:e,r:and()}; } return e; }
+  function and(){ let e=eq(); while(peekIs('op','&&')){ next(); e={type:'binop',op:'&&',l:e,r:eq()}; } return e; }
+  function eq(){ let e=rel(); while(peekIs('op')&&(peek().v==='=='||peek().v==='!=')){ const op=next().v; e={type:'binop',op,l:e,r:rel()}; } return e; }
+  function rel(){ let e=add(); while(peekIs('op')&&['<','>','<=','>='].includes(peek().v)){ const op=next().v; e={type:'binop',op,l:e,r:add()}; } return e; }
+  function add(){ let e=mul(); while(peekIs('op')&&(peek().v==='+'||peek().v==='-')){ const op=next().v; e={type:'binop',op,l:e,r:mul()}; } return e; }
+  function mul(){ let e=un(); while(peekIs('op')&&['*','/','%'].includes(peek().v)){ const op=next().v; e={type:'binop',op,l:e,r:un()}; } return e; }
+  function un(){ if(peekIs('op')&&(peek().v==='-'||peek().v==='!')){ const op=next().v; return {type:'unary',op,e:un()}; } return prim(); }
+  function prim(){
+    const t=peek();
+    if(!t) throw new Error('식이 끝나지 않음');
+    if(t.t==='num'){ next(); return {type:'num',v:t.v}; }
+    if(t.t==='str'){ next(); return {type:'str',v:t.v}; }
+    if(t.t==='kw'&&(t.v==='true'||t.v==='false')){ next(); return {type:'bool',v:t.v==='true'}; }
+    if(peekIs('punc','[')){ next(); const items=[]; if(!peekIs('punc',']')){ items.push(expr()); while(peekIs('punc',',')){ next(); items.push(expr()); } } expectPunc(']'); return {type:'array',items}; }
+    if(t.t==='id'){
+      next();
+      if(peekIs('punc','(')){ next(); const args=[]; if(!peekIs('punc',')')){ args.push(expr()); while(peekIs('punc',',')){ next(); args.push(expr()); } } expectPunc(')'); return {type:'call',name:t.v,args}; }
+      if(peekIs('punc','[')){ next(); const idx=expr(); expectPunc(']'); return {type:'index',obj:{type:'id',name:t.v},idx}; }
+      return {type:'id',name:t.v};
+    }
+    if(t.t==='kw'&&t.v==='len'){ next(); expectPunc('('); const a=expr(); expectPunc(')'); return {type:'call',name:'len',args:[a]}; }
+    if(peekIs('punc','(')){ next(); const e=expr(); expectPunc(')'); return e; }
+    throw new Error(`예상 밖 토큰 '${t.v}'`);
+  }
+  // statements
+  function block(){
+    if(peekIs('punc','{')){ next(); const stmts=[]; while(!peekIs('punc','}')){ stmts.push(stmt()); } expectPunc('}'); return {type:'block',stmts}; }
+    return {type:'block',stmts:[stmt()]};
+  }
+  function stmtEnd(){ while(peekIs('punc','\n')) next(); }
+  function stmt(){
+    const t=peek();
+    if(!t){ return {type:'noop'}; }
+    if(peekIs('punc','\n')){ next(); return {type:'noop'}; }
+    if(t.t==='kw'){
+      if(t.v==='let'){ next(); const name=next(); if(name.t!=='id')throw new Error('변수명 필요'); expectPunc('='); const val=expr(); stmtEnd(); return {type:'let',name:name.v,val}; }
+      if(t.v==='print'){ next(); const args=[]; if(!peekIs('punc','\n')&&!peekIs('punc','}')){ args.push(expr()); while(peekIs('punc',',')){ next(); args.push(expr()); } } stmtEnd(); return {type:'print',args}; }
+      if(t.v==='if'){ next(); const cond=expr(); const body=block(); let els=null; if(peek()&&peek().t==='kw'&&peek().v==='else'){ next(); els={body:block()}; } stmtEnd(); return {type:'if',cond,body,els}; }
+      if(t.v==='while'){ next(); const cond=expr(); const body=block(); stmtEnd(); return {type:'while',cond,body}; }
+      if(t.v==='return'){ next(); const val=expr(); stmtEnd(); return {type:'return',val}; }
+      if(t.v==='fn'){ next(); const name=next(); const params=[]; expectPunc('('); if(!peekIs('punc',')')){ params.push(next().v); while(peekIs('punc',',')){ next(); params.push(next().v); } } expectPunc(')'); const body=block(); stmtEnd(); return {type:'fn',name:name.v,params,body}; }
+    }
+    if(t.t==='id'){ const name=next().v; if(peekIs('op','=')){ next(); const val=expr(); stmtEnd(); return {type:'assign',name,val}; } stmtEnd(); return {type:'expr',e:{type:'id',name}}; }
+    const e=expr(); stmtEnd(); return {type:'expr',e};
+  }
+  const prog=[];
+  while(pos<toks.length){ prog.push(stmt()); }
+  return prog;
+}
+
+// Ctrl+Enter to run
+$('code').addEventListener('keydown',e=>{ if(e.ctrlKey&&e.key==='Enter'){ e.preventDefault(); runCode(); } });
+</script>
+</body>
+</html>
