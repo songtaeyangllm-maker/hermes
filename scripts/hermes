@@ -104,7 +104,7 @@ sleep 2; curl -s http://127.0.0.1:8765/api/health || echo "  (curl로 상태 확
     eng3d)  start "$WS/projects/engine3d/index.html" ;;
     freedom) banner; echo "  내가 자유롭게 만든 워크스페이스 도구:"
 echo "  툴킷 / 진단 / 트래커 / 보고서 / 일기 / 파일유틸 / 네트워크 / md2html / 트리맵 / 배지 / autocommit / 검색 / 워드클라우드 / 타임라인"
-echo "  위젯: sns(공유QR) 일기히트맵 속도계 폴더트리맵 배지 타임라인 워드클라우드 스네이크 타이핑 갤러리 벽돌깨기 운세 커맨드센터 포모도로 devcalc regex 허미즈OS 감정리포트 게이지"
+echo "  위젯: sns(공유QR) 일기히트맵 속도계 폴더트리맵 배지 타임라인 워드클라우드 스네이크 타이핑 갤러리 벽돌깨기 운세 커맨드센터 포모도로 devcalc regex 허미즈OS 감정리포트 게이지 호흡 분석 큐브 3D엔진 데일리 2048 틱택토 메모리 반응속도"
 echo "  자동화: 일일보고(09:00) 주간정리(금19:00) 커밋(4h) 백업(08:00) cron" ;;
     help|-h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//' ;;
     *)       banner; banner_stats; echo ""; echo "  Try: hermes <status|tree|info|diag|watch|report|refresh|projects|backup|widget|dash|help>" ;;

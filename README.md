@@ -159,6 +159,12 @@ python tools/file_utils.py clean <dir> --ext .tmp --dry-run
 | 🧊 커맨드 센터 | `projects/command_center/index.html` | KPI+프로젝트+도구+실시간 시스템 |
 | ◈ Hermes OS | `projects/hermes_os/index.html` | 미니 OS 바탕화면 런처 (앱 아이콘) |
 | 📊 감정 리포트 | `projects/sentiment/report.html` | 일기 감정 분석 월간 리포트 |
+| ◉ 라이브 게이지 | `projects/gauges/index.html` | CPU/메모리/디스크 원형 게이지 (2s 폴링) |
+| 🌿 호흡 가이드 | `projects/breath/index.html` | 4-7-8/박스/일관 호흡 세션 타이머 |
+| 📊 분석 대시보드 | `projects/analytics/index.html` | 감정추이/분포/일기/git/키워드 SVG 차트 |
+| 🧊 큐브 쇼케이스 | `projects/landing/index.html` | 3D 큐브+파티클+통계 랜딩 |
+| 🔮 3D 엔진 | `projects/engine3d/index.html` | 순수 JS 행렬회전+원근투영 3D 데모 |
+| 📆 데일리 트래커 | `projects/daily/index.html` | 습관체크/할일/타이머/메모/7일히트맵 |
 
 ## 🕹️ 게임 / 재미
 
@@ -172,6 +178,11 @@ python tools/file_utils.py clean <dir> --ext .tmp --dry-run
 | 🧮 Dev 계산기 | `projects/devcalc/index.html` | Base64/URL/Escape/HEX/SHA/MD5 |
 | 🔍 정규식 테스터 | `projects/regex/index.html` | 실시간 매칭 하이라이트 |
 | 🛍️ 공유 갤러리 | `projects/showcase/index.html` | SNS 공유 키트 전시관 |
+| 🎮 게임 허브 | `projects/gamehub/index.html` | 미니게임 컬렉션 런처 |
+| 🔢 2048 | `projects/g2048/index.html` | 타일 합치기 퍼즐 + 최고점수 |
+| ⭕ 틱택토 | `projects/gttt/index.html` | 미니맥스 AI 대전 + 2인 모드 |
+| 🧠 메모리 | `projects/gmem/index.html` | 카드 뒤집기 짝맞추기 (난이도) |
+| ⚡ 반응속도 | `projects/greact/index.html` | 5회 평균 반응시간 측정 |
 
 ```bash
 # 데이터 갱신 후 위젯 열기
