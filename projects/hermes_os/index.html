@@ -52,7 +52,13 @@ body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; backgroun
         <span id="sTime">--:--:--</span>
         <span id="sDate"></span>
         <span id="sInfo" style="cursor:pointer;color:var(--accent);font-weight:600;">ℹ️ 정보</span>
+        <span id="sTheme" style="cursor:pointer;color:var(--accent);font-weight:600;" title="테마 전환">🎨</span>
     </div>
+</div>
+<div class="hero" id="hero" style="position:relative;padding:26px 24px 14px;text-align:center;">
+  <div style="font-size:3.4rem;font-weight:800;letter-spacing:4px;line-height:1;color:var(--text);" id="clockBig">--:--:--</div>
+  <div style="margin-top:6px;font-size:0.95rem;color:var(--muted);" id="heroSub">—</div>
+  <div style="margin-top:16px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;" id="heroMetrics"></div>
 </div>
 <div id="infoModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:40;align-items:center;justify-content:center;">
   <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:26px 30px;max-width:440px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.5);">
@@ -195,6 +201,8 @@ function tickTime() {
     const d = new Date();
     document.getElementById('sTime').textContent = d.toLocaleTimeString('ko-KR');
     document.getElementById('sDate').textContent = d.toLocaleDateString('ko-KR', {weekday:'short', month:'short', day:'numeric'});
+    const c = document.getElementById('clockBig'); if(c) c.textContent = d.toLocaleTimeString('ko-KR', {hour:'2-digit',minute:'2-digit'});
+    const hs = document.getElementById('heroSub'); if(hs){ const days=['일','월','화','수','목','금','토'][d.getDay()]; hs.textContent = `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 ${days}요일 · ${d.toLocaleTimeString('ko-KR',{hour:'2-digit'})}시 ${d.getMinutes()}분`; }
 }
 setInterval(tickTime, 1000); tickTime();
 
@@ -213,12 +221,35 @@ async function refreshSys(){
         if(r.ok){const d=await r.json();
             document.getElementById('sCpu').textContent=Math.round(d.cpu||0);
             document.getElementById('sMem').textContent=d.memory?Math.round(d.memory.percent):'―';
+            const hm=document.getElementById('heroMetrics');
+            if(hm){
+                const cpu=Math.round(d.cpu||0), mem=d.memory?Math.round(d.memory.percent):0, disc=d.disk?Math.round(d.disk.percent):0;
+                hm.innerHTML=`<div class="hmc">CPU <b>${cpu}%</b></div><div class="hmc">MEM <b>${mem}%</b></div><div class="hmc">DISK <b>${disc}%</b></div>`;
+            }
         }
     }catch(e){}
 }
+// hero metric chip style
+const _ss=document.createElement('style'); _ss.textContent='.hmc{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:8px 18px;font-size:.8rem;color:var(--muted);}.hmc b{color:var(--accent);font-size:1.1rem;}'; document.head.appendChild(_ss);
 refreshSys(); setInterval(refreshSys, 5000);
 document.getElementById('sInfo').addEventListener('click',()=>{const m=document.getElementById('infoModal');m.style.display='flex';});
 document.getElementById('infoModal').addEventListener('click',e=>{if(e.target.id==='infoModal')e.target.style.display='none';});
+// theme toggle (dark / lavender / ocean)
+let themeIdx=0;
+const THEMES=[
+  {bg:'#0d0d16', grad:'radial-gradient(1200px 600px at 80% -10%, rgba(124,92,255,0.18), transparent 60%),radial-gradient(900px 500px at 10% 110%, rgba(92,138,255,0.12), transparent 60%),#0d0d16', card:'rgba(255,255,255,0.05)', text:'#ececf5', muted:'#8a8fa3', border:'rgba(255,255,255,0.09)', accent:'#7c5cff'},
+  {bg:'#0d1424', grad:'radial-gradient(1200px 600px at 80% -10%, rgba(124,92,255,0.28), transparent 60%),radial-gradient(900px 500px at 10% 110%, rgba(92,138,255,0.2), transparent 60%),#0d1424', card:'rgba(124,92,255,0.08)', text:'#eef0ff', muted:'#9aa4c6', border:'rgba(124,92,255,0.16)', accent:'#a58bff'},
+  {bg:'#04121c', grad:'radial-gradient(1200px 600px at 80% -10%, rgba(92,230,168,0.16), transparent 60%),radial-gradient(900px 500px at 10% 110%, rgba(92,138,255,0.14), transparent 60%),#04121c', card:'rgba(92,230,168,0.06)', text:'#e6f7ee', muted:'#8fb3a5', border:'rgba(92,230,168,0.14)', accent:'#5ce6a8'},
+];
+document.getElementById('sTheme').addEventListener('click',()=>{
+  themeIdx=(themeIdx+1)%THEMES.length;
+  const t=THEMES[themeIdx];
+  const root=document.documentElement.style;
+  root.setProperty('--bg',t.bg);root.setProperty('--card',t.card);root.setProperty('--text',t.text);
+  root.setProperty('--muted',t.muted);root.setProperty('--border',t.border);root.setProperty('--accent',t.accent);
+  const body=document.body; body.style.background=t.grad;
+  const dock=document.querySelector('.dock'); if(dock) dock.style.background=t.bg+'cc';
+});
 </script>
 </body>
 </html>
