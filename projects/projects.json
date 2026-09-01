@@ -278,5 +278,13 @@
     "path": "C:/hermes/projects/engine3d",
     "created": "2026-09-01",
     "updated": "2026-09-01 10:19"
+  },
+  {
+    "name": "DrumMachine",
+    "status": "active",
+    "description": "Web Audio 드럼머신 시퀀서",
+    "path": "C:/hermes/projects/drum",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 10:22"
   }
 ]

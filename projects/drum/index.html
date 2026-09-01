@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Drum Machine</title>
+<style>
+:root { --bg:#0b0b12; --card:#13131c; --border:#23233a; --text:#ececf5; --muted:#6b6f82; --accent:#7c5cff; --pos:#5ce6a8; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; }
+h1 { font-size:1.3rem; font-weight:800; } h1 span{color:var(--accent);}
+.sub { color:var(--muted); font-size:0.8rem; margin:5px 0 22px; }
+
+.ctrl { display:flex; align-items:center; gap:16px; margin-bottom:22px; flex-wrap:wrap; justify-content:center; }
+.play { padding:14px 34px; border-radius:40px; border:none; font-size:1rem; font-weight:800; cursor:pointer; background:var(--accent); color:#fff; transition:all .2s; letter-spacing:1px; }
+.play.playing { background:var(--pos); color:#0a2e1e; }
+.bpm { display:flex; align-items:center; gap:10px; }
+.bpm .lab { color:var(--muted); font-size:0.75rem; }
+.bpm .v { font-size:1.3rem; font-weight:800; color:var(--accent); width:52px; text-align:center; font-variant-numeric:tabular-nums; }
+.bpm input[type=range]{ -webkit-appearance:none; width:120px; height:5px; border-radius:5px; background:#23233a; outline:none; }
+.bpm input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:var(--accent); cursor:pointer; }
+
+.track { display:grid; grid-template-columns:64px 1fr; align-items:center; gap:0; background:var(--card); border:1px solid var(--border); border-radius:14px; padding:10px 12px; margin-bottom:8px; }
+.track .tname { font-size:0.82rem; font-weight:700; display:flex; align-items:center; gap:8px; }
+.track .tname .ic { font-size:1.1rem; }
+.steps { display:grid; grid-template-columns:repeat(16,1fr); gap:5px; }
+.step { aspect-ratio:1; border-radius:6px; background:#1c1c2a; border:none; cursor:pointer; transition:all .12s; }
+.step.on { background:var(--accent); }
+.step.playing { box-shadow:0 0 0 2px #fff, 0 0 12px rgba(124,92,255,0.6); }
+/* drum color accents */
+.row-kick .step.on{background:#ff6b6b}.row-snare .step.on{background:#ffd166}.row-hat .step.on{background:#5ce6a8}.row-clap .step.on{background:#5c8aff}
+
+.presets { display:flex; gap:8px; margin-top:20px; flex-wrap:wrap; justify-content:center; }
+.pbtn { padding:9px 18px; border-radius:20px; border:1.5px solid var(--border); background:transparent; color:var(--muted); font-size:0.78rem; cursor:pointer; font-weight:700; transition:all .2s; }
+.pbtn:hover { border-color:var(--accent); color:var(--text); }
+.foot { margin-top:22px; color:var(--muted); font-size:0.72rem; }
+</style>
+</head>
+<body>
+    <h1>🥁 <span>DRUM MACHINE</span></h1>
+    <div class="sub">Web Audio 합성 드럼 · 16스텝 시퀀서</div>
+
+    <div class="ctrl">
+        <button class="play" id="play" onclick="toggle()">▶ PLAY</button>
+        <div class="bpm"><span class="lab">BPM</span><input type="range" id="bpmRange" min="60" max="200" value="120" oninput="setBpm(this.value)"><span class="v" id="bpmVal">120</span></div>
+    </div>
+
+    <div id="tracks"></div>
+
+    <div class="presets">
+        <button class="pbtn" onclick="loadPreset('four')">🎵 포온더플로어</button>
+        <button class="pbtn" onclick="loadPreset('rock')">🎸 락 비트</button>
+        <button class="pbtn" onclick="loadPreset('trap')">🔥 트랩</button>
+        <button class="pbtn" onclick="clearAll()">🧹 전체 지우기</button>
+    </div>
+    <div class="foot">Hermes Drum Machine · 패턴은 자동 저장됩니다</div>
+
+<script>
+// ---- Web Audio setup ----
+let AC=null;
+function ctx(){ if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended') AC.resume(); return AC; }
+function noiseBuf(c){ const b=c.createBuffer(1,c.sampleRate*0.3,c.sampleRate); const d=b.getChannelData(0); for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1; return b; }
+
+// drum synthesizers
+function kick(c,when){
+    const o=c.createOscillator(), g=c.createGain();
+    o.frequency.setValueAtTime(160,when);
+    o.frequency.exponentialRampToValueAtTime(40,when+0.12);
+    g.gain.setValueAtTime(1,when);
+    g.gain.exponentialRampToValueAtTime(0.001,when+0.35);
+    o.connect(g).connect(c.destination); o.start(when); o.stop(when+0.4);
+}
+function snare(c,when){
+    const n=c.createBufferSource(); n.buffer=noiseBuf(c);
+    const g=c.createGain(); g.gain.setValueAtTime(0.7,when); g.gain.exponentialRampToValueAtTime(0.001,when+0.18);
+    const f=c.createBiquadFilter(); f.type='highpass'; f.frequency.value=1800;
+    n.connect(f).connect(g).connect(c.destination); n.start(when);
+    const o=c.createOscillator(); o.type='triangle'; o.frequency.value=180;
+    const og=c.createGain(); og.gain.setValueAtTime(0.5,when); og.gain.exponentialRampToValueAtTime(0.001,when+0.09);
+    o.connect(og).connect(c.destination); o.start(when); o.stop(when+0.1);
+}
+function hat(c,when,open){
+    const n=c.createBufferSource(); n.buffer=noiseBuf(c);
+    const g=c.createGain(); g.gain.setValueAtTime(open?0.3:0.5,when); g.gain.exponentialRampToValueAtTime(0.001,when+(open?0.3:0.06));
+    const f=c.createBiquadFilter(); f.type='highpass'; f.frequency.value=8000;
+    n.connect(f).connect(g).connect(c.destination); n.start(when); n.stop(when+0.35);
+}
+function clap(c,when){
+    for(let k=0;k<3;k++){
+        const n=c.createBufferSource(); n.buffer=noiseBuf(c);
+        const g=c.createGain(); const t=when+k*0.025;
+        g.gain.setValueAtTime(0.4,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.03);
+        const f=c.createBiquadFilter(); f.type='bandpass'; f.frequency.value=1200;
+        n.connect(f).connect(g).connect(c.destination); n.start(t); n.stop(t+0.05);
+    }
+}
+
+// ---- sequencer ----
+const TRACKS=[
+    {name:'킥', ic:'🥁', fn:kick},
+    {name:'스네어', ic:'💥', fn:snare},
+    {name:'하이햇', ic:'🎺', fn:hat},
+    {name:'클랩', ic:'👏', fn:clap},
+];
+let pattern = TRACKS.map(()=>Array(16).fill(0));
+let bpm=120, playing=false, step=0, timer=null;
+
+// init from localStorage
+const patKey='drumPattern';
+const saved=localStorage.getItem(patKey);
+if(saved){ try{ const p=JSON.parse(saved); if(p&&p.length===TRACKS.length) pattern=p; }catch(e){} }
+
+function render(){
+    const box=document.getElementById('tracks');
+    box.innerHTML='';
+    pattern.forEach((row,ri)=>{
+        const tr=document.createElement('div');
+        tr.className='track row-'+['kick','snare','hat','clap'][ri];
+        tr.innerHTML=`<div class="tname"><span class="ic">${TRACKS[ri].ic}</span>${TRACKS[ri].name}</div><div class="steps">${row.map((on,si)=>`<button class="step ${on?'on':''}" data-r="${ri}" data-s="${si}" onclick="toggleStep(${ri},${si})"></button>`).join('')}</div>`;
+        box.appendChild(tr);
+    });
+    // highlight current step
+    document.querySelectorAll('.step').forEach(s=>{
+        const si=+s.dataset.s;
+        s.classList.toggle('playing', playing && si===step);
+    });
+}
+function toggleStep(r,s){ pattern[r][s]=pattern[r][s]?0:1; save(); render(); }
+function save(){ localStorage.setItem(patKey,JSON.stringify(pattern)); }
+
+function setBpm(v){ bpm=+v; document.getElementById('bpmVal').textContent=v; if(playing) restart(); }
+function restart(){ stop(); toggle(); }
+
+function toggle(){
+    if(!playing){
+        ctx();
+        playing=true; step=0;
+        document.getElementById('play').textContent='⏹ STOP';
+        document.getElementById('play').classList.add('playing');
+        scheduleLoop();
+    }else{ stop(); }
+}
+function stop(){
+    playing=false; clearInterval(timer);
+    document.getElementById('play').textContent='▶ PLAY';
+    document.getElementById('play').classList.remove('playing');
+    step=0; render();
+}
+function scheduleLoop(){
+    const c=ctx(); const stepDur=60/bpm/4;
+    timer=setInterval(()=>{
+        playStep(step,c);
+        step=(step+1)%16;
+        render();
+    }, stepDur*1000);
+}
+function playStep(s,c){
+    for(let r=0;r<TRACKS.length;r++){
+        if(pattern[r][s]) TRACKS[r].fn(c, c.currentTime+0.01);
+    }
+}
+
+// presets
+function loadPreset(name){
+    pattern=TRACKS.map(()=>Array(16).fill(0));
+    const PR={
+        four:()=>{ [0,4,8,12].forEach(s=>pattern[0][s]=1); [4,12].forEach(s=>pattern[1][s]=1); for(let i=0;i<16;i++)if(i%2===0)pattern[2][i]=1; },
+        rock:()=>{ [0,4,8,10,12].forEach(s=>pattern[0][s]=1); [4,10].forEach(s=>pattern[1][s]=1); for(let i=0;i<16;i++)if(i%2===0)pattern[2][i]=1; pattern[3][4]=1; pattern[3][12]=1; },
+        trap:()=>{ [0,6,10,14].forEach(s=>pattern[0][s]=1); [4,12].forEach(s=>pattern[1][s]=1); for(let i=0;i<16;i+=2)pattern[2][i]=1; pattern[3][0]=1; pattern[3][8]=1; },
+    };
+    PR[name]();
+    save(); render();
+    if(playing){ stop(); }
+}
+function clearAll(){ pattern=TRACKS.map(()=>Array(16).fill(0)); save(); render(); if(playing){stop();} }
+
+render();
+</script>
+</body>
+</html>
