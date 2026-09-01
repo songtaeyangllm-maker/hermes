@@ -206,5 +206,13 @@
     "path": "C:/hermes/projects/breath",
     "created": "2026-08-31",
     "updated": "2026-08-31 18:37"
+  },
+  {
+    "name": "Analytics",
+    "status": "active",
+    "description": "데이터 분석 대시보드",
+    "path": "C:/hermes/projects/analytics",
+    "created": "2026-09-01",
+    "updated": "2026-09-01 10:05"
   }
 ]

@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Analytics</title>
+<style>
+:root { --bg:#0b0b12; --card:#13131c; --text:#ececf5; --muted:#6b6f82; --border:#23233a; --accent:#7c5cff; --pos:#5ce6a8; --neg:#ff6b6b; --warn:#ffd166; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,'Segoe UI','Noto Sans KR',sans-serif; background:var(--bg); color:var(--text); padding:34px 22px; }
+.wrap { max-width:980px; margin:0 auto; }
+.head { display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:10px; margin-bottom:26px; }
+.head h1 { font-size:1.6rem; font-weight:800; } .head h1 span { color:var(--accent); }
+.head .meta { color:var(--muted); font-size:0.78rem; text-align:right; }
+
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:18px; padding:20px; }
+.card h3 { font-size:0.85rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:14px; }
+.card.wide { grid-column:1/-1; }
+.hl { color:var(--accent); font-weight:800; }
+
+.kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:14px; margin-bottom:18px; }
+.kpi { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px; text-align:center; }
+.kpi .n { font-size:0.7rem; color:var(--muted); } .kpi .v { font-size:1.6rem; font-weight:800; color:var(--accent); margin-top:3px; }
+
+svg text { font-family:inherit; }
+.axis { stroke:var(--border); }
+.gridline { stroke:rgba(255,255,255,0.05); }
+.tooltip-item { font-size:0.8rem; padding:8px 12px; border-bottom:1px solid var(--border); color:var(--muted); }
+.tooltip-item b { color:var(--text); }
+.kw-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:0.82rem; }
+.kw-row .w { width:110px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.kw-bar { flex:1; height:10px; background:#1c1c28; border-radius:8px; overflow:hidden; }
+.kw-bar .fill { height:100%; border-radius:8px; background:linear-gradient(90deg,var(--accent),#5c8aff); }
+.kw-row .c { width:30px; text-align:right; color:var(--muted); font-variant-numeric:tabular-nums; }
+.tree { display:flex; flex-wrap:wrap; gap:6px; }
+.tool-chip { padding:7px 13px; border-radius:10px; background:var(--bg); border:1px solid var(--border); font-size:0.75rem; font-family:monospace; color:var(--muted); }
+.foot { text-align:center; color:var(--muted); font-size:0.72rem; margin-top:26px; }
+.legend { display:flex; gap:14px; font-size:0.72rem; color:var(--muted); margin-top:8px; }
+.legend i { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <div class="head">
+        <h1>📊 <span>HERMES</span> ANALYTICS</h1>
+        <div class="meta">생성: <b id="gen">—</b></div>
+    </div>
+
+    <div class="kpis" id="kpis"></div>
+
+    <div class="grid">
+        <div class="card wide">
+            <h3>감정 추이</h3>
+            <svg id="sentimentChart" width="100%" height="220" viewBox="0 0 920 220" preserveAspectRatio="xMidYMid meet"></svg>
+            <div class="legend">
+                <span><i style="background:var(--pos)"></i>긍정</span>
+                <span><i style="background:var(--neg)"></i>부정</span>
+                <span><i style="background:var(--warn)"></i>중립</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>감정 분포</h3>
+            <svg id="pieChart" width="100%" height="210" viewBox="0 0 240 210"></svg>
+        </div>
+
+        <div class="card">
+            <h3>일기 활동</h3>
+            <svg id="dailyBar" width="100%" height="210" viewBox="0 0 320 210"></svg>
+        </div>
+
+        <div class="card wide">
+            <h3>최근 git 커밋</h3>
+            <div id="gitList"></div>
+        </div>
+
+        <div class="card">
+            <h3>상위 키워드</h3>
+            <div id="kwList"></div>
+        </div>
+
+        <div class="card">
+            <h3>프로젝트 현황</h3>
+            <div id="projList" style="font-size:0.82rem"></div>
+        </div>
+
+        <div class="card wide">
+            <h3>도구함 <span class="hl" id="toolCount">0</span></h3>
+            <div class="tree" id="toolTree"></div>
+        </div>
+    </div>
+
+    <div class="foot">Hermes Analytics · 자동 생성 데이터 기반</div>
+</div>
+
+<script src="analytics_data.js"></script>
+<script>
+const D = window.HERMES_ANALYTICS || { diary:[], top_keywords:[], projects:[], git:[], tools:[] };
+document.getElementById('gen').textContent = D.generated || '—';
+
+// KPI row
+const posDays = D.diary.filter(d => d.label==='긍정').length;
+const negDays = D.diary.filter(d => d.label==='부정').length;
+const totalScore = D.diary.reduce((a,d)=>a+d.score,0);
+const totalKw = D.top_keywords.reduce((a,k)=>a+k.c,0);
+const kpiHtml = [
+    ['일기', D.diary.length], ['긍정 일수', posDays, 'color:#5ce6a8'],
+    ['부정 일수', negDays, 'color:#ff6b6b'], ['총 감정', (totalScore>0?'+':'')+totalScore, 'color:#7c5cff'],
+    ['커밋', D.git.length], ['키워드', totalKw]
+].map(([n,v,st]) => `<div class="kpi"><div class="n">${n}</div><div class="v" ${st||''}>${v}</div></div>`).join('');
+document.getElementById('kpis').innerHTML = kpiHtml;
+
+// --- Sentiment line chart ---
+(function(){
+    const svg = document.getElementById('sentimentChart');
+    const ns = 'http://www.w3.org/2000/svg';
+    const W=920,H=210,padL=40,padR=20,padT=20,padB=30;
+    const data = D.diary;
+    if(data.length < 1){ svg.innerHTML=''; return; }
+    let html='';
+    // gridlines
+    for(let g=0; g<=4; g++){
+        const y = padT + (H-padT-padB) * g/4;
+        html += `<line class="gridline" x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}"/>`;
+    }
+    const innerW = W-padL-padR, innerH = H-padT-padB;
+    const minX = innerW, maxX = 0, minY = -10, maxY = 10;
+    const x = i => padL + (data.length===1? innerW/2 : innerW*i/(data.length-1));
+    const y = s => padT + innerH - (s-minY)/(maxY-minY)*innerH;
+    // area + line
+    let pts = data.map((d,i)=>`${x(i)},${y(d.score)}`).join(' ');
+    let areaPts = padL+','+(padT+innerH)+' '+pts+' '+(padL+innerW)+','+(padT+innerH);
+    html += `<polygon points="${areaPts}" fill="rgba(124,92,255,0.12)"/>`;
+    html += `<polyline points="${pts}" fill="none" stroke="#7c5cff" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+    // zero line
+    html += `<line class="axis" x1="${padL}" y1="${y(0)}" x2="${W-padR}" y2="${y(0)}" stroke-dasharray="4 4"/>`;
+    // points
+    data.forEach((d,i)=>{
+        const col = d.label==='긍정'?'#5ce6a8':(d.label==='부정'?'#ff6b6b':'#ffd166');
+        html += `<circle cx="${x(i)}" cy="${y(d.score)}" r="4.5" fill="${col}" stroke="#0b0b12" stroke-width="1.5">
+            <title>${d.date}: ${d.score>=0?'+':''}${d.score} (${d.label})</title></circle>`;
+        html += `<text x="${x(i)}" y="${H-10}" font-size="9" fill="#6b6f82" text-anchor="middle">${d.date.slice(5)}</text>`;
+    });
+    svg.innerHTML = html;
+})();
+
+// --- Pie (sentiment distribution) ---
+(function(){
+    const svg=document.getElementById('pieChart'), ns='http://www.w3.org/2000/svg';
+    const pos=posDays, neg=negDays, neu=D.diary.length-pos-neg, total=D.diary.length||1;
+    const cx=85,cy=105,r=70;
+    const segs=[['#5ce6a8',pos],['#ff6b6b',neg],['#ffd166',neu]].filter(s=>s[1]>0);
+    let ang=-Math.PI/2, html='';
+    segs.forEach(([col,n])=>{
+        const frac=n/total, a2=ang+frac*2*Math.PI;
+        const x1=cx+r*Math.cos(ang), y1=cy+r*Math.sin(ang);
+        const x2=cx+r*Math.cos(a2), y2=cy+r*Math.sin(a2);
+        const large=frac>0.5?1:0;
+        html+=`<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z" fill="${col}"/>`;
+        ang=a2;
+    });
+    html+=`<circle cx="${cx}" cy="${cy}" r="${r*0.55}" fill="#13131c"/>`;
+    html+=`<text x="${cx}" y="${cy-2}" text-anchor="middle" font-size="20" font-weight="800" fill="#ececf5">${D.diary.length}</text>`;
+    html+=`<text x="${cx}" y="${cy+16}" text-anchor="middle" font-size="9" fill="#6b6f82">일기</text>`;
+    html+=`<text x="175" y="70" font-size="11" fill="#5ce6a8">● 긍정 ${pos}</text>`;
+    html+=`<text x="175" y="96" font-size="11" fill="#ff6b6b">● 부정 ${neg}</text>`;
+    html+=`<text x="175" y="122" font-size="11" fill="#ffd166">● 중립 ${neu}</text>`;
+    svg.innerHTML=html;
+})();
+
+// --- Daily bar (chars) ---
+(function(){
+    const svg=document.getElementById('dailyBar'), ns='http://www.w3.org/2000/svg';
+    const data=D.diary.slice().sort((a,b)=>a.date<b.date?-1:1);
+    const W=320,H=210,padL=30,padB=28,padT=14;
+    const max=Math.max(1,...data.map(d=>d.chars));
+    const bw=Math.min(22,(W-padL-10)/data.length);
+    let html='';
+    data.forEach((d,i)=>{
+        const h=(d.chars/max)*(H-padT-padB);
+        const x=padL+i*bw, y=H-padB-h;
+        const col=d.label==='긍정'?'#5ce6a8':(d.label==='부정'?'#ff6b6b':'#5c8aff');
+        html+=`<rect x="${x}" y="${y}" width="${bw-3}" height="${h}" rx="3" fill="${col}" opacity="0.85">
+            <title>${d.date}: ${d.chars}자</title></rect>`;
+        if(i%2===0 || data.length<8) html+=`<text x="${x+bw/2}" y="${H-8}" font-size="7" fill="#6b6f82" text-anchor="middle">${d.date.slice(5)}</text>`;
+    });
+    svg.innerHTML=html;
+})();
+
+// --- git list ---
+document.getElementById('gitList').innerHTML = D.git.slice(0,10).map(c =>
+    `<div class="tooltip-item"><span style="color:#7c5cff;font-family:monospace">${c.hash}</span> <span style="font-size:0.72rem;color:#6b6f82">${c.date}</span><br>${c.msg}</div>`
+).join('') || '<div class="tooltip-item">커밋 없음</div>';
+
+// --- keywords ---
+const maxKw=Math.max(1,...D.top_keywords.map(k=>k.c));
+document.getElementById('kwList').innerHTML = D.top_keywords.map(k =>
+    `<div class="kw-row"><div class="w">${k.w}</div><div class="kw-bar"><div class="fill" style="width:${k.c/maxKw*100}%"></div></div><div class="c">${k.c}</div></div>`
+).join('') || '<div style="color:var(--muted);font-size:0.82rem">키워드 없음</div>';
+
+// --- projects ---
+const stColor={active:'#5ce6a8',planned:'#ffd166',done:'#7c5cff',paused:'#ff8a5c',archived:'#6b6f82'};
+document.getElementById('projList').innerHTML = D.projects.map(p =>
+    `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+        <span>${p.name}</span>
+        <span style="color:${stColor[p.status]||'#6b6f82'};font-size:0.7rem;font-weight:700">${p.status||''}</span>
+    </div>`
+).join('') || '<div style="color:var(--muted)">프로젝트 없음</div>';
+
+// --- tools ---
+document.getElementById('toolCount').textContent=D.tools.length;
+document.getElementById('toolTree').innerHTML = D.tools.map(t=>`<span class="tool-chip">${t}</span>`).join('') || '';
+</script>
+</body>
+</html>
