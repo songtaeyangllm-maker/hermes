@@ -93,6 +93,7 @@ sleep 2; curl -s http://127.0.0.1:8765/api/health || echo "  (curl로 상태 확
     summary) $PY "$WS/tools/summary.py" ;;
     smoke) $PY "$WS/tools/smoke.py" ;;
     check) $PY "$WS/tools/validate_widgets.py" ;;
+    oscheck) $PY "$WS/tools/verify_os_catalog.py" ;;
     gauges) start "$WS/projects/gauges/index.html" ;;
     analytics) banner; $PY "$WS/tools/analytics.py"; start "$WS/projects/analytics/index.html" ;;
     g2048)  start "$WS/projects/g2048/index.html" ;;

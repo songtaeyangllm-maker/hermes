@@ -36,6 +36,7 @@ CORE = [
     ("summary", ["python", "tools/summary.py"]),
     ("poster dark", ["python", "tools/poster.py", "--theme", "dark"]),
     ("validate_widgets", ["python", "tools/validate_widgets.py"]),
+    ("verify_os_catalog", ["python", "tools/verify_os_catalog.py"]),
 ]
 
 # These write binary files; a non-zero exit from missing Pillow is expected
