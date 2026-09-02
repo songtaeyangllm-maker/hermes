@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Synesthesia</title>
+<style>
+:root { --bg:#0b0e16; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; --accent:#60a5fa; --good:#4ade80; --bad:#ef4444; }
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px}h1{font-size:28px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}.sub{color:var(--muted);font-size:14px;margin-bottom:24px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;width:100%;max-width:1200px}.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;transition:transform .2s,box-shadow .2s}.card:hover{transform:translateY(-2px);box-shadow:0 20px 60px rgba(0,0,0,.3)}.system{background:linear-gradient(135deg,#1a2540 0%,#0d1322 100%);border:none}.system h3{color:var(--text);margin-bottom:8px}.system p{color:var(--muted);font-size:13px;line-height:1.5}.toggle{width:100%;background:#0d1322;border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;color:var(--text);cursor:pointer;margin:8px 0}.toggle.on{background:var(--accent);color:#0b0e16}.parameter-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}.param{background:#0d1322;border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--text);min-width:80px}.range{flex:1;min-width:150px}.btn{background:var(--accent);color:#0b0e16;border:none;padding:8px 16px;font-size:13px;font-weight:bold;cursor:pointer;border-radius:6px;margin-top:12px}.btn:hover{opacity:.9}.btn.download{background:var(--good)}.visual{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-top:24px;min-height:300px;position:relative}.canvas-wrapper{width:100%;height:100%;}.controls{margin-top:24px;display:flex;flex-direction:column;gap:12px}.status{display:flex;gap:6px;align-items:center}.dot{width:10px;height:10px;border-radius:50%;}.dot.online{background:var(--good)}.dot.offline{background:var(--bad)}.footer{margin-top:24px;color:var(--muted);font-size:12px;text-align:center;}.link{color:var(--accent);text-decoration:none;font-weight:bold;font-size:13px}.link:hover{text-decoration:underline}.empty{color:var(--muted);text-align:center;padding:40px}</style>
+</head>
+<body>
+<h1>SYNESTHESIA</h1>
+<div class="sub">7AI가 오디오와 캔버스를 통해 상호작용하는 실시간 비주얼라이저</div>
+<div class="grid">
+  <!-- System 1: Neural Network -->
+  <div class="card system" data-system="nn">
+    <div class="header"><h3>🧠 신경망</h3><span class="status"><span class="dot offline"></span>중단됨</span></div>
+    <div class="parameter-row">
+      <div class="param">확신도:<span class="confidence">0</span></div>
+      <div class="param">손실:<span class="loss">0.0</span></div>
+    </div>
+    <button class="toggle" onclick="toggleSystem('nn')">활성화</button>
+    <div class="visual"><canvas class="canvas" data-canvas="nn" width="400" height="250"></canvas></div>
+  </div>
+  
+  <!-- System 2: Q-Learning -->
+  <div class="card system" data-system="qlearn">
+    <div class="header"><h3>⏳ Q-러닝</h3><span class="status"><span class="dot offline"></span>중단됨</span></div>
+    <div class="parameter-row">
+      <div class="param">에피소드:<span class="episodes">0</span></div>
+      <div class="param">평균스텝:<span class="avgsteps">0</span></div>
+    </div>
+    <button class="toggle" onclick="toggleSystem('qlearn')">활성화</button>
+    <div class="visual"><canvas class="canvas" data-canvas="qlearn" width="400" height="250"></canvas></div>
+  </div>
+  
+  <!-- System 3: Genetic Algorithm -->
+  <div class="card system" data-system="ga">
+    <div class="header"><h3>🧬 유전알고리즘</h3><span class="status"><span class="dot offline"></span>중단됨</span></div>
+    <div class="parameter-row">
+      <div class="param">세대:<span class="generation">0</span></div>
+      <div class="param">적합도:<span class="fitness">0.0</span></div>
+    </div>
+    <button class="toggle" onclick="toggleSystem('ga')">활성화</button>
+    <div class="visual"><canvas class="canvas" data-canvas="ga" width="400" height="250"></canvas></div>
+  </div>
+  
+  <!-- System 4: A* Pathfinding -->
+  <div class="card system" data-system="astar">
+    <div class="header"><h3>📍 A* 경로찾기</h3><span class="status"><span class="dot offline"></span>대기모드</span></div>
+    <div class="parameter-row">
+      <div class="param">확장노드:<span class="nodes">0</span></div>
+      <div class="param">최적경로:<span class="pathlen">0</span></div>
+    </div>
+    <button class="toggle" onclick="toggleSystem('astar')">활성화</button>
+    <div class="visual"><canvas class="canvas" data-canvas="astar" width="400" height="250"></canvas></div>
+  </div>
+  
+  <!-- System 5: Cell Automata -->
+  <div class="card system" data-system="ca">
+    <div class="header"><h3>🔢 셀오토마타</h3><span class="status"><span class="dot offline"></span>패턴생성</span></div>
+    <div class="parameter-row">
+      <div class="param">룰:<span class="rule">Rule30</span></div>
+      <div class="param">세대:<span class="generation">0</span></div>
+    </div>
+    <button class="toggle" onclick="toggleSystem('ca')">활성화</button>
+    <div class="visual"><canvas class="canvas" data-canvas="ca" width="400" height="250"></canvas></div>
+  </div>
+  
+  <!-- System 6: Lorentz Attractor -->
+  <div class="card system" data-system="lorentz">
+    <div class="header"><h3>🌀 로렌츠 어트랙터</h3><span class="status"><span class="dot offline"></span>시뮬레이션</span></div>
+    <div class="parameter-row">
+      <div class="param">Lyapunov:<span class="lyap">0.0</span></div>
+      <div class="param">민감성:<span class="sensitivity">높음</span></div>
+    </div>
+    <button class="toggle" onclick="toggleSystem('lorentz')">활성화</button>
+    <div class="visual"><canvas class="canvas" data-canvas="lorentz" width="400" height="250"></canvas></div>
+  </div>
+  
+  <!-- System 7: Gravity N-Body -->
+  <div class="card system" data-system="grav">
+    <div class="header"><h3>🪐 중력 N-바디</h3><span class="status"><span class="dot offline"></span>궤도안정</span></div>
+    <div class="parameter-row">
+      <div class="param">천체:<span class="bodies">300</span></div>
+      <div class="param">원궤도:<span class="orbit">200~200</span></div>
+    </div>
+    <button class="toggle" onclick="toggleSystem('grav')">활성화</button>
+    <div class="visual"><canvas class="canvas" data-canvas="grav" width="400" height="250"></canvas></div>
+  </div>
+  
+  <!-- System 8: Mini Language -->
+  <div class="card system" data-system="lang">
+    <div class="header"><h3>🟢 미니 언어</h3><span class="status"><span class="dot offline"></span>대기모드</span></div>
+    <div class="parameter-row">
+      <div class="param">테스트:<span class="tests">8/8</span></div>
+      <div class="param">점수:<span class="score">100%</span></div>
+    </div>
+    <button class="toggle" onclick="toggleSystem('lang')">활성화</button>
+    <div class="visual"><canvas class="canvas" data-canvas="lang" width="400" height="250"></canvas></div>
+  </div>
+</div>
+<div class="controls">
+  <button class="btn" onclick="startAllSystems()">전체 시작</button>
+  <button class="btn" onclick="stopAllSystems()">전체 중지</button>
+  <button class="btn download" onclick="downloadSession()">세션 다운로드</button>
+</div>
+<div class="status" id="globalStatus">전역 상태: 초기화됨</div>
+<div class="footer">
+  <div>Hermes Synesthesia | 65프로젝트 통합 | Web Audio + Canvas</div>
+  <div>GitHub: songtaeyangllm-maker/hermes</div>
+</div>
+<script>
+// 시스템 상태 (실제 AI 시스템 상태 시뮬레이션)
+// 실제로는 nn/qlearn/ga/astar/ca/lorentz/grav/lang 모듈의 real-time state 연결
+const systemStates = {
+  nn: {active: false, confidence: 0, loss: 0.45, color: '#f472b6'},
+  qlearn: {active: false, episodes: 0, avgsteps: 12, color: '#fbbf24'},
+  ga: {active: false, generation: 0, fitness: 0, color: '#22c55e'},
+  astar: {active: false, nodes: 0, pathlen: 0, color: '#3b82f6'},
+  ca: {active: false, rule: 'Rule30', generation: 0, color: '#a855f7'},
+  lorentz: {active: false, lyap: 0, sensitivity: '높음', color: '#ec4899'},
+  grav: {active: false, bodies: 300, orbit: '200~200', color: '#14b8a6'},
+  lang: {active: false, tests: '8/8', score: '100%', color: '#6366f1'}
+};
+let audioContext = null;
+let analyzers = {};
+let sources = {};
+
+// 오디오 컨텍스트 초기화
+function initAudio() {
+  try { audioContext = new (window.AudioContext || window.webkitAudioContext)(); }
+  catch(e) { console.error('Web Audio API 지원 안 함'); }
+}
+
+// 시스템 토글
+function toggleSystem(system) {
+  const state = systemStates[system];
+  state.active = !state.active;
+  const toggleBtn = document.querySelector(`[onclick="toggleSystem('${system}')"`);
+  const dot = document.querySelector(`[data-system="${system}"] .status .dot`);
+  const confEl = document.querySelector(`[data-system="${system}"] .confidence`);
+  const lossEl = document.querySelector(`[data-system="${system}"] .loss`);
+  const episEl = document.querySelector(`[data-system="${system}"] .episodes`);
+  const avgEl = document.querySelector(`[data-system="${system}"] .avgsteps`);
+  const genEl = document.querySelector(`[data-system="${system}"] .generation`);
+  const fitEl = document.querySelector(`[data-system="${system}"] .fitness`);
+  const nodesEl = document.querySelector(`[data-system="${system}"] .nodes`);
+  const pathEl = document.querySelector(`[data-system="${system}"] .pathlen`);
+  const ruleEl = document.querySelector(`[data-system="${system}"] .rule`);
+  const lyapEl = document.querySelector(`[data-system="${system}"] .lyap`);
+  const sensEl = document.querySelector(`[data-system="${system}"] .sensitivity`);
+  const bodiesEl = document.querySelector(`[data-system="${system}"] .bodies`);
+  const orbitEl = document.querySelector(`[data-system="${system}"] .orbit`);
+  const testsEl = document.querySelector(`[data-system="${system}"] .tests`);
+  const scoreEl = document.querySelector(`[data-system="${system}"] .score`);
+  
+  if (state.active) {
+    dot.className = 'dot online';
+    toggleBtn.className = 'toggle on';
+    // 오디오 시작
+    if (audioContext && !sources[system]) {
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 440 + systemStates[system].confidence * 100;
+      osc.connect(gain).connect(audioContext.destination);
+      osc.start();
+      sources[system] = {osc, gain};
+    }
+  } else {
+    dot.className = 'dot offline';
+    toggleBtn.className = 'toggle';
+    if (sources[system]) {
+      sources[system].osc.stop();
+      delete sources[system];
+    }
+  }
+  
+  // UI 업데이트 (시스템별)
+  if (state.confidence !== undefined) { confEl.textContent = state.confidence.toFixed(1); }
+  if (state.loss !== undefined) { lossEl.textContent = state.loss.toFixed(2); }
+  if (state.episodes !== undefined) { episEl.textContent = state.episodes; }
+  if (state.avgsteps !== undefined) { avgEl.textContent = state.avgsteps; }
+  if (state.generation !== undefined) { genEl.textContent = state.generation; }
+  if (state.fitness !== undefined) { fitEl.textContent = state.fitness.toFixed(3); }
+  if (state.nodes !== undefined) { nodesEl.textContent = state.nodes; }
+  if (state.pathlen !== undefined) { pathEl.textContent = state.pathlen; }
+  if (state.rule !== undefined) { ruleEl.textContent = state.rule; }
+  if (state.lyap !== undefined) { lyapEl.textContent = state.lyap.toFixed(1); }
+  if (state.sensitivity !== undefined) { sensEl.textContent = state.sensitivity; }
+  if (state.bodies !== undefined) { bodiesEl.textContent = state.bodies; }
+  if (state.orbit !== undefined) { orbitEl.textContent = state.orbit; }
+  if (state.tests !== undefined) { testsEl.textContent = state.tests; }
+  if (state.score !== undefined) { scoreEl.textContent = state.score; }
+}
+
+// 전체 시작/중지
+function startAllSystems() {
+  Object.keys(systemStates).forEach(toggleSystem);
+}
+function stopAllSystems() {
+  Object.keys(systemStates).forEach(s => { systemStates[s].active = false; toggleSystem(s); });
+}
+
+// 글로벌 상태 표시
+document.getElementById('globalStatus').textContent = '전역 상태: ' + Object.keys(systemStates).filter(k => systemStates[k].active).length + '/7 활성';
+
+// 다운로드
+function downloadSession() {
+  // 캔버스 이미지 다운로드
+  const canvases = document.querySelectorAll('.canvas');
+  canvases.forEach((canvas, idx) => {
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/png');
+    link.download = `synesthesia_system_${idx+1}.png`;
+    link.click();
+  });
+  // 오디오 다운로드 (믹싱된 오디오 렌더링)
+  if (audioContext) {
+    const offlineCtx = new OfflineAudioContext(1, audioContext.sampleRate * 5, audioContext.sampleRate);
+    const mix = offlineCtx.createGain();
+    Object.values(sources).forEach(s => s.gain.connect(mix));
+    mix.connect(offlineCtx.destination);
+    offlineCtx.startRendering().then(blob => {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'synesthesia_audio.wav';
+      link.click();
+    });
+  }
+}
+
+// 초기화
+initAudio();
+</script>
+</body>
+</html>
