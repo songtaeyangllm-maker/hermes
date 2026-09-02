@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Chess</title>
+<style>
+:root { --bg:#0b0e16; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; --accent:#4ade80; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-serif; display:flex; flex-direction:column; align-items:center; gap:12px; padding:16px; }
+h1{ font-size:19px; letter-spacing:2px; } h1 span{ color:var(--accent); }
+.sub{ color:var(--muted); font-size:12px; }
+.wrap{ display:flex; gap:18px; flex-wrap:wrap; justify-content:center; align-items:flex-start; }
+#board{ display:grid; grid-template-columns:repeat(8,56px); grid-template-rows:repeat(8,56px); border:1px solid #2a3a55; border-radius:8px; overflow:hidden; box-shadow:0 12px 36px rgba(0,0,0,.45); }
+.cell{ width:56px; height:56px; display:flex; align-items:center; justify-content:center; font-size:40px; line-height:1; cursor:pointer; user-select:none; position:relative; }
+.cell.l{ background:#e8d8b8; } .cell.d{ background:#b58863; }
+.cell.sel{ outline:3px solid #4ade80; outline-offset:-3px; z-index:2; }
+.cell.mv::after{ content:''; position:absolute; width:18px; height:18px; border-radius:50%; background:rgba(74,222,128,.45); }
+.cell.last{ box-shadow:inset 0 0 0 3px rgba(255,200,60,.55); }
+.cell.check{ background:#d05a5a !important; }
+.pw{ color:#fdfdfd; text-shadow:0 1px 3px rgba(0,0,0,.7); } .pb{ color:#1a1a20; text-shadow:0 1px 2px rgba(255,255,255,.3); }
+.side{ display:flex; flex-direction:column; gap:10px; width:230px; }
+.panel{ background:var(--card); border:1px solid var(--border); border-radius:10px; padding:12px; }
+.title-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.cap{ font-size:12px; color:var(--muted); }
+.pgn{ font-family:Consolas,monospace; font-size:12px; color:#9fb0c8; max-height:180px; overflow-y:auto; line-height:1.6; background:#0d1322; border-radius:6px; padding:8px; }
+.btn{ background:#16223a; color:#e5e7eb; border:1px solid var(--border); border-radius:8px; padding:7px 12px; cursor:pointer; font-size:13px; width:100%; }
+.btn:hover{ background:#1f3050; }
+.msg{ min-height:24px; font-size:14px; color:#9fb0c8; text-align:center; }
+.captured{ min-height:22px; font-size:14px; }
+</style>
+</head>
+<body>
+<h1>CHESS <span>::</span> MINIMAX</h1>
+<div class="sub">백(당신) vs 흑(컴퓨터) — 알파베타 가지치기 + 피스퀘어 테이블</div>
+<div class="msg" id="msg">당신 차례 — 흰색 말을 클릭하세요</div>
+<div class="wrap">
+  <div id="board"></div>
+  <div class="side">
+    <div class="panel"><div class="title-row"><span class="cap">백</span><span class="cap" id="capW">♙♙ ♟♟</span></div><div id="score" style="font-size:20px;text-align:center">0 : 0</div><div class="title-row" style="margin-top:8px"><span class="cap" id="capB">♟♟ ♙♙</span><span class="cap">흑</span></div></div>
+    <div class="panel"><b style="font-size:12px;color:var(--muted)">수 목록</b><div class="pgn" id="pgn"></div></div>
+    <div class="panel"><b style="font-size:12px;color:var(--muted)">난이도</b><div style="display:flex;gap:6px;margin-top:6px"><button class="btn" id="dEasy" style="font-size:11px">쉬움</button><button class="btn active" id="dHard" style="font-size:11px">어려움</button></div></div>
+    <button class="btn" id="restart">🔄 새 게임</button>
+  </div>
+</div>
+<script>
+// ============ 체스 엔진 ============
+const PW={K:12000,Q:900,R:500,B:330,N:320,P:100}; // 백 기물 가치
+const DIRS={R:[[1,0],[-1,0],[0,1],[0,-1]],B:[[1,1],[1,-1],[-1,1],[-1,-1]],Q:[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]};
+const KN=[[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]];
+const PST={ // 피스퀘어 테이블 (백 기준, 흑은 y반전)
+ K:[[-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],[-20,-30,-30,-40,-40,-30,-30,-20],[-10,-20,-20,-20,-20,-20,-20,-10],[20,20,0,0,0,0,20,20],[20,30,10,0,0,10,30,20]],
+ Q:[[-20,-10,-10,-5,-5,-10,-10,-20],[-10,0,0,0,0,0,0,-10],[-10,0,5,5,5,5,0,-10],[-5,0,5,5,5,5,0,-5],[0,0,5,5,5,5,0,-5],[-10,5,5,5,5,5,0,-10],[-10,0,5,0,0,0,0,-10],[-20,-10,-10,-5,-5,-10,-10,-20]],
+ R:[[0,0,0,0,0,0,0,0],[5,10,10,10,10,10,10,5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[0,0,0,5,5,0,0,0]],
+ B:[[-20,-10,-10,-10,-10,-10,-10,-20],[-10,0,0,0,0,0,0,-10],[-10,0,5,10,10,5,0,-10],[-10,5,5,10,10,5,5,-10],[-10,0,10,10,10,10,0,-10],[-10,10,10,10,10,10,10,-10],[-10,5,0,0,0,0,5,-10],[-20,-10,-10,-10,-10,-10,-10,-20]],
+ N:[[-50,-40,-30,-30,-30,-30,-40,-50],[-40,-20,0,0,0,0,-20,-40],[-30,0,10,15,15,10,0,-30],[-30,5,15,20,20,15,5,-30],[-30,0,15,20,20,15,0,-30],[-30,5,10,15,15,10,5,-30],[-40,-20,0,5,5,0,-20,-40],[-50,-40,-30,-30,-30,-30,-40,-50]],
+ P:[[0,0,0,0,0,0,0,0],[50,50,50,50,50,50,50,50],[10,10,20,30,30,20,10,10],[5,5,10,25,25,10,5,5],[0,0,0,20,20,0,0,0],[5,-5,-10,0,0,-10,-5,5],[5,10,10,-20,-20,10,10,5],[0,0,0,0,0,0,0,0]]};
+let board, turn, castling={K:true,Q:true,k:true,q:true}, ep=null, halfmove=0, gameOver=false, sel=null, legalMoves=[], pgn=[], depth=3, captured={w:[],b:[]}, kingPos={w:null,b:null}, lastMove=null;
+const GLYPHS={K:'♔',Q:'♕',R:'♖',B:'♗',N:'♘',P:'♙',k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'};
+const FILES='abcdefgh';
+function reset(){
+  board=[
+    ['r','n','b','q','k','b','n','r'],
+    ['p','p','p','p','p','p','p','p'],
+    Array(8).fill(null),Array(8).fill(null),Array(8).fill(null),Array(8).fill(null),
+    ['P','P','P','P','P','P','P','P'],
+    ['R','N','B','Q','K','B','N','R']];
+  turn='w'; castling={K:true,Q:true,k:true,q:true}; ep=null; halfmove=0; gameOver=false; sel=null; legalMoves=[]; pgn=[]; captured={w:[],b:[]}; lastMove=null;
+  kingPos={w:[7,4],b:[0,4]}; render(); updateCaptured(); document.getElementById('msg').textContent='당신 차례 — 흰색 말을 클릭하세요';
+}
+function inB(x,y){ return x>=0&&y>=0&&x<8&&y<8; }
+function own(b,x,y,p){ const c=p==='w'?'P':'p'; return b[y][x]&&b[y][x]===b[y][x].toUpperCase()? (b[y][x]===b[y][x].toUpperCase()?b[y][x].charCodeAt(0)<97:b[y][x].charCodeAt(0)>=97):false; }
+function isWhite(p){ return p>='A'&&p<='Z'; }
+function isBlack(p){ return p>='a'&&p<='z'; }
+function findKing(b,c){ for(let y=0;y<8;y++)for(let x=0;x<8;x++){ const p=b[y][x]; if(p&&((c==='w'&&p==='K')||(c==='b'&&p==='k'))) return [x,y]; } return null; }
+function isCheck(b,c){ const kp=findKing(b,c); if(!kp)return false; const opp=c==='w'?'b':'w';
+  const oc=opp==='w'?'P':'p';
+  // pawn attacks
+  const dir=c==='w'?-1:1;
+  for(const dx of [-1,1]){ const x=kp[0]+dx,y=kp[1]+dir; if(inB(x,y)&&b[y][x]===oc)return true; }
+  for(const [dx,dy] of DIRS.Q){ let x=kp[0]+dx,y=kp[1]+dy; while(inB(x,y)){ const p=b[y][x]; if(p){ const wp=isWhite(p); if(wp=== (opp==='w')){ const t=p.toUpperCase(); if((t==='Q')||(Math.abs(dx)===Math.abs(dy)&&t==='B')||(Math.abs(dx)!==Math.abs(dy)&&t==='R'))return true; } break; } x+=dx;y+=dy; } }
+  for(const [dx,dy] of KN){ const x=kp[0]+dx,y=kp[1]+dy; if(inB(x,y)){ const p=b[y][x]; if(p&&p.toUpperCase()==='N'&&isWhite(p)===(opp==='w'))return true; } }
+  // knight check uses isWhite(p)===(opp==='w')? careful: isWhite returns true if uppercase. opp==='w' means white to check.
+  return false;
+}
+function pseudoMoves(b,c){
+  // returns [fx,fy,tx,ty,promo?] — snapshot moves; castling+ep handled as special moves [fx,fy,tx,ty,'O-O'] etc handled separately
+  const moves=[]; const dir=c==='w'?-1:1;
+  for(let y=0;y<8;y++)for(let x=0;x<8;x++){ const p=b[y][x]; if(!p)continue; const wp=isWhite(p); if(wp!==(c==='w'))continue; const t=p.toUpperCase();
+    const add=(tx,ty,promo=null)=>{ moves.push([x,y,tx,ty,promo]); };
+    if(t==='P'){
+      const sy=c==='w'?6:1; const prom=c==='w'?0:7;
+      if(inB(x,y+dir)&&!b[y+dir][x]){ if(y+dir===prom)add(x,y+dir,'Q'); else add(x,y+dir); if(y===sy&&!b[y+2*dir][x])add(x,y+2*dir); }
+      for(const dx of [-1,1]){ const nx=x+dx,ny=y+dir; if(inB(nx,ny)){ const q=b[ny][nx]; if(q&&isWhite(q)!==wp){ if(ny===prom)add(nx,ny,'Q'); else add(nx,ny); } else if(ep&&nx===ep[0]&&ny===ep[1]){ add(nx,ny,'EP'); } } }
+    } else if(t==='N'){ for(const [dx,dy] of KN){ const nx=x+dx,ny=y+dy; if(inB(nx,ny)&&(!b[ny][nx]||isWhite(b[ny][nx])!==wp))add(nx,ny); } }
+    else if(t==='K'){ for(const [dx,dy] of DIRS.Q){ const nx=x+dx,ny=y+dy; if(inB(nx,ny)&&(!b[ny][nx]||isWhite(b[ny][nx])!==wp))add(nx,ny); } }
+    else { for(const [dx,dy] of DIRS[t]){ let nx=x+dx,ny=y+dy; while(inB(nx,ny)){ const q=b[ny][nx]; if(!q)add(nx,ny); else { if(isWhite(q)!==wp)add(nx,ny); break; } nx+=dx;ny+=dy; } } }
+  }
+  return moves;
+}
+function applySpecial(b,m,undoCastle=null){ // m=[fx,fy,tx,ty,promo]; handles EP; returns captured piece
+  const [fx,fy,tx,ty,promo]=m; const p=b[fy][fx]; let cap=null;
+  if(!p)return null;
+  if(promo==='EP'){ cap=b[fy][tx]; b[fy][tx]=null; b[ty][tx]=p; } else { cap=b[ty][tx]; b[ty][tx]=p; }
+  b[fy][fx]=null;
+  // castling detection: king moves 2 squares
+  if(p.toUpperCase()==='K'&&Math.abs(tx-fx)===2){ if(tx>fx){ b[fy][5]=b[fy][7]; b[fy][7]=null; } else { b[fy][3]=b[fy][0]; b[fy][0]=null; } }
+  return cap;
+}
+function legalMovesFor(b,c){
+  const res=[]; const pm=pseudoMoves(b,c);
+  for(const m of pm){ const [fx,fy,tx,ty,promo]=m; const nb=b.map(r=>r.slice()); const piece=nb[fy][fx]; applySpecial(nb,m);
+    // remove captured king case (illegal)
+    if(!nb.flat().some(q=>q===(c==='w'?'K':'k')))continue;
+    if(!isCheck(nb,c))res.push(m);
+  }
+  // castling
+  const kx=kingPos[c][0], ky=kingPos[c][1]; const k=b[ky][kx];
+  const rights=c==='w'?{K:'K',Q:'Q'}:{K:'k',Q:'q'};
+  if(k&&k.toUpperCase()==='K'&&!isCheck(b,c)){
+    for(const side of ['K','Q']){
+      const r=castling[rights[side]]; if(!r)continue;
+      const dir=side==='K'?1:-1; const rCol=side==='K'?7:0;
+      if(!(c==='w'?b[ky][rCol]==='R':b[ky][rCol]==='r'))continue;
+      const steps=side==='K'?2:3;
+      let ok=true;
+      for(let i=1;i<=steps;i++){ const x=kx+dir*i; if(b[ky][x]){ok=false;break;} }
+      if(!ok)continue;
+      // 통과 칸(i=1,2)이 공격받는지
+      for(let i=1;i<=2;i++){ const x=kx+dir*i; const ck=clonedKing(b,c,kx,ky,x); if(isCheck(ck,c)){ok=false;break;} }
+      if(!ok)continue;
+      res.push([kx,ky,kx+dir*2,ky,side==='K'?'O-O':'O-O-O']);
+    }
+  }
+  return res;
+}
+function clonedKing(b,c,kx,ky,nx){ const nb=b.map(r=>r.slice()); nb[ky][nx]=nb[ky][kx]; nb[ky][kx]=null; return nb; }
+function anyLegal(b,c){ return legalMovesFor(b,c).length>0; }
+function inCheckMate(b,c){ return isCheck(b,c)&&!anyLegal(b,c); }
+function inStaleMate(b,c){ return !isCheck(b,c)&&!anyLegal(b,c); }
+// ============ AI ============
+function evalBoard(b){
+  let s=0;
+  for(let y=0;y<8;y++)for(let x=0;x<8;x++){ const p=b[y][x]; if(!p)continue; const wp=isWhite(p); const t=p.toUpperCase();
+    const val=PW[t]; if(!val)continue;
+    const pst=PST[t]; const yy=wp?y:7-y;
+    if(wp)s+=val+pst[yy][x]; else s-=val+pst[yy][x];
+  }
+  return s;
+}
+function minimax(b,c,depth,alpha,beta){
+  if(depth===0)return evalBoard(b);
+  const moves=legalMovesFor(b,c);
+  if(!moves.length)return isCheck(b,c)?(c==='w'?-100000- (10-depth):100000+(10-depth)) : 0;
+  const opp=c==='w'?'b':'w';
+  if(c==='w'){ let best=-Infinity; for(const m of moves){ const nb=b.map(r=>r.slice()); applySpecial(nb,m); best=Math.max(best,minimax(nb,opp,depth-1,alpha,beta)); alpha=Math.max(alpha,best); if(alpha>=beta)break; } return best; }
+  else { let best=Infinity; for(const m of moves){ const nb=b.map(r=>r.slice()); applySpecial(nb,m); best=Math.min(best,minimax(nb,opp,depth-1,alpha,beta)); beta=Math.min(beta,best); if(alpha>=beta)break; } return best; }
+}
+function aiMove(){
+  const moves=legalMovesFor(board,'b'); if(!moves.length)return null;
+  // sort captures first for better pruning
+  const scored=moves.map(m=>({m,s:board[m[3]][m[2]]?(PW[board[m[3]][m[2]].toUpperCase()]||0):0})).sort((a,b)=>b.s-a.s);
+  let best=null,bestVal=Infinity;
+  for(const {m} of scored){ const nb=board.map(r=>r.slice()); applySpecial(nb,m); const v=minimax(nb,'w',depth-1,-Infinity,Infinity); if(v<bestVal){bestVal=v;best=m;} }
+  return best;
+}
+// ============ 렌더링 ============
+const boardEl=document.getElementById('board');
+function render(){
+  boardEl.innerHTML='';
+  for(let y=0;y<8;y++)for(let x=0;x<8;x++){ const d=document.createElement('div'); d.className='cell '+( (x+y)%2?'d':'l');
+    const p=board[y][x];
+    if(p){ d.textContent=GLYPHS[p]; d.classList.add(isWhite(p)?'pw':'pb'); }
+    if(lastMove&&((lastMove[0]===x&&lastMove[1]===y)||(lastMove[2]===x&&lastMove[3]===y)))d.classList.add('last');
+    if(sel&&sel[0]===x&&sel[1]===y)d.classList.add('sel');
+    if(sel&&legalMoves.some(m=>m[2]===x&&m[3]===y)){ d.classList.add('mv'); }
+    if(turn==='w'&&!gameOver&&isWhite(p)&&p==='P'){ } // pawn highlight unneeded
+    if(turn==='w'&&!gameOver&&p&&isWhite(p)){ d.dataset.piece='1'; }
+    const kp=kingPos[turn];
+    if(kp&&p&&p.toUpperCase()==='K'&&isWhite(p)=== (turn==='w')&&isCheck(board,turn))d.classList.add('check');
+    d.onclick=()=>onClick(x,y);
+    boardEl.appendChild(d);
+  }
+}
+function onClick(x,y){
+  if(gameOver||turn!=='w')return;
+  const p=board[y][x];
+  if(sel){ const mv=legalMoves.find(m=>m[2]===x&&m[3]===y); if(mv){ doMove(mv,true); return; } }
+  if(p&&isWhite(p)){ sel=[x,y]; legalMoves=legalMovesFor(board,'w'); } else { sel=null; legalMoves=[]; }
+  render();
+}
+function doMove(m,fromUser){
+  const [fx,fy,tx,ty,promo]=m; const piece=board[fy][fx]; const cap=applySpecial(board,m);
+  const wp=isWhite(piece);
+  if(cap&&!wp)captured.w.push(cap); else if(cap&&wp)captured.b.push(cap);
+  // update king pos
+  if(piece.toUpperCase()==='K')kingPos[wp?'w':'b']=[tx,ty];
+  // castling rights
+  if(piece==='K')castling.K=castling.Q=false; if(piece==='k')castling.k=castling.q=false;
+  if(fx===0&&fy===0)castling.Q=false; if(fx===7&&fy===0)castling.K=false;
+  if(fx===0&&fy===7)castling.q=false; if(fx===7&&fy===7)castling.k=false;
+  // ep target
+  ep=null; if(piece.toUpperCase()==='P'&&Math.abs(ty-fy)===2)ep=[fx,(fy+ty)/2];
+  if(promo==='EP')board[fy][fx]=null; // removed in applySpecial already
+  lastMove=m; pgn.push(moveSAN(m,piece,cap)); halfmove++;
+  sel=null; legalMoves=[];
+  if(fromUser){ turn='b'; render(); updateCaptured(); document.getElementById('msg').textContent='컴퓨터 차례…'; setTimeout(aiTurn,400); } else render();
+}
+function aiTurn(){
+  if(inCheckMate(board,'b')){ gameOver=true; document.getElementById('msg').textContent='🏆 체크메이트! 당신 승리!'; render(); return; }
+  if(!anyLegal(board,'b')){ gameOver=true; document.getElementById('msg').textContent='스테일메이트 — 무승부'; render(); return; }
+  const mv=aiMove(); if(mv){ doMove(mv,false); }
+  updateCaptured();
+  if(inCheckMate(board,'w')){ gameOver=true; document.getElementById('msg').textContent='🤖 체크메이트! 컴퓨터 승리'; render(); return; }
+  if(!anyLegal(board,'w')){ gameOver=true; document.getElementById('msg').textContent='스테일메이트 — 무승부'; render(); return; }
+  document.getElementById('msg').textContent=isCheck(board,'w')?'⚠️ 체크! 당신 차례':'당신 차례';
+  render();
+}
+function moveSAN(m,piece,cap){
+  const [fx,fy,tx,ty,promo]=m; const t=piece.toUpperCase();
+  if(promo==='O-O')return 'O-O'; if(promo==='O-O-O')return 'O-O-O';
+  const capS=cap?'x':'';
+  const promoQ=promo==='EP'? '':('='+ (promo?promo:''));
+  return (t==='P'?(cap?FILES[fx]:(promo==='EP'?FILES[fx]:'')):t)+capS+FILES[tx]+(8-ty)+promoQ;
+}
+function updateCaptured(){
+  const order=['Q','R','B','N','P'].map(t=>captured.b.filter(p=>p.toUpperCase()===t).map(p=>GLYPHS[p.toUpperCase()]).join('')).join('');
+  const order2=['Q','R','B','N','P'].map(t=>captured.w.filter(p=>p.toUpperCase()===t).map(p=>GLYPHS[p.toUpperCase()]).join('')).join('');
+  document.getElementById('capW').textContent='♙ '+order2;
+  document.getElementById('capB').textContent=order+' ♟';
+  const bw=evalBoard(board); document.getElementById('score').textContent=(bw>0?'+':'')+(bw/100).toFixed(1)+' : '+((bw>0?'':'+')+(-bw/100).toFixed(1));
+  document.getElementById('pgn').textContent=pgn.length?pgn.map((s,i)=>((i%2===0)?Math.floor(i/2)+1+'.':'')+' '+s).join(' '):'—';
+}
+document.getElementById('restart').addEventListener('click',()=>{ reset(); });
+document.getElementById('dEasy').addEventListener('click',e=>{ depth=2; document.getElementById('dEasy').classList.add('active'); document.getElementById('dHard').classList.remove('active'); });
+document.getElementById('dHard').addEventListener('click',e=>{ depth=3; document.getElementById('dEasy').classList.remove('active'); document.getElementById('dHard').classList.add('active'); });
+reset();
+</script>
+</body>
+</html>

@@ -502,5 +502,13 @@
     "path": "C:/hermes/projects/othello",
     "created": "2026-09-02",
     "updated": "2026-09-02 09:20"
+  },
+  {
+    "name": "Chess",
+    "status": "active",
+    "description": "체스 풀규칙 + 미니맥스 AI",
+    "path": "C:/hermes/projects/chess",
+    "created": "2026-09-02",
+    "updated": "2026-09-02 09:25"
   }
 ]
