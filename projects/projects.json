@@ -494,5 +494,13 @@
     "path": "C:/hermes/projects/deck",
     "created": "2026-09-01",
     "updated": "2026-09-01 11:44"
+  },
+  {
+    "name": "Othello",
+    "status": "active",
+    "description": "미니맥스+알파베타 AI 전략 게임",
+    "path": "C:/hermes/projects/othello",
+    "created": "2026-09-02",
+    "updated": "2026-09-02 09:20"
   }
 ]

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Othello</title>
+<style>
+:root { --bg:#0b0e16; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; --accent:#4ade80; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-serif; display:flex; flex-direction:column; align-items:center; gap:12px; padding:16px; }
+h1{ font-size:19px; letter-spacing:2px; } h1 span{ color:var(--accent); }
+.sub{ color:var(--muted); font-size:12px; }
+.wrap{ display:flex; gap:16px; flex-wrap:wrap; justify-content:center; align-items:flex-start; }
+#board{ background:#0f8b5f; border:1px solid #0c6b49; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.4); }
+.side{ display:flex; flex-direction:column; gap:10px; min-width:180px; }
+.panel{ background:var(--card); border:1px solid var(--border); border-radius:10px; padding:12px; }
+.score{ display:flex; gap:14px; align-items:center; font-size:14px; justify-content:space-around; }
+.disc{ width:16px; height:16px; border-radius:50%; display:inline-block; vertical-align:-2px; }
+.b{ background:#111; border:1px solid #555; } .w{ background:#fff; }
+.btn{ background:#16223a; color:#e5e7eb; border:1px solid var(--border); border-radius:8px; padding:7px 12px; cursor:pointer; font-size:13px; width:100%; }
+.btn:hover{ background:#1f3050; }
+.hint{ color:var(--muted); font-size:11px; line-height:1.7; }
+.msg{ min-height:24px; font-size:14px; color:#9fb0c8; text-align:center; }
+</style>
+</head>
+<body>
+<h1>OTHELLO <span>::</span> REVERSI</h1>
+<div class="sub">검정(당신) vs 흰(컴퓨터) — 알파베타 가지치기 미니맥스</div>
+<div class="msg" id="msg">당신이 먼저, 검정돌을 놓으세요</div>
+<div class="wrap">
+  <canvas id="board" width="400" height="400"></canvas>
+  <div class="side">
+    <div class="panel score"><span><span class="disc b"></span><b id="black">2</b></span><span><b id="white">2</b><span class="disc w"></span></span></div>
+    <div class="panel"><h4 style="font-size:12px;color:var(--muted);margin-bottom:6px">난이도</h4>
+      <div style="display:flex;gap:6px">
+        <button class="btn" id="dEasy" style="font-size:11px">쉬움</button>
+        <button class="btn" id="dMed" style="font-size:11px">보통</button>
+        <button class="btn active" id="dHard" style="font-size:11px">어려움</button>
+      </div>
+    </div>
+    <button class="btn" id="restart">🔄 새 게임</button>
+    <div class="hint">유효한 칸(연두 순록)을 클릭하세요.<br>방향키 없음 — 클릭만.<br>컴퓨터는 미니맥스 + 알파베타로 최선수를 둡니다.</div>
+  </div>
+</div>
+<script>
+const S=8, CS=50;
+const cv=document.getElementById('board'), g=cv.getContext('2d');
+let board, turn, over, depth=4;
+const DIR=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+const CORNER_WEIGHT=[
+  [120,-20,20,5,5,20,-20,120],[-20,-40,-5,-5,-5,-5,-40,-20],
+  [20,-5,15,3,3,15,-5,20],[5,-5,3,3,3,3,-5,5],[5,-5,3,3,3,3,-5,5],
+  [20,-5,15,3,3,15,-5,20],[-20,-40,-5,-5,-5,-5,-40,-20],[120,-20,20,5,5,20,-20,120]
+];
+function reset(){ board=Array.from({length:S},()=>Array(S).fill(null)); board[3][3]=board[4][4]='w'; board[3][4]=board[4][3]='b'; turn='b'; over=false; draw(); updateScores(); document.getElementById('msg').textContent='당신이 먼저, 검정돌을 놓으세요'; }
+function inB(x,y){ return x>=0&&y>=0&&x<S&&y<S; }
+function flipped(board,player,x,y){
+  if(board[y][x]!==null)return [];
+  const opp=player==='b'?'w':'b'; const result=[];
+  for(const [dx,dy] of DIR){ let nx=x+dx, ny=y+dy, found=[]; while(inB(nx,ny)&&board[ny][nx]===opp){ found.push([nx,ny]); nx+=dx; ny+=dy; } if(inB(nx,ny)&&board[ny][nx]===player&&found.length) result.push(...found); }
+  return result;
+}
+function valid(board,player){ const r=[]; for(let y=0;y<S;y++)for(let x=0;x<S;x++) if(flipped(board,player,x,y).length) r.push([x,y]); return r; }
+function applyMove(board,player,x,y){ const fl=flipped(board,player,x,y); if(!fl.length)return false; board[y][x]=player; fl.forEach(([fx,fy])=>board[fy][fx]=player); return true; }
+// ----- AI: minimax + alpha-beta -----
+function evaluate(b){ let s=0; for(let y=0;y<S;y++)for(let x=0;x<S;x++){ if(b[y][x]==='b')s+=CORNER_WEIGHT[y][x]; else if(b[y][x]==='w')s-=CORNER_WEIGHT[y][x]; } return s; }
+function hasMove(b,p){ return valid(b,p).length>0; }
+function minimax(b,player,depth,alpha,beta){
+  const moves=valid(b,player);
+  if(depth===0||moves.length===0){ // terminal-ish
+    const bCnt=b.flat().filter(v=>v==='b').length, wCnt=b.flat().filter(v=>v==='w').length;
+    if(moves.length===0&&!hasMove(b,player==='b'?'w':'b')) return (bCnt>wCnt?10000:(bCnt<wCnt?-10000:0));
+    return evaluate(b);
+  }
+  const opp=player==='b'?'w':'b';
+  if(player==='b'){ // max for black
+    let best=-Infinity;
+    for(const [x,y] of moves){ const nb=b.map(r=>r.slice()); applyMove(nb,player,x,y); best=Math.max(best,minimax(nb,opp,depth-1,alpha,beta)); alpha=Math.max(alpha,best); if(alpha>=beta)break; }
+    return best;
+  } else {
+    let best=Infinity;
+    for(const [x,y] of moves){ const nb=b.map(r=>r.slice()); applyMove(nb,player,x,y); best=Math.min(best,minimax(nb,opp,depth-1,alpha,beta)); beta=Math.min(beta,best); if(alpha>=beta)break; }
+    return best;
+  }
+}
+function aiMove(){
+  const moves=valid(board,'w');
+  if(!moves.length)return null;
+  let bestMove=moves[0], bestVal=Infinity;
+  for(const [x,y] of moves){ const nb=board.map(r=>r.slice()); applyMove(nb,'w',x,y); const v=minimax(nb,'b',depth-1,-Infinity,Infinity); if(v<bestVal){ bestVal=v; bestMove=[x,y]; } }
+  return bestMove;
+}
+// ----- rendering -----
+function draw(){
+  g.fillStyle='#0f8b5f'; g.fillRect(0,0,400,400);
+  g.strokeStyle='#0c6b49'; g.lineWidth=1;
+  for(let i=0;i<=S;i++){ g.beginPath(); g.moveTo(i*CS,0); g.lineTo(i*CS,400); g.stroke(); g.beginPath(); g.moveTo(0,i*CS); g.lineTo(400,i*CS); g.stroke(); }
+  const validMoves = turn==='b'&&!over? valid(board,'b'):[];
+  validMoves.forEach(([x,y])=>{ g.fillStyle='rgba(74,222,128,.4)'; g.beginPath(); g.arc(x*CS+CS/2,y*CS+CS/2,CS/2-8,0,7); g.fill(); });
+  for(let y=0;y<S;y++)for(let x=0;x<S;x++){ const v=board[y][x]; if(v){ g.shadowBlur=8; g.shadowColor='rgba(0,0,0,.5)'; g.fillStyle=v==='b'?'#111':'#fff'; g.beginPath(); g.arc(x*CS+CS/2,y*CS+CS/2,CS/2-6,0,7); g.fill(); g.shadowBlur=0; } }
+}
+function updateScores(){ const b=board.flat().filter(v=>v==='b').length, w=board.flat().filter(v=>v==='w').length; document.getElementById('black').textContent=b; document.getElementById('white').textContent=w; }
+function checkEnd(){
+  const bM=valid(board,'b').length, wM=valid(board,'w').length;
+  if(bM===0&&wM===0){ over=true; const b=board.flat().filter(v=>v==='b').length, w=board.flat().filter(v=>v==='w').length; document.getElementById('msg').textContent = b>w?`🏆 당신 승리! (${b}:${w})`:(w>b?`🤖 컴퓨터 승리 (${b}:${w})`:'🤝 무승부'); draw(); return true; }
+  return false;
+}
+function onCell(r,c){ // returns has user moved
+  if(over||turn!=='b')return;
+  const fl=flipped(board,'b',c,r); if(!fl.length)return;
+  applyMove(board,'b',c,r); turn='w'; draw(); updateScores();
+  if(checkEnd()){ turn=null; return; }
+  document.getElementById('msg').textContent='컴퓨터 차례…';
+  setTimeout(()=>{ if(valid(board,'w').length===0){ document.getElementById('msg').textContent='컴퓨터 패스, 당신 차례'; turn='b'; draw(); return; } const mv=aiMove(); if(mv){ applyMove(board,'w',mv[0],mv[1]); } turn='b'; draw(); updateScores(); if(checkEnd())return; document.getElementById('msg').textContent='당신 차례'; }, 350);
+}
+cv.addEventListener('click',e=>{ const r=cv.getBoundingClientRect(); const x=Math.floor((e.clientX-r.left)/CS), y=Math.floor((e.clientY-r.top)/CS); onCell(y,x); });
+document.getElementById('restart').addEventListener('click',reset);
+document.getElementById('dEasy').addEventListener('click',e=>{ depth=2; diffBtn(e.target); });
+document.getElementById('dMed').addEventListener('click',e=>{ depth=3; diffBtn(e.target); });
+document.getElementById('dHard').addEventListener('click',e=>{ depth=4; diffBtn(e.target); });
+function diffBtn(el){ ['dEasy','dMed','dHard'].forEach(i=>document.getElementById(i).classList.remove('active')); el.classList.add('active'); }
+reset();
+</script>
+</body>
+</html>
