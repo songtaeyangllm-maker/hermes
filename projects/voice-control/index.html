@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Voice Control</title>
+<style>
+:root { --bg:#0b0e16; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; --accent:#f472b6; --good:#4ade80; }
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:32px}h1{font-size:28px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}.sub{color:var(--muted);font-size:14px;margin-bottom:32px}.status{font-size:18px;color:var(--good);margin:32px 0}.listen-btn{background:var(--accent);color:#0b0e16;border:none;padding:16px 32px;font-size:18px;font-weight:bold;cursor;border-radius:8px;transition:opacity .2s}.listen-btn:hover{opacity:.9}.listen-btn:disabled{opacity:.5;cursor:not-allowed}.output{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;width:100%;max-width:600px;min-height:150px;overflow:auto;margin-top:32px}.command{background:#0d1322;border-radius:6px;padding:8px 12px;font-family:Consolas,monospace;font-size:14px;color:#c9d1d9;margin:4px 0}.break{height:1px;background:var(--border);margin:8px 0}.footer{margin-top:32px;color:var(--muted);font-size:12px;text-align:center}.mic-active{animation:pulse 1s ease-in-out infinite}.@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.2)}100%{transform:scale(1)}}</style>
+</head>
+<body>
+<h1>VOICE <span>CONTROL</span></h1>
+<div class="sub">브라우저 음성 인식으로 명령 제어</div>
+<div class="status" id="status">인식 대기 중...</div>
+<button class="listen-btn" id="listenBtn" disabled>음성 인식 시작</button>
+<div class="output" id="output">명령어를 말씀해 주세요...</div>
+<script>
+// 체크: 브라우저가 speechSynthesis 지원 여부
+const supportsSpeech = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+if(!supportsSpeech){document.getElementById('status').textContent='이 브라우저는 음성 인식을 지원하지 않습니다.';document.getElementById('listenBtn').disabled=true}else{
+  const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+  recognition.continuous=false;
+  recognition.interimResults=false;
+  recognition.lang='ko-KR';
+  const recognitionBtn=document.getElementById('listenBtn');
+  const output=document.getElementById('output');
+  recognition.onstart=function(){document.getElementById('status').textContent='청취 중...';recognitionBtn.classList.add('mic-active');};
+  recognition.onerror=function(event){document.getElementById('status').textContent='오류: '+event.error;recognitionBtn.classList.remove('mic-active');};
+  recognition.onresult=function(event){const transcript=event.results[0][0].transcript.trim();document.getElementById('output').innerHTML+='<div class="command">익명: '+transcript+'</div>';processCommand(transcript);};
+  recognition.onend=function(){document.getElementById('status').textContent='인식 중단';recognitionBtn.classList.remove('mic-active');setTimeout(()=>recognition.start(),3000)};
+  recognitionBtn.onclick=function(){if(recognition){if(recognition.recognizing){recognition.stop();document.getElementById('status').textContent='인식 일시중단';recognitionBtn.textContent='음성 인식 시작';recognitionBtn.classList.remove('mic-active')}else{recognition.start();document.getElementById('status').textContent='청취 중...';recognitionBtn.textContent='청취 중단';recognitionBtn.classList.add('mic-active')}}};
+}
+// 명령 처리
+function processCommand(cmd){const lower=cmd.toLowerCase();if(lower.includes('중지')||lower.includes('그만')||lower.includes('끝')){document.getElementById('status').textCommand='인식 일시중단';recognition.stop()}else if(lower.includes('시작')||lower.includes('실행')){document.getElementById('status').textContent='명령 실행됨';}else if(lower.includes('일시중단')||lower.includes('일시 정지')){document.getElementById('status').textCommand='일시중간';}else{document.getElementById('output').innerHTML+='<div class="command">알 수 없는 명령</div>'}}
+document.getElementById('listenBtn').disabled=!supportsSpeech;document.getElementById('listenBtn').onclick=function(){if(recognition.recognizing){recognition.stop()}else{recognition.start()}}
+</script>
+</body>
+</html>
