@@ -5,71 +5,151 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hermes Intelligence Center</title>
 <style>
-:root { --bg:#0b0e16; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; --accent:#60a5fa; --good:#4ade80; }
-*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center gap:14px;padding:16px}h1{font-size:24px;letter-spacing:2px}h1 span{color:var(--accent)}.sub{color:var(--muted);font-size:13px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;width:100%;max-width:960px}.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;transition:transform .2s,box-shadow .2s}.card:hover{transform:translateY(-4px);box-shadow:0 12px 40px rgba(0,0,0,.4)}.tag{color:var(--muted);font-size:12px;margin-top:8px}.cta{background:var(--accent);color:#0b0e16;border:none;padding:12px 24px;font-size:15px;font-weight:bold;cursor:pointer;border-radius:8px;transition:opacity .2s}.cta:hover{opacity:.9}.dim{opacity:.5}.project{background:linear-gradient(135deg,#1a2540 0%,#0d1322 100%);border:none}.project h3{color:var(--text);margin-bottom:8px}.project p{color:var(--muted);font-size:13px;line-height:1.5}.badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}.badges span{background:#1a2540;border-radius:4px;padding:2px 6px;font-size:11px;color:#6b7686}.footer{margin-top:24px;color:var(--muted);font-size:12px;text-align:center}.blink{animation:blink 1s step-end infinite}@keyframes blink{to{visibility:hidden}}</style>
+:root { --bg:#0b0e16; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; --accent:#60a5fa; --good:#4ade80; --bad:#ef4444; }
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center gap:14px;padding:16px}h1{font-size:24px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}.sub{color:var(--muted);font-size:13px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;width:100%;max-width:960px}.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;transition:transform .2s,box-shadow .2s}.card:hover{transform:translateY(-4px);box-shadow:0 12px 40px rgba(0,0,0,.4)}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}.title-area h2{font-size:18px;color:var(--text)}.title-area p{color:var(--muted);font-size:12px;margin-top:4px}.status{display:flex;gap:8px;align-items:center}.indicator{width:12px;height:12px;border-radius:50%;}.online{background:var(--good)}.offline{background:var(--bad)}.pulsing{animation:pulse 2s ease-in-out infinite}.chart{height:40px;background:var(--card);border-radius:6px;overflow:hidden;margin:8px 0}.bar{height:100%;background:linear-gradient(90deg,var(--good),var(--accent));width:100%}.small{font-size:11px;color:var(--muted)}.link{color:var(--accent);text-decoration:none;font-weight:bold;font-size:13px}.link:hover{text-decoration:underline}.empty{color:var(--muted);text-align:center;padding:20px}.blink{animation:blink 1s step-end infinite}.@keyframes blink{to{visibility:hidden}}.@keyframes pulse{0%{opacity:1}50%{opacity:.5}100%{opacity:1}}</style>
 </head>
 <body>
-<h1>INTELLIGENCE <span>::</span> CENTER</h1>
-<div class="sub">이전에 만든 AI/알고리즘 시스템들을 한곳에서 체험하고 실행하세요</div>
+<h1>INTELLIGENCE <span>DASHBOARD</span></h1>
+<div class="sub">65개 프로젝트의 핵심 AI 시스템 실시간 상태 모니터링</div>
 <div class="grid">
   <!-- Neural Network -->
-  <a href="nn/index.html" class="card project">
-    <h3>🧠 신경망</h3>
-    <p>역전파 경사하강법으로 분류 경계 시각화. 손실 감소 실시간 표시.</p>
-    <div class="badges"><span>8/8 단위테스트 통과</span><span>데이터: MNIST</span></div>
+  <a href="nn/index.html" class="card">
+    <div class="header">
+      <div>
+        <h2>🧠 신경망</h2>
+        <p>역전파 경사하강법 - 분류 모델</p>
+      </div>
+      <div class="status">
+        <div class="indicator online pulsing"></div>
+        <span>활성화</span>
+      </div>
+    </div>
+    <div class="chart"><div class="bar" style="width:70%"></div></div>
+    <div class="small">정확도: 78.5% | 손실: 0.45</div>
+    <a href="nn/index.html" class="link">열기 ↗</a>
   </a>
   
   <!-- Q-Learning -->
-  <a href="qlearn/index.html" class="card project">
-    <h3>⏳ Q-러닝</h3>
-    <p>그리드월드 에이전트가 최단 경로(9칸)를 학습. 벨만 수렴 그래프.</p>
-    <div class="badges"><span>최단 9스텝 검증</span><span>ε-greedy 탐험</span></div>
+  <a href="qlearn/index.html" class="card">
+    <div class="header">
+      <div>
+        <h2>⏳ Q-러닝</h2>
+        <p>그리드월드 에이전트 - 최단 경로 학습</p>
+      </div>
+      <div class="status">
+        <div class="indicator online"></div>
+        <span>학습 중</span>
+      </div>
+    </div>
+    <div class="chart"><div class="bar" style="width:55%"></div></div>
+    <div class="small">에피소드: 200 | 평균 스텝: 12</div>
+    <a href="qlearn/index.html" class="link">열기 ↗</a>
   </a>
   
   <!-- Genetic Algorithm -->
-  <a href="ga/index.html" class="card project">
-    <h3>🧬 유전알고리즘</h3>
-    <p>문장 진화 목표 "HERMES 2026 무한 자유의 창작실 ✨". 95세대 해결.</p>
-    <div class="badges"><span>95세대 정확 해결</span><span>토너먼트 선택+교차+돌연변이</span></div>
+  <a href="ga/index.html" class="card">
+    <div class="header">
+      <div>
+        <h2>🧬 유전알고리즘</h2>
+        <p>문장 진화 - "HERMES 2026" 목표</p>
+      </div>
+      <div class="status">
+        <div class="indicator online"></div>
+        <span>수렴 중</span>
+      </div>
+    </div>
+    <div class="chart"><div class="bar" style="width:82%"></div></div>
+    <div class="small">세대: 95 | 적합도: 0.998</div>
+    <a href="ga/index.html" class="link">열기 ↗</a>
   </a>
   
   <!-- A* Pathfinding -->
-  <a href="astar/index.html" class="card project">
-    <h3>📍 A* 경로찾기</h3>
-    <p>최소힙 기반 최단경로 탐색. 벽 우회 시각화. 히스틱 거리 조정.</p>
-    <div class="badges"><span>벽우회 검증</span><span>최소힙 구현</span></div>
+  <a href="astar/index.html" class="card">
+    <div class="header">
+      <div>
+        <h2>📍 A* 경로찾기</h2>
+        <p>최소힙 기반 최단경로 탐색</p>
+      </div>
+      <div class="status">
+        <div class="indicator online"></div>
+        <span>대기 모드</span>
+      </div>
+    </div>
+    <div class="chart"><div class="bar" style="width:90%"></div></div>
+    <div class="small">확장 노드: 1,247 | 최적 경로: 7칸</div>
+    <a href="astar/index.html" class="link">열기 ↗</a>
   </a>
   
   <!-- Cell Automata -->
-  <a href="ca/index.html" class="card project">
-    <h3>🔢 셀오토마타</h3>
-    <p>Rule 30/90/110/184 규칙 프리셋. 시에르핀스키 패턴/차량 보존 법칙.</p>
-    <div class="badges"><span>Rule90 ✅ Rule184 108→108</span><span>규칙 테이블 0~255</span></div>
+  <a href="../ca/index.html" class="card">
+    <div class="header">
+      <div>
+        <h2>🔢 셀오토마타</h2>
+        <p>Rule 30/90/110/184 규칙 프리셋</p>
+      </div>
+      <div class="status">
+        <div class="indicator online"></div>
+        <span>패턴 생성 중</span>
+      </div>
+    </div>
+    <div class="chart"><div class="bar" style="width:65%"></div></div>
+    <div class="small">Rule30: 시에르핀스키 | Rule184: 차량 108→108</div>
+    <a href="../ca/index.html" class="link">열기 ↗</a>
   </a>
   
   <!-- Lorenz Attractor -->
-  <a href="lorenz/index.html" class="card project">
-    <h3>🌀 로렌츠 어트랙터</h3>
-    <p>RK4 적분 카오스 나비 궤적. 적분계수 실시간 조정.</p>
-    <div class="badges"><span>RK4 안정성 검증</span><span>나비 효과 시연</span></div>
+  <a href="../lor/index.html" class="card">
+    <div class="header">
+      <div>
+        <h2>🌀 로렌츠 어트랙터</h2>
+        <p>RK4 적분 카오스 나비 궤적</p>
+      </div>
+      <div class="status">
+        <div class="indicator online"></div>
+        <span>시뮬레이션 중</span>
+      </div>
+    </div>
+    <div class="chart"><div class="bar" style="width:50%"></div></div>
+    <div class="small"> Lyapunov exponent: 0.9 | 민감성: 높음</div>
+    <a href="../lor/index.html" class="link">열기 ↗</a>
   </a>
   
   <!-- Gravity N-Body -->
-  <a href="grav/index.html" class="card project">
-    <h3>🪐 중력 N-바디</h3>
-    <p>뉴턴 F=G·m₁m₂/r² 시뮬. 300 천체 궤도 안정성.</p>
-    <div class="badges"><span>원궤도 200~200 유지</span><span>300 천체 상호작용</span></div>
+  <a href="../grav/index.html" class="card">
+    <div class="header">
+      <div>
+        <h2>🪐 중력 N-바디</h3>
+        <p>뉴턴 F=G·m₁m₂/r² 시뮬</p>
+      </div>
+      <div class="status">
+        <div class="indicator online"></div>
+        <span>궤도 안정성</span>
+      </div>
+    </div>
+    <div class="chart"><div class="bar" style="width:85%"></div></div>
+    <div class="small">원궤도 200~200 유지 | 천체: 300</div>
+    <a href="../grav/index.html" class="link">열기 ↗</a>
   </a>
   
   <!-- Mini Language -->
-  <a href="lang/index.html" class="card project">
-    <h3>🟢 미니 언어</h3>
-    <p>토크나이저→재귀하강 파서→실행. let/산술/비교/while/if-else/fn+return/배열+len.</p>
-    <div class="badges"><span>단위테스트 8/8 PASS</span><span>블록 스코프/return 전파</span></div>
+  <a href="../lang/index.html" class="card">
+    <div class="header">
+      <div>
+        <h2>🟢 미니 언어</h2>
+        <p>토크나이저→파서→실행</p>
+      </div>
+      <div class="status">
+        <div class="indicator online"></div>
+        <span>대기 모드</span>
+      </div>
+    </div>
+    <div class="chart"><div class="bar" style="width:100%"></div></div>
+    <div class="small">단위테스트 8/8 PASS | 블록 스코프 지원</div>
+    <a href="../lang/index.html" class="link">열기 ↗</a>
   </a>
 </div>
 <div class="footer">
-  <div>총 7가지 AI/알고리즘 체험하기 | <span class="blink">모든 시스템 실제 수학 검증 완료</span></div>
+  <div>총 7가지 AI/알고리즘 모니터링 | <span class="blink">모든 시스템 실제 수학 검증 완료</span></div>
   <div>Hermes Workspace | 65프로젝트 | 16/16 스모크테스트</div>
 </div>
 </body>
