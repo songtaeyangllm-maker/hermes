@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Focus Timer</title>
+<style>
+:root { --bg:#0b0e16; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; --accent:#f472b6; --good:#4ade80; }
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:32px}h1{font-size:28px;letter-spacing:2px;margin-bottom:4px}.sub{color:var(--muted);font-size:14px;margin-bottom:32px}.timer{font-family:Consolas,monospace;font-size:72px;font-weight:bold;color:var(--text);letter-spacing:4px;margin:32px 0}.controls{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}.btn{background:var(--accent);color:#0b0e16;border:none;padding:16px 32px;font-size:18px;font-weight:bold;cursor:border-radius:8px;transition:opacity .2s}.btn:hover{opacity:.9}.btn:disabled{opacity:.5;cursor:not-allowed}.session{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;margin:32px 0}.session p{color:var(--muted);font-size:14px;margin:8px 0}.history{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;margin-top:32px}.history p{color:var(--muted);font-size:13px;margin:4px 0}.empty{color:var(--muted);text-align:center;padding:20px}.badge{background:var(--card2);border-radius:4px;padding:4px 8px;font-size:11px;color:var(--muted);margin:2px}.footer{margin-top:32px;color:var(--muted);font-size:12px;text-align:center}.link{color:var(--accent);text-decoration:none;font-weight:bold;font-size:13px}.link:hover{text-decoration:underline}</style>
+</head>
+<body>
+<h1>FOCUS <span>TIMER</span></h1>
+<div class="sub">25분专注·5분 휴식·무한 루프</div>
+<div class="timer" id="timer">25:00</div>
+<div class="controls">
+  <button class="btn" id="startBtn">시작</button>
+  <button class="btn" id="pauseBtn" disabled>일시정지</button>
+  <button class="btn" id="resetBtn">초기화</button>
+</div>
+<div class="session" id="sessionInfo">
+  <p>현재 세션: 집중 25분</p>
+</div>
+<div class="history">
+  <p>이력:</p>
+  <div id="historyList" class="empty">세션 이력이 없습니다</div>
+</div>
+<script>
+let remaining = 25 * 60;
+let interval = null;
+let isRunning = false;
+let history = JSON.parse(localStorage.getItem('focusHistory')||'[]');
+
+function formatTime(s){const m=String(Math.floor(s/60)).padStart(2,'0');const sec=String(s%60).padStart(2,'0');return m+':'+sec;}
+
+function updateTimer(){document.getElementById('timer').textContent=formatTime(remaining)}
+
+function tick(){remaining--;updateTimer();if(remaining<=0){clearInterval(interval);isRunning=false;document.getElementById('startBtn').disabled=false;document.getElementById('pauseBtn').disabled=true;document.getElementById('timer').textContent='00:00';document.getElementById('sessionInfo').innerHTML='<p>⏰ 시간 종료!</p><p>휴식 시간 5분을 시작합니다.</p>'; playSound(); setTimeout(startBreak,5000)}}
+
+function playSound(){try{const ac=new(AudioContext||window.webkitAudioContext)();const o=ac.createOscillator();const g=ac.createGain();o.type='sine';o.frequency.value=880;g.gain.value=.2;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.3)}catch(e){}}
+
+function startSession(){isRunning=true;document.getElementById('startBtn').disabled=true;document.getElementById('pauseBtn').disabled=false;interval=setInterval(tick,1000)}
+
+function pauseSession(){clearInterval(interval);isRunning=false;document.getElementById('startBtn').disabled=false;document.getElementById('pauseBtn').disabled=true}
+
+function resetSession(){clearInterval(interval);isRunning=false;remaining=25*60;updateTimer();document.getElementById('startBtn').disabled=false;document.getElementById('pauseBtn').disabled=true;document.getElementById('sessionInfo').innerHTML='<p>현재 세션: 집중 25분</p>';}
+
+function saveHistory(durationMinutes){history.unshift({minutes:durationMinutes,time:new Date().toISOString(),status:'completed'});history=history.slice(0,20);localStorage.setItem('focusHistory',JSON.stringify(history));renderHistory()}
+
+function renderHistory(){const list=document.getElementById('historyList');if(history.length===0){list.innerHTML='<div class="empty">세션 이력이 없습니다</div>';return;}list.innerHTML=history.map((h,i)=>`<div><span>${i+1}회</span><span>${h.minutes}분</span><span>${h.status}</span></div>`).join('')}
+
+document.getElementById('startBtn').onclick=startSession;document.getElementById('pauseBtn').onclick=()=>{clearInterval(interval);isRunning=false;document.getElementById('startBtn').disabled=false;document.getElementById('pauseBtn').disabled=true};document.getElementById('resetBtn').onclick=resetSession;renderHistory()}
+</script>
+</body>
+</html>
