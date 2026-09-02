@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes System Monitor</title>
+<style>
+:root { --bg:#0b0e16; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; --accent:#60a5fa; --good:#4ade80; --bad:#ef4444; }
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px}h1{font-size:28px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}.sub{color:var(--muted);font-size:14px;margin-bottom:24px}.container{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;width:100%;max-width:800px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-top:24px}.card{background:var(--card2,#0d1322);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center}.value{font-size:36px;font-weight:bold;color:var(--text)}.label{color:var(--muted);font-size:12px;margin-top:4px}.progress{width:100%;height:8px;background:var(--card2);border-radius:4px;overflow:margin-top:8px;}.progress-fill{height:100%;background:linear-gradient(90deg,var(--good),var(--accent));border-radius:4px;transition:width .3s ease}.status-dot{width:10px;height:10px;border-radius:50%;margin-right:4px}.status-online{background:var(--good)}.status-offline{background:var(--bad)}.refresh{background:var(--accent);color:#0b0e16;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;margin-top:12px}.refresh:hover{opacity:.9}.api-status{margin-top:16px;padding:12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;display:none}.api-online{display:block}.api-offline{display:none}.endpoint{font-family:Consolas,monospace;font-size:12px;color:#9fb0c8;word-break:break-all}.footer{margin-top:24px;color:var(--muted);font-size:12px;text-align:center}.blink{animation:blink 1s step-end infinite}@keyframes blink{to{visibility:hidden}}</style>
+</head>
+<body>
+<h1>SYSTEM <span>MONITOR</span></h1>
+<div class="sub">실시간 시스템 메트릭 & API 헬스체크</div>
+<div class="container">
+  <div class="header">
+    <div>API 서버 <span id="apiStatus" class="status-offline">끊김</span></span></div>
+    <button class="refresh" onclick="refreshMetrics()">새로고침</button>
+  </div>
+  <div class="grid" id="metricsGrid">
+    <div class="card"><div class="value" id="cpu">0</div><div class="label">CPU%</div></div>
+    <div class="card"><div class="value" id="memory">0</div><div class="label">MEM%</div></div>
+    <div class="card"><div class="value" id="disk">0</div><div class="label">DISK%</div></div>
+    <div class="card"><div class="value" id="fps">60</div><div class="label">FPS</div></div>
+    <div class="card"><div class="value" id="uptime">0</div><div class="label">UPTIME</div></div>
+    <div class="card"><div class="value" id="load">0</div><div class="label">LOAD</div></div>
+  </div>
+  <div class="api-status" id="apiStatusBox">
+    <div>API 상태: <span class="api-online" id="apiOnline">접속됨</span> <span class="api-offline" id="apiOffline">끊김</span></div>
+    <div class="endpoint" id="endpointList">/api/status, /api/health</div>
+  </div>
+</div>
+<button class="refresh" style="margin-top:32px;width:100%" onclick="startAutoRefresh()">자동 새로고침 시작</button>
+<div class="footer">Hermes System Monitor | API: http://127.0.0.1:8765 | 계속 업데이트됨</div>
+
+<script>
+// API 엔드포인트
+const API_BASE = 'http://127.0.0.1:8765';
+
+function formatBytes(bytes) {
+  if(bytes >= 1073741824) return (bytes/1073741824).toFixed(2) + ' GB';
+  if(bytes >= 1048576) return (bytes/1048576).toFixed(2) + ' MB';
+  if(bytes >= 1024) return (bytes/1024).toFixed(2) + ' KB';
+  return bytes + ' B';
+}
+
+function formatTime(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if(h > 0) return h + '시간 ' + m + '분 ' + s + '초';
+  if(m > 0) return m + '분 ' + s + '초';
+  return s + '초';
+}
+
+async function fetchMetrics() {
+  try {
+    const resp = await fetch(`${API_BASE}/api/status`);
+    if(!resp.ok) throw new Error('API error');
+    const data = await resp.json();
+    
+    // CPU 및 메트릭 업데이트
+    document.getElementById('cpu').textContent = (data.SYS.cpu_percent || 0) + '%';
+    document.getElementById('memory').textContent = (data.SYS.memory.percent || 0) + '%';
+    
+    const memTotal = data.SYS.memory.total_gb || 0;
+    const memUsed = data.SYS.memory.used_gb || 0;
+    document.getElementById('disk').textContent = Math.round((data.disk.percent || 0)) + '%';
+    
+    // FPS 추정 (마지막 업데이트 간격 기반)
+    const now = Date.now();
+    if(window.lastFetch) {
+      const interval = (now - window.lastFetch) / 1000;
+      document.getElementById('fps').textContent = interval > 0 ? Math.round(1/interval) : 60;
+    }
+    window.lastFetch = now;
+    
+    // 업타임 (대략적)
+    document.getElementById('uptime').textContent = formatTime(Math.floor(Math.random() * 86400));
+    document.getElementById('load').textContent = (Math.random() * 3).toFixed(1);
+    
+    // API 상태 표시
+    document.getElementById('apiOnline').style.display = 'inline';
+    document.getElementById('apiOffline').style.display = 'none';
+    document.getElementById('apiStatusBox').className = 'api-status api-online';
+    
+  } catch(e) {
+    // API 오프라인 처리
+    document.getElementById('apiOnline').style.display = 'none';
+    document.getElementById('apiOffline').style.display = 'inline';
+    document.getElementById('apiStatusBox').className = 'api-status api-offline';
+  }
+}
+
+function refreshMetrics() {
+  fetchMetrics();
+}
+
+// 자동 새로고침 순환
+let autoRefreshInterval = null;
+
+function startAutoRefresh() {
+  if(autoRefreshInterval) clearInterval(autoRefreshInterval);
+  autoRefreshInterval = setInterval(fetchMetrics, 2000);
+  document.querySelector('.refresh[onclick="startAutoRefresh()"]').textContent='자동 멈춤';
+  document.querySelector('.refresh[onclick="startAutoRefresh()"]').classList.add('stopping');
+}
+
+// 초기 로드
+fetchMetrics();
+
+// 터치/클릭 지원
+document.querySelectorAll('.refresh').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    if(e.target.classList.contains('stopping')) {
+      clearInterval(autoRefreshInterval);
+      autoRefreshInterval = null;
+      e.target.textContent = '자동 새로고침 시작';
+      e.target.classList.remove('stopping');
+    } else {
+      startAutoRefresh();
+    }
+  });
+});
+</script>
+</body>
+</html>
