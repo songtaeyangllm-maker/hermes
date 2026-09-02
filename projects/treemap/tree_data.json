@@ -1,14 +1,14 @@
 {
   "name": "hermes",
-  "size": 1753327,
+  "size": 1738105,
   "children": [
     {
       "name": "projects",
-      "size": 878133,
+      "size": 883518,
       "children": [
         {
           "name": "poster",
-          "size": 162473,
+          "size": 164534,
           "children": [
             {
               "name": "poster_neon.png",
@@ -27,7 +27,7 @@
             },
             {
               "name": "poster_dark.png",
-              "size": 37638,
+              "size": 39699,
               "children": []
             }
           ]
@@ -50,27 +50,27 @@
         },
         {
           "name": "wordcloud",
-          "size": 53719,
+          "size": 54597,
           "children": [
             {
               "name": "wc.png",
-              "size": 53719,
+              "size": 54597,
               "children": []
             }
           ]
         },
         {
           "name": "treemap",
-          "size": 47174,
+          "size": 40890,
           "children": [
             {
               "name": "tree_data.json",
-              "size": 27138,
+              "size": 22609,
               "children": []
             },
             {
               "name": "tree_data.js",
-              "size": 12072,
+              "size": 10317,
               "children": []
             },
             {
@@ -82,16 +82,16 @@
         },
         {
           "name": "timeline",
-          "size": 28479,
+          "size": 28475,
           "children": [
             {
               "name": "timeline_data.json",
-              "size": 11968,
+              "size": 11966,
               "children": []
             },
             {
               "name": "timeline_data.js",
-              "size": 10060,
+              "size": 10058,
               "children": []
             },
             {
@@ -130,11 +130,11 @@
         },
         {
           "name": "hermes_os",
-          "size": 17754,
+          "size": 17829,
           "children": [
             {
               "name": "index.html",
-              "size": 17754,
+              "size": 17829,
               "children": []
             }
           ]
@@ -152,7 +152,7 @@
         },
         {
           "name": "projects.json",
-          "size": 14938,
+          "size": 15170,
           "children": []
         },
         {
@@ -405,6 +405,17 @@
           ]
         },
         {
+          "name": "timer",
+          "size": 8427,
+          "children": [
+            {
+              "name": "index.html",
+              "size": 8427,
+              "children": []
+            }
+          ]
+        },
+        {
           "name": "othello",
           "size": 8377,
           "children": [
@@ -513,36 +524,25 @@
               "children": []
             }
           ]
-        },
-        {
-          "name": "engine3d",
-          "size": 7215,
-          "children": [
-            {
-              "name": "index.html",
-              "size": 7215,
-              "children": []
-            }
-          ]
         }
       ]
     },
     {
       "name": ".git",
-      "size": 625132,
+      "size": 604386,
       "children": [
         {
           "name": "objects",
-          "size": 558421,
+          "size": 537150,
           "children": [
             {
               "name": "pack",
-              "size": 558314,
+              "size": 537096,
               "children": []
             },
             {
               "name": "info",
-              "size": 107,
+              "size": 54,
               "children": []
             }
           ]
@@ -625,23 +625,23 @@
         },
         {
           "name": "logs",
-          "size": 25500,
+          "size": 25912,
           "children": [
             {
               "name": "HEAD",
-              "size": 12750,
+              "size": 12956,
               "children": []
             },
             {
               "name": "refs",
-              "size": 12750,
+              "size": 12956,
               "children": []
             }
           ]
         },
         {
           "name": "index",
-          "size": 13785,
+          "size": 13903,
           "children": []
         },
         {
@@ -672,7 +672,7 @@
         },
         {
           "name": "COMMIT_EDITMSG",
-          "size": 72,
+          "size": 67,
           "children": []
         },
         {
@@ -821,7 +821,7 @@
     },
     {
       "name": "dashboard",
-      "size": 54857,
+      "size": 54929,
       "children": [
         {
           "name": "index.html",
@@ -830,7 +830,7 @@
         },
         {
           "name": "history.json",
-          "size": 4272,
+          "size": 4344,
           "children": []
         },
         {
@@ -852,15 +852,15 @@
     },
     {
       "name": "notes",
-      "size": 25556,
+      "size": 25570,
       "children": [
         {
           "name": "reports",
-          "size": 12369,
+          "size": 12383,
           "children": [
             {
               "name": "summary_2026-09-02.html",
-              "size": 2647,
+              "size": 2651,
               "children": []
             },
             {
@@ -875,7 +875,7 @@
             },
             {
               "name": "summary_2026-09-02.md",
-              "size": 1319,
+              "size": 1329,
               "children": []
             },
             {
@@ -975,11 +975,11 @@
     },
     {
       "name": "scripts",
-      "size": 8053,
+      "size": 8106,
       "children": [
         {
           "name": "hermes",
-          "size": 8053,
+          "size": 8106,
           "children": []
         }
       ]

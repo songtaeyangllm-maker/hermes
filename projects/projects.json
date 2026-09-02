@@ -542,5 +542,13 @@
     "path": "C:/hermes/projects/timer",
     "created": "2026-09-02",
     "updated": "2026-09-02 09:32"
+  },
+  {
+    "name": "ASCIIArt",
+    "status": "active",
+    "description": "ASCII 아트 스튜디오 (텍스트 배너/이미지 변환)",
+    "path": "C:/hermes/projects/ascii",
+    "created": "2026-09-02",
+    "updated": "2026-09-02 09:34"
   }
 ]

@@ -121,6 +121,7 @@ sleep 2; curl -s http://127.0.0.1:8765/api/health || echo "  (curl로 상태 확
     nn)     start "$WS/projects/nn/index.html" ;;
     grav)   start "$WS/projects/grav/index.html" ;;
     kal)    start "$WS/projects/kal/index.html" ;;
+    ascii)  start "$WS/projects/ascii/index.html" ;;
     tarot)  start "$WS/projects/tarot/index.html" ;;
     qlearn) start "$WS/projects/qlearn/index.html" ;;
     ga)     start "$WS/projects/ga/index.html" ;;
