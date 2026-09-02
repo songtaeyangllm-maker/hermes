@@ -550,5 +550,13 @@
     "path": "C:/hermes/projects/ascii",
     "created": "2026-09-02",
     "updated": "2026-09-02 09:34"
+  },
+  {
+    "name": "IntelligenceCenter",
+    "status": "active",
+    "description": "AI/알고리즘 통합 허브 (신경망/Q-러닝/유전/A*/셀오토마타/로렌츠/중력/미니언어)",
+    "path": "C:/hermes/projects/intelligence-center",
+    "created": "2026-09-02",
+    "updated": "2026-09-02 09:47"
   }
 ]

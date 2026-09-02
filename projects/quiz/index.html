@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Quiz</title>
+<style>
+:root { --bg:#0b0e16; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; --accent:#60a5fa; --good:#4ade80; --bad:#ef4444; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-serif; display:flex; flex-direction:column; align-items:center; gap:14px; padding:16px; min-height:100vh; }
+h1{ font-size:20px; letter-spacing:2px; } h1 span{ color:var(--accent); }
+.sub{ color:var(--muted); font-size:12px; }
+.screen{ display:none; width:100%; max-width:680px; } .screen.on{ display:block; }
+.cats{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-top:20px; }
+.cat{ background:var(--card); border:1px solid var(--border); border-radius:12px; padding:18px; text-align:center; cursor:pointer; transition:.15s; }
+.cat:hover{ border-color:var(--accent); transform:translateY(-2px); }
+.cat .emoji{ font-size:30px; } .cat b{ display:block; margin:8px 0 4px; font-size:14px; } .cat .best{ font-size:11px; color:var(--muted); }
+.qcard{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:22px; }
+.qmeta{ display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-bottom:14px; }
+.qtext{ font-size:17px; font-weight:600; margin-bottom:18px; line-height:1.5; }
+.opt{ display:block; width:100%; text-align:left; background:#0d1322; border:1px solid var(--border); border-radius:10px; padding:11px 14px; font-size:14px; color:var(--text); cursor:pointer; margin-bottom:8px; transition:.12s; }
+.opt:hover{ border-color:var(--accent); }
+.opt.correct{ background:#0f2e1c; border-color:var(--good); color:var(--good); }
+.opt.wrong{ background:#2e0f0f; border-color:var(--bad); color:var(--bad); }
+.opt:disabled{ cursor:default; }
+.timerbar{ height:5px; background:#1a2540; border-radius:3px; overflow:hidden; margin-bottom:12px; }
+.timerbar i{ display:block; height:100%; background:var(--accent); border-radius:3px; transition:width .1s linear; }
+.scoretop{ font-size:14px; color:var(--accent); font-weight:bold; }
+.result-hero{ text-align:center; padding:26px 0; }
+.result-hero .big{ font-size:46px; font-weight:bold; }
+.result-hero .bigsmall{ font-size:22px; color:var(--muted); margin-top:6px; }
+.review{ margin-top:16px; display:flex; flex-direction:column; gap:10px; }
+.ritem{ background:var(--card); border:1px solid var(--border); border-radius:10px; padding:12px; font-size:13px; }
+.ritem b{ display:block; margin-bottom:4px; } .rgood{ color:var(--good); } .rbad{ color:var(--bad); }
+.btn{ background:#16223a; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:11px 24px; cursor:pointer; font-size:14px; }
+.btn:hover{ background:#1f3050; } .btn.acc{ background:var(--accent); color:#0b0e16; font-weight:bold; }
+.center{ text-align:center; margin-top:18px; }
+.feedback{ font-size:13px; margin-top:8px; min-height:20px; }
+</style>
+</head>
+<body>
+<h1>QUIZ <span>::</span> MASTER</h1>
+<div class="sub">카테고리별 상식 퀴즈 — 20초 안에 정답을!</div>
+
+<!-- 홈 -->
+<div class="screen on" id="s-home">
+  <div class="cats" id="catList"></div>
+  <div class="center"><button class="btn acc" id="mixBtn">🎲 랜덤 10문제</button></div>
+</div>
+
+<!-- 퀴즈 -->
+<div class="screen" id="s-quiz">
+  <div class="qcard">
+    <div class="qmeta"><span id="qCat">과학</span><span class="scoretop">⭐ <span id="qScore">0</span></span><span id="qNum">1/10</span><span>⏱ <span id="qTime">20</span></span></div>
+    <div class="timerbar"><i id="qBar"></i></div>
+    <div class="qtext" id="qText">질문</div>
+    <div id="qOpts"></div>
+    <div class="feedback" id="qFeed"></div>
+  </div>
+</div>
+
+<!-- 결과 -->
+<div class="screen" id="s-result">
+  <div class="result-hero"><div class="big" id="rScore">0</div><div class="bigsmall" id="rMsg">결과</div></div>
+  <div id="rStats" style="text-align:center;color:var(--muted);font-size:14px"></div>
+  <button class="btn acc" id="againBtn" style="margin-top:16px;width:100%">🔄 다시 도전</button>
+  <button class="btn" id="homeBtn" style="margin-top:8px;width:100%">🏠 홈으로</button>
+  <div class="review" id="rReview"></div>
+</div>
+
+<script>
+// ======== 문제 데이터 ========
+const QS={
+ '일반상식':[
+  {q:'세계에서 가장 인구가 많은 나라는?',o:['인도','중국','미국','인도네시아','파키스탄'],a:0},
+  {q:'1년은 몇 주인가?',o:['50주','52주','54주','48주','53주'],a:1},
+  {q:'우리나라의 수도는?',o:['부산','대구','서울','인천','대전'],a:2},
+  {q:'지구에서 가장 큰 바다는?',o:['대서양','인도양','태평양','남극해','북극해'],a:2},
+  {q:'다음 중 포유류가 아닌 것은?',o:['고래','박쥐','상어','돌고래','오리너구리'],a:2},
+  {q:'인류 최초로 달에 착륙한 나라는?',o:['소련','미국','중국','일본','프랑스'],a:1},
+  {q:'물의 화학식은?',o:['CO2','O2','H2O','NaCl','CH4'],a:2},
+  {q:'일주일의 시작은 (ISO 기준)?',o:['일요일','월요일','화요일','토요일','금요일'],a:1},
+  {q:'세계에서 가장 큰 대륙은?',o:['아프리카','북아메리카','아시아','남아메리카','유럽'],a:2},
+  {q:'태양계에서 가장 뜨거운 행성은?',o:['수성','금성','지구','화성','목성'],a:1},
+  {q:'한글을 창제한 왕은?',o:['태종','세종','문종','성종','연산군'],a:1},
+  {q:'하루는 몇 초인가?',o:['84,600초','86,400초','88,200초','82,800초','90,000초'],a:1}
+ ],
+ '과학':[
+  {q:'빛의 속도는 약 몇 km/s인가?',o:['30만','10만','3만','100만','50만'],a:0},
+  {q:'원자핵을 구성하는 입자는?',o:['전자와 중성자','양성자와 중성자','양성자와 전자','중성자만','쿼크만'],a:1},
+  {q:'DNA의 이중나선 구조를 발견한 과학자는?',o:['아인슈타인','뉴턴','왓슨과 크릭','파스퇴르','멘델'],a:2},
+  {q:'물이 얼 때의 온도는?',o:['4°C','0°C','-4°C','100°C','-10°C'],a:1},
+  {q:'피에서는 산소를 운반하는 세포는?',o:['백혈구','혈소판','적혈구','혈장','림프구'],a:2},
+  {q:'E=mc² 공식의 주인공은?',o:['뉴턴','보어','아인슈타인','갈릴레오','플랑크'],a:2},
+  {q:'최소 단위의 기본 입자로 여겨지는 것은?',o:['원자','분자','쿼크','전자','중성자'],a:2},
+  {q:'식물이 광합성으로 만드는 기체는?',o:['이산화탄소','산소','질소','수소','메탄'],a:1},
+  {q:'인간의 뼈는 대략 몇 개인가?',o:['106개','206개','306개','406개','156개'],a:1},
+  {q:'소리의 전달 매질이 필요없는 것은?',o:['소리','빛','진동','울림','반향'],a:1}
+ ],
+ '역사':[
+  {q:'프랑스 혁명이 일어난 해는?',o:['1776년','1789년','1804년','1701년','1815년'],a:1},
+  {q:'제2차 세계대전이 끝난 해는?',o:['1943년','1944년','1945년','1946년','1949년'],a:2},
+  {q:'거북선을 이끈 장군은?',o:['권율','이순신','김시민','원균','곽재우'],a:1},
+  {q:'콜럼버스가 아메리카에 도착한 해는?',o:['1492년','1482년','1502년','1472년','1522년'],a:0},
+  {q:'로마 제국의 수도는?',o:['아테네','로마','카르타고','알렉산드리아','콘스탄티노플'],a:1},
+  {q:'세계 최초의 인쇄술 금속활자는 어느 나라?',o:['중국','일본','한국','독일','이탈리아'],a:2},
+  {q:'피라미드를 만든 문명은?',o:['메소포타미아','이집트','마야','인더스','그리스'],a:1},
+  {q:'한국전쟁이 발발한 해는?',o:['1950년','1945년','1953년','1948년','1939년'],a:0}
+ ],
+ '기술':[
+  {q:'WWW를 발명한 사람은?',o:['빌 게이츠','팀 버너스리','스티브 잡스','리누스 토발즈','마크 저커버그'],a:1},
+  {q:'HTML의 약자는?',o:['Hyper Text Markup Language','High Tech Media Language','Hyper Transfer Markup','Home Tool Markup','Hyperlink Text Module Language'],a:0},
+  {q:'최초의 프로그래밍 언어 중 하나로, 영국 계산과학자인 에이다가 관련된 것은?',o:['BASIC','Fortran','C','COBOL','Python'],a:1},
+  {q:'CPU가 명령을 처리하는 기본 주기는?',o:['버스 주기','클럭 주기','메모리 주기','입출력 주기','전송 주기'],a:1},
+  {q:'다음 중 운영체제가 아닌 것은?',o:['Windows','Linux','macOS','Chrome','Android'],a:3},
+  {q:"TCP/IP에서 'IP'의 뜻은?",o:['Internet Protocol','Internal Process','Input Processor','Internet Page','Information Packet'],a:0},
+  {q:'SQL은 무엇을 다루는 언어인가?',o:['웹 페이지','데이터베이스','그래픽','네트워크','파일'],a:1},
+  {q:'리눅스 커널을 만든 사람은?',o:['팀 버너스리','리누스 토발즈','리처드 스톨먼','데니스 리치','앤드류 타넨바움'],a:1},
+  {q:'웹사이트의 주소를 나타내는 것은?',o:['IP 주소','URL','MAC 주소','DNS','FTP'],a:1}
+ ]
+};
+const CATS=['일반상식','과학','역사','기술'];
+const EMOJI={일반상식:'🌍',과학:'🔬',역사:'🏛️',기술:'💻'};
+// ======== 상태 ========
+let questions=[], qi=0, score=0, combo=0, timer=null, timeLeft=0, results=[], qBest=JSON.parse(localStorage.getItem('quizBest')||'{}');
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function renderHome(){
+  document.getElementById('catList').innerHTML=CATS.map(c=>`<div class="cat" data-c="${c}"><div class="emoji">${EMOJI[c]}</div><b>${c}</b><span class="best">최고 ${qBest[c]??0}점</span></div>`).join('');
+  document.querySelectorAll('.cat').forEach(el=>el.onclick=()=>startQuiz(el.dataset.c));
+  document.getElementById('mixBtn').onclick=()=>startQuiz(null);
+}
+function startQuiz(cat){
+  if(cat) questions=shuffle(QS[cat].slice()).slice(0,10);
+  else { let all=[]; CATS.forEach(c=>all.push(...QS[c])); questions=shuffle(all).slice(0,10); }
+  qi=0; score=0; combo=0; results=[];
+  show('s-quiz'); nextQ();
+}
+function nextQ(){
+  if(qi>=questions.length)return finish();
+  const q=questions[qi]; const t=document.getElementById('qTime');
+  timeLeft=20; clearInterval(timer); renderQ(q);
+  timer=setInterval(()=>{ timeLeft--; document.getElementById('qTime').textContent=timeLeft; document.getElementById('qBar').style.width=(timeLeft/20*100)+'%'; if(timeLeft<=5)document.getElementById('qBar').style.background='#ef4444'; if(timeLeft<=0){ timeoutQ(q); } },1000);
+}
+function renderQ(q){
+  document.getElementById('qCat').textContent=EMOJI[q.cat||'일반상식']+' '+(q.cat||'랜덤');
+  document.getElementById('qScore').textContent=score;
+  document.getElementById('qNum').textContent=(qi+1)+'/10';
+  document.getElementById('qText').textContent=q.q;
+  document.getElementById('qFeed').textContent='';
+  document.getElementById('qOpts').innerHTML=q.o.map((opt,i)=>`<button class="opt" data-i="${i}">${String.fromCharCode(65+i)}. ${opt}</button>`).join('');
+  document.querySelectorAll('.opt').forEach(b=>b.onclick=()=>answer(+b.dataset.i));
+}
+function answer(i){
+  clearInterval(timer); const q=questions[qi];
+  const opts=document.querySelectorAll('.opt');
+  if(i===q.a){ combo++; score+=100+combo*10; opts[i].classList.add('correct'); results.push({q,ok:1,i}); document.getElementById('qFeed').textContent='✅ 정답! +'+(100+combo*10)+'점 (콤보 x'+combo+')'; document.getElementById('qFeed').style.color='var(--good)'; }
+  else { combo=0; opts[i].classList.add('wrong'); opts[q.a].classList.add('correct'); results.push({q,ok:0}); document.getElementById('qFeed').textContent='❌ 오답 — 정답은 '+String.fromCharCode(65+q.a)+'. '+q.o[q.a]; document.getElementById('qFeed').style.color='var(--bad)'; }
+  opts.forEach(o=>o.disabled=true);
+  setTimeout(()=>{ qi++; nextQ(); }, 1700);
+}
+function timeoutQ(q){ clearInterval(timer); combo=0; document.querySelectorAll('.opt').forEach((o,i)=>{ o.disabled=true; if(i===q.a)o.classList.add('correct'); }); results.push({q,ok:0}); document.getElementById('qFeed').textContent='⏰ 시간 초과! 정답은 '+q.o[q.a]; document.getElementById('qFeed').style.color='var(--bad)'; setTimeout(()=>{ qi++; nextQ(); },1700); }
+function finish(){
+  clearInterval(timer); show('s-result');
+  document.getElementById('rScore').textContent=score+'점';
+  const pct=Math.round(results.filter(r=>r.ok!==0).length/10*100); // ok===1로 표시 문제 방지 위해 판정
+  const correct=results.filter(r=>r.ok).length;
+  document.getElementById('rStats').innerHTML=`10문제 중 ${correct}개 정답 · 정확도 ${correct*10}%`;
+  document.getElementById('rMsg').textContent=correct>=9?'🏆 퀴즈 마스터!':correct>=7?'🎉 훌륭해요!':correct>=5?'👍 괜찮아요':'💪 연습하세요!';
+  // 최고점 갱신
+  const cat=questions[0].cat; if(cat&&score>(qBest[cat]||0)){ qBest[cat]=score; localStorage.setItem('quizBest',JSON.stringify(qBest)); }
+  document.getElementById('rReview').innerHTML=results.map((r,i)=>`<div class="ritem"><b>${i+1}. ${r.q.q}</b><span class="${r.ok?'rgood':'rbad'}">${r.ok?'✅ '+r.q.o[r.q.a]:'❌ 당신: '+(r.i!==undefined?r.q.o[r.i]:'시간초과')+' · 정답: '+r.q.o[r.q.a]}</span></div>`).join('');
+}
+document.getElementById('againBtn').onclick=()=>{ startQuiz(questions[0].cat||null); };
+document.getElementById('homeBtn').onclick=()=>{ show('s-home'); renderHome(); };
+function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on')); document.getElementById(id).classList.add('on'); }
+renderHome();
+</script>
+</body>
+</html>

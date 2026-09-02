@@ -101,7 +101,8 @@ sleep 2; curl -s http://127.0.0.1:8765/api/health || echo "  (curl로 상태 확
     ttt)    start "$WS/projects/gttt/index.html" ;;
     games)  start "$WS/projects/gamehub/index.html" ;;
     mem)    start "$WS/projects/gmem/index.html" ;;
-    reflex) start "$WS/projects/greact/index.html" ;;
+    reflex)  start "$WS/projects/greact/index.html" ;;
+       quiz)  start "$WS/projects/quiz/index.html" ;;
     rhythm)  start "$WS/projects/rhythm/index.html" ;;
     cube)   start "$WS/projects/landing/index.html" ;;
     deck)   start "$WS/projects/deck/index.html" ;;
@@ -125,6 +126,7 @@ sleep 2; curl -s http://127.0.0.1:8765/api/health || echo "  (curl로 상태 확
     tarot)  start "$WS/projects/tarot/index.html" ;;
     qlearn) start "$WS/projects/qlearn/index.html" ;;
     ga)     start "$WS/projects/ga/index.html" ;;
+    intelligence-center) start "$WS/projects/intelligence-center/index.html" ;;
     astar)  start "$WS/projects/astar/index.html" ;;
     ca)     start "$WS/projects/ca/index.html" ;;
     lor)    start "$WS/projects/lor/index.html" ;;
