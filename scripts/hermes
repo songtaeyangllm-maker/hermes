@@ -107,6 +107,7 @@ sleep 2; curl -s http://127.0.0.1:8765/api/health || echo "  (curl로 상태 확
     deck)   start "$WS/projects/deck/index.html" ;;
     daily)  start "$WS/projects/daily/index.html" ;;
     kanban) start "$WS/projects/kanban/index.html" ;;
+    timer)  start "$WS/projects/timer/index.html" ;;
     eng3d)  start "$WS/projects/engine3d/index.html" ;;
     drum)   start "$WS/projects/drum/index.html" ;;
     synth)  start "$WS/projects/synth/index.html" ;;

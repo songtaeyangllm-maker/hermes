@@ -534,5 +534,13 @@
     "path": "C:/hermes/projects/kanban",
     "created": "2026-09-02",
     "updated": "2026-09-02 09:30"
+  },
+  {
+    "name": "Timer",
+    "status": "active",
+    "description": "멀티 타이머 + 스톱워치 + TTS 알림",
+    "path": "C:/hermes/projects/timer",
+    "created": "2026-09-02",
+    "updated": "2026-09-02 09:32"
   }
 ]
