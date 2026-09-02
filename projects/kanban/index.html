@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Kanban</title>
+<style>
+:root { --bg:#0b0e16; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; --accent:#60a5fa; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-serif; display:flex; flex-direction:column; align-items:center; gap:14px; padding:16px; }
+h1{ font-size:20px; letter-spacing:2px; } h1 span{ color:var(--accent); }
+.sub{ color:var(--muted); font-size:12px; }
+.topbar{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center; }
+.board{ display:grid; grid-template-columns:repeat(3,minmax(240px,1fr)); gap:14px; width:100%; max-width:1100px; }
+.col{ background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; min-height:400px; display:flex; flex-direction:column; gap:8px; }
+.col h2{ font-size:14px; display:flex; justify-content:space-between; align-items:center; }
+.count{ background:#1a2540; border-radius:12px; padding:2px 9px; font-size:12px; color:var(--muted); }
+.card{ background:#0d1322; border:1px solid var(--border); border-radius:8px; padding:10px; cursor:grab; }
+.card:active{ cursor:grabbing; }
+.card.drag{ opacity:.4; }
+.card h3{ font-size:13px; margin-bottom:4px; }
+.card p{ font-size:11px; color:var(--muted); }
+.labels{ display:flex; gap:4px; margin-top:6px; }
+.lbl{ font-size:10px; padding:2px 7px; border-radius:10px; }
+.addBtn{ background:#1a2540; border:1px dashed var(--border); border-radius:8px; padding:8px; color:var(--muted); cursor:pointer; font-size:12px; text-align:center; }
+.addBtn:hover{ background:#22304f; color:var(--text); }
+.stats{ display:flex; gap:24px; font-size:13px; color:var(--muted); }
+.stats b{ color:var(--accent); font-size:16px; }
+.progress{ width:100%; max-width:500px; height:6px; background:#1a2540; border-radius:3px; overflow:hidden; }
+.progress i{ display:block; height:100%; background:linear-gradient(90deg,#60a5fa,#4ade80); border-radius:3px; transition:width .3s; }
+.modal{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); align-items:center; justify-content:center; z-index:50; }
+.modal.on{ display:flex; }
+.mbox{ background:var(--card); border:1px solid var(--border); border-radius:12px; padding:18px; width:320px; display:flex; flex-direction:column; gap:10px; }
+.mbox h3{ font-size:14px; }
+input[type=text],textarea{ background:#0d1322; border:1px solid var(--border); color:var(--text); border-radius:6px; padding:8px; font-size:13px; width:100%; font-family:inherit; }
+textarea{ min-height:70px; resize:vertical; }
+.colorRow{ display:flex; gap:6px; }
+.dot{ width:22px; height:22px; border-radius:50%; cursor:pointer; border:2px solid transparent; }
+.dot.on{ border-color:#fff; }
+.mbtn{ display:flex; gap:8px; justify-content:flex-end; }
+.btn{ background:#16223a; border:1px solid var(--border); border-radius:8px; padding:7px 14px; cursor:pointer; font-size:13px; color:var(--text); }
+.btn:hover{ background:#1f3050; } .btn.acc{ background:var(--accent); color:#0b0e16; font-weight:bold; border:none; }
+.del{ position:absolute; top:6px; right:8px; }
+.cardwrap{ position:relative; }
+</style>
+</head>
+<body>
+<h1>KANBAN <span>::</span> BOARD</h1>
+<div class="sub">드래그로 카드 이동 · localStorage 자동 저장</div>
+<div class="topbar">
+  <div class="stats" id="stats"></div>
+  <div style="flex:1;min-width:200px;max-width:500px"><div class="progress"><i id="bar"></i></div></div>
+</div>
+<div class="board" id="board"></div>
+
+<div class="modal" id="modal">
+  <div class="mbox">
+    <h3 id="mTitle">새 카드</h3>
+    <input type="text" id="mName" placeholder="제목">
+    <textarea id="mDesc" placeholder="설명 (선택)"></textarea>
+    <div class="colorRow" id="mColors"></div>
+    <div class="mbtn"><button class="btn" id="mCancel">취소</button><button class="btn acc" id="mSave">저장</button></div>
+  </div>
+</div>
+
+<script>
+const COLS=['todo','doing','done'];
+const COL_NAMES={todo:'📋 할 일',doing:'⏳ 진행 중',done:'✅ 완료'};
+const COLORS=['#60a5fa','#f472b6','#4ade80','#facc15','#fb923c','#a78bfa','#ef4444','#38bdf8'];
+let cards=JSON.parse(localStorage.getItem('kanban')||'null')||[
+  {id:1,col:'todo',title:'픽셀 아트 그리기',desc:'16x16 도트',color:'#60a5fa'},
+  {id:2,col:'todo',title:'리듬 게임 클리어',desc:'Perfect 30개',color:'#f472b6'},
+  {id:3,col:'doing',title:'체스 AI 개선',desc:'깊이 4로',color:'#4ade80'},
+  {id:4,col:'done',title:'오델로 만들기',desc:'미니맥스 완성',color:'#facc15'}
+];
+let nextId=Math.max(...cards.map(c=>c.id))+1, dragFrom=null, editId=null, currentColor=COLORS[0];
+function save(){ localStorage.setItem('kanban',JSON.stringify(cards)); }
+function renderColors(){ document.getElementById('mColors').innerHTML=COLORS.map(c=>`<div class="dot ${c===currentColor?'on':''}" style="background:${c}" data-c="${c}"></div>`).join(''); document.querySelectorAll('.dot').forEach(d=>d.onclick=()=>{currentColor=d.dataset.c;renderColors();}); }
+function render(){
+  const board=document.getElementById('board');
+  board.innerHTML=COLS.map(c=>{
+    const list=cards.filter(x=>x.col===c);
+    // done 카드는 최신순 정렬, todo는 우선순위
+    return `<div class="col" data-col="${c}">
+      <h2>${COL_NAMES[c]} <span class="count">${list.length}</span></h2>
+      ${list.map(card=>`<div class="cardwrap" data-id="${card.id}">
+        <div class="card" draggable="true" data-id="${card.id}" data-col="${c}">
+          <h3>${card.title}</h3>${card.desc?`<p>${card.desc}</p>`:''}
+          <div class="labels"><span class="lbl" style="background:${card.color}22;color:${card.color};border:1px solid ${card.color}44">${card.color==='#60a5fa'?'작업':card.color==='#f472b6'?'중요':card.color==='#4ade80'?'완료':card.color==='#facc15'?'우선':card.color==='#fb923c'?'오늘':'기타'}</span></div>
+        </div>
+        <button class="del btn" style="font-size:10px;padding:2px 6px;position:static;margin-left:auto;display:block" data-del="${card.id}">🗑</button>
+      </div>`).join('')||'<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px">비어있음</div>'}
+      <button class="addBtn" data-add="${c}">+ 카드 추가</button>
+    </div>`;
+  }).join('');
+  // 통계
+  const total=cards.length, done=cards.filter(c=>c.col==='done').length;
+  document.getElementById('stats').innerHTML=`<span>전체 <b>${total}</b></span><span>완료 <b>${done}</b></span><span>진행률 <b>${total?Math.round(done/total*100):0}%</b></span>`;
+  document.getElementById('bar').style.width=(total?done/total*100:0)+'%';
+  // 이벤트
+  document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{ editId=null; document.getElementById('mTitle').textContent='새 카드 ('+COL_NAMES[b.dataset.add]+')'; document.getElementById('mName').value=''; document.getElementById('mDesc').value=''; currentColor=COLORS[0]; renderColors(); openModal(b.dataset.add); });
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); cards=cards.filter(c=>c.id!==+b.dataset.del); save(); render(); });
+  document.querySelectorAll('.card').forEach(c=>{
+    c.addEventListener('dragstart',e=>{ dragFrom=c.dataset.col; e.dataTransfer.setData('text/plain',c.dataset.id); setTimeout(()=>c.classList.add('drag'),0); });
+    c.addEventListener('dragend',()=>c.classList.remove('drag'));
+    c.onclick=()=>{ const card=cards.find(x=>x.id===+c.dataset.id); if(card){ editId=card.id; document.getElementById('mTitle').textContent='카드 편집'; document.getElementById('mName').value=card.title; document.getElementById('mDesc').value=card.desc||''; currentColor=card.color; renderColors(); openModal(card.col); } };
+  });
+  document.querySelectorAll('.col').forEach(col=>{
+    col.addEventListener('dragover',e=>e.preventDefault());
+    col.addEventListener('drop',e=>{ e.preventDefault(); const id=e.dataTransfer.getData('text/plain'); const card=cards.find(x=>x.id===+id); if(card){ card.col=col.dataset.col; save(); render(); } });
+  });
+}
+let modalCol='todo';
+function openModal(col){ modalCol=col; document.getElementById('modal').classList.add('on'); document.getElementById('mName').focus(); }
+function closeModal(){ document.getElementById('modal').classList.remove('on'); }
+document.getElementById('mCancel').onclick=closeModal;
+document.getElementById('mSave').onclick=()=>{
+  const title=document.getElementById('mName').value.trim();
+  if(!title)return;
+  const desc=document.getElementById('mDesc').value.trim();
+  if(editId){ const c=cards.find(x=>x.id===editId); if(c){c.title=title;c.desc=desc;c.color=currentColor;} }
+  else cards.push({id:nextId++,col:modalCol,title,desc,color:currentColor});
+  save(); closeModal(); render();
+};
+render();
+</script>
+</body>
+</html>

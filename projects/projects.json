@@ -526,5 +526,13 @@
     "path": "C:/hermes/projects/rhythm",
     "created": "2026-09-02",
     "updated": "2026-09-02 09:29"
+  },
+  {
+    "name": "Kanban",
+    "status": "active",
+    "description": "칸반 보드 (드래그앤드롭/로컬저장)",
+    "path": "C:/hermes/projects/kanban",
+    "created": "2026-09-02",
+    "updated": "2026-09-02 09:30"
   }
 ]
