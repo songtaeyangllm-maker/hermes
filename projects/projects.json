@@ -510,5 +510,13 @@
     "path": "C:/hermes/projects/chess",
     "created": "2026-09-02",
     "updated": "2026-09-02 09:25"
+  },
+  {
+    "name": "TokyoTrip",
+    "status": "active",
+    "description": "도쿄 3일 여행 플래너 (일정/이동/예산/지도)",
+    "path": "C:/hermes/projects/tokyo",
+    "created": "2026-09-02",
+    "updated": "2026-09-02 09:27"
   }
 ]

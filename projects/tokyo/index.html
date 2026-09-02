@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tokyo Trip Planner</title>
+<style>
+:root { --bg:#0b0e16; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; --accent:#f472b6; }
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{ background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-serif; display:flex; flex-direction:column; align-items:center; gap:14px; padding:16px; max-width:960px; margin:0 auto; }
+h1{ font-size:20px; letter-spacing:2px; } h1 span{ color:var(--accent); }
+.sub{ color:var(--muted); font-size:12px; }
+.tabs{ display:flex; gap:8px; } .tab{ background:#16223a; border:1px solid var(--border); border-radius:8px; padding:8px 16px; cursor:pointer; font-size:13px; color:var(--muted); } .tab.on{ color:var(--text); border-color:var(--accent); background:#1f3050; }
+.view{ display:none; width:100%; } .view.on{ display:block; }
+.grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px; }
+.card{ background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px; display:flex; flex-direction:column; gap:8px; }
+.card h3{ font-size:15px; } .tag{ font-size:11px; color:var(--muted); }
+.price{ font-size:13px; color:var(--accent); font-weight:bold; }
+.desc{ font-size:12px; color:#9fb0c8; line-height:1.6; }
+.route{ background:#0d1322; border-radius:8px; padding:10px; font-size:12px; color:#9fb0c8; line-height:1.7; font-family:Consolas,monospace; }
+.btn{ background:#16223a; border:1px solid var(--border); border-radius:8px; padding:7px 14px; cursor:pointer; font-size:13px; color:var(--text); }
+.btn:hover{ background:#1f3050; } .btn.accent{ background:var(--accent); color:#0b0e16; font-weight:bold; border:none; }
+.flex{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+label{ font-size:12px; color:var(--muted); } input[type=number],select{ background:#0d1322; border:1px solid var(--border); color:var(--text); border-radius:6px; padding:5px 8px; font-size:13px; }
+table{ width:100%; border-collapse:collapse; font-size:12px; } th,td{ border:1px solid var(--border); padding:6px 8px; text-align:left; } th{ color:var(--muted); font-size:11px; }
+.summary{ background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; }
+.sum-item{ text-align:center; } .sum-item b{ font-size:20px; color:var(--accent); display:block; } .sum-item span{ font-size:11px; color:var(--muted); }
+.sights{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; } .sight{ background:#0d1322; border:1px solid var(--border); border-radius:8px; padding:8px; font-size:12px; cursor:pointer; } .sight:hover{ border-color:var(--accent); } .sight.sel{ border-color:var(--accent); background:#1f3050; }
+svg text{ font-size:10px; fill:#9fb0c8; }
+</style>
+</head>
+<body>
+<h1>TOKYO <span>::</span> TRIP PLANNER</h1>
+<div class="sub">3일 도쿄 여행 — 일정 · 이동 · 예산 한 번에</div>
+<div class="tabs"><div class="tab on" data-v="route">🗺️ 일정·이동</div><div class="tab" data-v="budget">💰 예산</div><div class="tab" data-v="map">📍 지도</div></div>
+
+<!-- 일정·이동 뷰 -->
+<div class="view on" id="v-route">
+<div class="flex" style="margin-bottom:10px">
+<label>출발지</label>
+<select id="from"><option>신주쿠</option><option>시부야</option><option>아키하바라</option><option>우에노</option><option>도쿄역</option><option>오다이바</option></select>
+<label>도착지</label>
+<select id="to"><option>시부야</option><option>신주쿠</option><option>아키하바라</option><option>우에노</option><option>도쿄역</option><option>오다이바</option></select>
+<button class="btn accent" id="calcRoute">🔍 경로 계산</button>
+</div>
+<div class="route" id="routeOut">출발지/도착지를 선택하고 경로를 계산하세요.</div>
+<div style="height:10px"></div>
+<h3 style="font-size:14px;margin-bottom:8px">🗓️ 추천 일정 (3일)</h3>
+<div class="grid">
+<div class="card"><h3>Day 1 — 도쿄 클래식</h3><div class="tag">👣 도보 8km · ⏱️ 8h</div><div class="desc">가나모리바시 → 신주쿠교엔(🍁 벚꽃) → 메이지신궁 → 하라주쿠 거리 → 시부야 스카이(해질녘 전망)</div></div>
+<div class="card"><h3>Day 2 — 오타쿠 & 전통</h3><div class="tag">🚇 지하철 · ⏱️ 9h</div><div class="desc">아키하바라(전자상가·메이드카페) → 우에노공원 → 아사쿠사 센소지 → 스카이트리 전망대(야경)</div></div>
+<div class="card"><h3>Day 3 — 자연 & 미식</h3><div class="tag">🍣 · ⏱️ 7h</div><div class="desc">츠키지 시장(아침 초밥) → 팀랩 보더리스(디지털 아트) → 오다이바 해변 → 긴자 디너</div></div>
+</div>
+</div>
+
+<!-- 예산 뷰 -->
+<div class="view" id="v-budget">
+<div class="flex" style="margin-bottom:12px">
+<label>인원</label><input type="number" id="people" value="2" min="1" max="8">
+<label>박수</label><input type="number" id="nights" value="2" min="1" max="7">
+<label>환율(1엔=원)</label><input type="number" id="rate" value="9.5" min="1" step="0.1">
+</div>
+<div class="summary" id="budgetSummary"></div>
+<div style="height:12px"></div>
+<h3 style="font-size:14px;margin-bottom:8px">세부 내역 (엔)</h3>
+<table id="budgetTable"></table>
+</div>
+
+<!-- 지도 뷰 -->
+<div class="view" id="v-map">
+<div class="flex" style="margin-bottom:10px">
+<label>관심 명소 선택 (최대 8)</label>
+</div>
+<div class="sights" id="sightList"></div>
+<div style="height:12px"></div>
+<svg id="mapSvg" width="100%" height="420" viewBox="0 0 960 420" xmlns="http://www.w3.org/2000/svg"></svg>
+</div>
+
+<script>
+// ======== 경로 데이터 ========
+const STATIONS={ 신주쿠:{x:340,y:120,line:'JR山手線'}, 시부야:{x:380,y:210,line:'JR山手線'}, 아키하바라:{x:520,y:150,line:'JR山手線'}, 우에노:{x:560,y:80,line:'JR山手線'}, 도쿄역:{x:600,y:130,line:'JR山手線'}, 오다이바:{x:760,y:250,line:'ゆりかもめ'}, 시모키타자와:{x:250,y:300,line:'小田急線'}, 기치조지:{x:150,y:200,line:'中央線'}, 아사쿠사:{x:620,y:60,line:'銀座線'}, 츠키지:{x:680,y:180,line:'日比谷線'} };
+// 실제 대략적 환승시간 분 (표본)
+const TRAVEL={
+ '신주쿠':{'시부야':4,'아키하바라':9,'우에노':12,'도쿄역':10,'오다이바':32},
+ '시부야':{'신주쿠':4,'아키하바라':15,'우에노':19,'도쿄역':13,'오다이바':23},
+ '아키하바라':{'신주쿠':9,'시부야':15,'우에노':4,'도쿄역':4,'오다이바':28},
+ '우에노':{'신주쿠':12,'시부야':19,'아키하바라':4,'도쿄역':5,'오다이바':33},
+ '도쿄역':{'신주쿠':10,'시부야':13,'아키하바라':4,'우에노':5,'오다이바':27},
+ '오다이바':{'신주쿠':32,'시부야':23,'아키하바라':28,'우에노':33,'도쿄역':27}
+};
+// ======== 예산 데이터 ========
+const BUDGET={ 호텔:12000, 콘비니:800, 식비:2500, 교통:800, 입장료:2000, 쇼핑:5000 };
+function fmt(n){ return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+// ======== 명소 데이터 ========
+const SIGHTS=[
+ {n:'센소지',x:640,y:90,g:'🏯'},{n:'메이지신궁',x:340,y:140,g:'⛩️'},{n:'시부야 스카이',x:380,y:230,g:'🌆'},
+ {n:'팀랩',x:720,y:280,g:'🎨'},{n:'신주쿠교엔',x:320,y:90,g:'🌸'},{n:'아키하바라',x:520,y:170,g:'⚡'},
+ {n:'스카이트리',x:660,y:40,g:'🗼'},{n:'츠키지',x:700,y:190,g:'🍣'},{n:'오다이바',x:790,y:260,g:'🌊'},{n:'하라주쿠',x:360,y:175,g:'🛍️'},
+ {n:'우에노공원',x:560,y:100,g:'🎋'},{n:'긴자',x:650,y:150,g:'💎'}
+];
+let selSights=new Set(['센소지','메이지신궁','시부야 스카이']);
+let travelCache={};
+// ======== 기능 ========
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{ document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on')); t.classList.add('on'); document.querySelectorAll('.view').forEach(v=>v.classList.remove('on')); document.getElementById('v-'+t.dataset.v).classList.add('on'); });
+function calcRoute(){
+  const f=document.getElementById('from').value, to=document.getElementById('to').value;
+  if(f===to){ document.getElementById('routeOut').textContent='같은 역입니다. 다른 목적지를 선택하세요.'; return; }
+  if(TRAVEL[f]&&TRAVEL[f][to]!==undefined){ document.getElementById('routeOut').innerHTML=`${f} → ${to}<br>⏱️ JR ${TRAVEL[f][to]}분 · ${f}(JR山手線) → ${to} (환승없음)<br>🎫 약 ¥${220} (IC카드)`; return; }
+  // 환승 경로 시뮬
+  const a=TRAVEL[f], b=TRAVEL[to];
+  let direct=Object.keys(a).find(k=>b&&a[k]&&b[k]!==undefined);
+  const t1=Object.values(a).reduce((s,v)=>s+(v||0),0), t2=Object.values(b).reduce((s,v)=>s+(v||0),0);
+  document.getElementById('routeOut').innerHTML=`${f} → ${to}<br>${f}(${a.line}) → ${direct||'도쿄역'} → ${to}(${b.line})<br>⏱️ 약 ${15+Math.floor(2+Math.random()*8)}분 · 환승 1회 · 🎫 약 ¥${350}`;
+}
+document.getElementById('calcRoute').addEventListener('click',calcRoute);
+function renderBudget(){
+  const p=+document.getElementById('people').value||1, n=+document.getElementById('nights').value||2, r=+document.getElementById('rate').value||9.5;
+  const rows=[['🏨 숙박',BUDGET.호텔,'박/인',BUDGET.호텔*n*p],['🍱 식비',BUDGET.식비,'일/인',BUDGET.식비*3*p],['🚇 교통',BUDGET.교통,'일/인',BUDGET.교통*3*p],['🎟️ 입장료',BUDGET.입장료,'일/인',BUDGET.입장료*3*p],['🍙 콘비니',BUDGET.콘비니,'박/인',BUDGET.콘비니*n*p],['🛍️ 쇼핑',BUDGET.쇼핑,'예비/인',BUDGET.쇼핑*p]];
+  const total=rows.reduce((s,r)=>s+r[3],0);
+  document.getElementById('budgetSummary').innerHTML=rows.map((r,i)=>`<div class="sum-item"><b>¥${fmt(r[3])}</b><span>${r[0]} · ${r[1].toLocaleString()}엔/${r[2]}</span></div>`).join('')+`<div class="sum-item"><b>¥${fmt(total)}</b><span>총합 (엔)</span></div><div class="sum-item"><b>₩${fmt(Math.round(total*r))}</b><span>한화 환산 (1엔=${r}원)</span></div><div class="sum-item"><b>₩${fmt(Math.round(total*r/p))}</b><span>1인당 (${p}인)</span></div>`;
+  document.getElementById('budgetTable').innerHTML=`<tr><th>항목</th><th>단가</th><th>기준</th><th>소계(엔)</th></tr>`+rows.map(r=>`<tr><td>${r[0]}</td><td>¥${r[1].toLocaleString()}</td><td>${r[2]}</td><td>¥${fmt(r[3])}</td></tr>`).join('');
+}
+['people','nights','rate'].forEach(id=>document.getElementById(id).addEventListener('input',renderBudget));
+// 지도
+function renderSights(){
+  document.getElementById('sightList').innerHTML=SIGHTS.map(s=>`<div class="sight ${selSights.has(s.n)?'sel':''}" data-n="${s.n}">${s.g} ${s.n}</div>`).join('');
+  document.querySelectorAll('.sight').forEach(el=>el.onclick=()=>{ const n=el.dataset.n; if(selSights.has(n))selSights.delete(n); else if(selSights.size<8)selSights.add(n); renderSights(); renderMap(); });
+}
+function renderMap(){
+  const svg=document.getElementById('mapSvg'); let out='';
+  // 스테이션 렌더
+  Object.entries(STATIONS).forEach(([n,st])=>{ out+=`<circle cx="${st.x}" cy="${st.y}" r="6" fill="#f472b6" stroke="#0d1322" stroke-width="2"/><text x="${st.x+9}" y="${st.y+3}">${n}</text>`; });
+  // 연결선 (간략)
+  const links=[['신주쿠','시부야'],['시부야','신주쿠'],['아키하바라','도쿄역'],['도쿄역','우에노'],['오다이바','도쿄역']];
+  links.forEach(([a,b])=>{ if(STATIONS[a]&&STATIONS[b]) out+=`<line x1="${STATIONS[a].x}" y1="${STATIONS[a].y}" x2="${STATIONS[b].x}" y2="${STATIONS[b].y}" stroke="#3a4a66" stroke-width="2" stroke-dasharray="4 3"/>`; });
+  SIGHTS.forEach(s=>{ out+=`<circle cx="${s.x}" cy="${s.y}" r="11" fill="${selSights.has(s.n)?'#f472b6':'#232f4a'}" stroke="#0d1322" stroke-width="1.5"/><text x="${s.x}" y="${s.y+4}" text-anchor="middle" fill="#fff" font-size="12">${s.g}</text>`; if(selSights.has(s.n)) out+=`<text x="${s.x}" y="${s.y-15}" text-anchor="middle" fill="#f472b6" font-size="11">${s.n}</text>`; });
+  svg.innerHTML=out;
+}
+renderBudget(); renderSights(); renderMap();
+</script>
+</body>
+</html>
