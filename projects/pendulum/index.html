@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Double Pendulum</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--accent:#60a5fa;--muted:#9ca3af;--card2:#1f2434;--border:#2a3042}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px;min-height:100vh}
+h1{font-size:24px;letter-spacing:2px}h1 span{color:var(--accent)}
+.sub{color:var(--muted);font-size:13px;margin-bottom:12px}
+.controls{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;justify-content:center}
+button{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:7px 13px;font-size:12px;border-radius:7px;cursor:pointer;transition:all .2s}
+button:hover{border-color:var(--accent)}
+button.acc{background:var(--accent);color:#0b0e16;border:none;font-weight:600}
+canvas{background:#0a0d14;border:1px solid var(--border);border-radius:12px}
+.metrics{color:var(--muted);font-size:12px;background:var(--card2);padding:10px 16px;border-radius:10px;border:1px solid var(--border);margin-top:10px;text-align:center}
+.metrics b{color:var(--text)}
+input[type=range]{accent-color:var(--accent)}
+</style>
+</head>
+<body>
+<h1>HERMES <span>PENDULUM</span></h1>
+<div class="sub">이중진자 · 혼돈 역학 · 라그랑지 RK4</div>
+<div class="controls">
+  <label style="font-size:12px;color:var(--muted)">질량① <input type="range" id="m1" min="0.5" max="3" step="0.1" value="1.5" style="width:70px"></label>
+  <label style="font-size:12px;color:var(--muted)">질량② <input type="range" id="m2" min="0.5" max="3" step="0.1" value="1.0" style="width:70px"></label>
+  <button class="acc" onclick="resetPend()">⟳ 리셋</button>
+</div>
+<canvas id="cv"></canvas>
+<div class="metrics" id="stats">초기각: 120°와 90°</div>
+<script>
+'use strict';
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const W=640,H=520;cv.width=W;cv.height=H;
+
+// 이중진자 상태 [θ1,ω1,θ2,ω2]
+let m1=1.5,m2=1;
+const L1=1.0,L2=0.9;
+const g=9.81;
+
+function accel(s){ // 라그랑지 운동방정식에서 θ'', ω'' 계산
+  const [t1,w1,t2,w2]=s;
+  const d=t1-t2;
+  const D = 2*m1 + m2 - m2*Math.cos(2*d); // 공통 분모
+  const a1 = ( -g*(2*m1+m2)*Math.sin(t1)
+              - m2*g*Math.sin(t1-2*t2)
+              - 2*Math.sin(d)*m2*(w2*w2*L2 + w1*w1*L1*Math.cos(d)) )
+            / (L1*D);
+  const a2 = ( 2*Math.sin(d)*( w1*w1*L1*(m1+m2) + g*(m1+m2)*Math.cos(t1) + w2*w2*L2*m2*Math.cos(d) ) )
+            / (L2*D);
+  return [w1,a1,w2,a2]; // dθ/dt, dω/dt
+}
+function rk4(s,dt){
+  const a1=accel(s);
+  const s2=[s[0]+a1[0]*dt/2,s[1]+a1[1]*dt/2,s[2]+a1[2]*dt/2,s[3]+a1[3]*dt/2];
+  const a2=accel(s2);
+  const s3=[s[0]+a2[0]*dt/2,s[1]+a2[1]*dt/2,s[2]+a2[2]*dt/2,s[3]+a2[3]*dt/2];
+  const a3=accel(s3);
+  const s4=[s[0]+a3[0]*dt,s[1]+a3[1]*dt,s[2]+a3[2]*dt,s[3]+a3[3]*dt];
+  const a4=accel(s4);
+  return s.map((v,i)=>v+(dt/6)*(a1[i]+2*a2[i]+2*a3[i]+a4[i]));
+}
+function energy(s){
+  const [t1,w1,t2,w2]=s;
+  const KE=0.5*m1*L1*L1*w1*w1 + 0.5*m2*(L1*L1*w1*w1+L2*L2*w2*w2+2*L1*L2*w1*w2*Math.cos(t1-t2));
+  const PE=-(m1+m2)*g*L1*Math.cos(t1)-m2*g*L2*Math.cos(t2);
+  return {KE,PE,total:KE+PE};
+}
+
+let state=[120*Math.PI/180,0,90*Math.PI/180,0];
+let trail=[]; // 뒤끝 궤적
+function resetPend(){
+  state=[120*Math.PI/180,0,90*Math.PI/180,0];
+  trail=[];
+}
+const dt=0.015;
+let lastE=0,initTotal=0;
+function step(){
+  const m1v=document.getElementById('m1').value;
+  const m2v=document.getElementById('m2').value;
+  m1=+m1v;m2=+m2v;
+  if(m1v!==m1||m2v!==m2){}
+  if(!initTotal)initTotal=energy(state).total;
+  for(let i=0;i<1;i++){
+    state=rk4(state,dt);
+    const e=energy(state).total;
+    lastE=e;
+  }
+  // 뒤 끝 마커 저장
+  const x2=W/2+Math.sin(state[2])*L2*140;
+  const y2=H/2+40+Math.cos(state[2])*L2*140;
+  trail.push([x2,y2]);
+  if(trail.length>900)trail.shift();
+}
+function draw(){
+  step();
+  ctx.fillStyle='#0a0d14';ctx.fillRect(0,0,W,H);
+  // 궤적 (뒤 끝)
+  ctx.lineWidth=1.2;
+  for(let i=1;i<trail.length;i++){
+    const a=trail[i-1],b=trail[i];
+    const hu=(i/trail.length)*260;
+    ctx.strokeStyle=`hsla(${hu},90%,60%,${0.5+0.5*i/trail.length})`;
+    ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();
+  }
+  const [t1,w1,t2,w2]=state;
+  const cx=W/2,cy=H/2+40;
+  const x1=cx+Math.sin(t1)*L1*140, y1=cy+Math.cos(t1)*L1*140;
+  const x2=x1+Math.sin(t2)*L2*140, y2=y1+Math.cos(t2)*L2*140;
+  // 지지점
+  ctx.fillStyle='rgba(255,255,255,0.4)';ctx.beginPath();ctx.arc(cx,cy,4,0,7);ctx.fill();
+  // 질량2 궤적 연결점
+  ctx.fillStyle='#f472b6';ctx.beginPath();ctx.arc(x1,y1,5,0,7);ctx.fill();
+  // 막대
+  ctx.strokeStyle='rgba(255,255,255,0.7)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(x1,y1);ctx.stroke();
+  ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  // 질량1
+  ctx.fillStyle='#60a5fa';ctx.beginPath();ctx.arc(x1,y1,m1*8,0,7);ctx.fill();
+  // 질량2
+  ctx.fillStyle='#f472b6';ctx.beginPath();ctx.arc(x2,y2,m2*9,0,7);ctx.fill();
+
+  const e=energy(state);
+  const drift=Math.abs(e.total-initTotal)/initTotal*100;
+  document.getElementById('stats').innerHTML=
+    '각① <b>'+Math.round(t1*180/Math.PI)+'°</b> · 각② <b>'+Math.round(t2*180/Math.PI)+'°</b>'+
+    ' · 에너지 드리프트 <b style="color:'+(drift<1?'var(--green)':drift<5?'var(--yellow)':'var(--pink)')+'">'+drift.toFixed(2)+'%</b>'+
+    '<br>KE <b>'+e.KE.toFixed(2)+'</b> · PE <b>'+e.PE.toFixed(2)+'</b> · 총 <b>'+e.total.toFixed(2)+'</b>';
+}
+function loop(){draw();requestAnimationFrame(loop);}
+loop();
+</script>
+</body>
+</html>

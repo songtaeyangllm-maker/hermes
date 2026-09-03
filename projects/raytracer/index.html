@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Raytracer</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--accent:#60a5fa;--muted:#9ca3af;--card2:#1f2434;--border:#2a3042}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px;min-height:100vh}
+h1{font-size:24px;letter-spacing:2px}h1 span{color:var(--accent)}
+.sub{color:var(--muted);font-size:13px;margin-bottom:12px}
+.controls{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;justify-content:center}
+button{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:7px 13px;font-size:12px;border-radius:7px;cursor:pointer;transition:all .2s}
+button:hover{border-color:var(--accent)}
+button.acc{background:var(--accent);color:#0b0e16;border:none;font-weight:600}
+canvas{background:#0a0d14;border:1px solid var(--border);border-radius:12px}
+.metrics{color:var(--muted);font-size:12px;background:var(--card2);padding:10px 16px;border-radius:10px;border:1px solid var(--border);margin-top:10px;text-align:center}
+.metrics b{color:var(--text)}
+input[type=range]{accent-color:var(--accent)}
+</style>
+</head>
+<body>
+<h1>HERMES <span>RAYTRACER</span></h1>
+<div class="sub">Whitted 광선추적 · 반사/굴절 · 렌더링</div>
+<div class="controls">
+  <label style="font-size:12px;color:var(--muted)">반사심도 <select id="recdepth"><option>0</option><option>1</option><option selected>2</option><option>3</option></select></label>
+  <button class="acc" onclick="render()">▶ 렌더</button>
+  <button onclick="preset('spheres')">구들</button>
+  <button onclick="preset('mirror')">거울</button>
+  <button onclick="preset('checker')">체커</button>
+</div>
+<canvas id="cv" style="width:540px;height:360px"></canvas>
+<div class="metrics" id="stats">렌더를 누르세요</div>
+<script>
+'use strict';
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const W=540,H=360;cv.width=W;cv.height=H;
+
+// ----- 3D 벡터 -----
+function v3(x,y,z){return {x,y,z};}
+function dot(a,b){return a.x*b.x+a.y*b.y+a.z*b.z;}
+function sub(a,b){return v3(a.x-b.x,a.y-b.y,a.z-b.z);}
+function add(a,b){return v3(a.x+b.x,a.y+b.y,a.z+b.z);}
+function mul(a,s){return v3(a.x*s,a.y*s,a.z*s);}
+function norm(a){const l=Math.sqrt(dot(a,a));return mul(a,1/Math.max(1e-9,l));}
+function cross(a,b){return v3(a.y*b.z-a.z*b.y,a.z*b.x-a.x*b.z,a.x*b.y-a.y*b.x);}
+function reflect(d,n){return sub(d,mul(n,2*dot(d,n)));}
+// 스넬 굴절 (표준 glsl 규약: d=진행방향, n=표면법선)
+function refract(d,n,ni,nt){
+  const eta=ni/nt;
+  const c=dot(n,d);
+  const k=1-eta*eta*(1-c*c);
+  if(k<0)return null;
+  const sq=Math.sqrt(k);
+  return v3(
+    eta*d.x-(eta*c+sq)*n.x,
+    eta*d.y-(eta*c+sq)*n.y,
+    eta*d.z-(eta*c+sq)*n.z);
+}
+function fresnel(d,n,ni,nt){
+  let r0=((ni-nt)/(ni+nt));r0=r0*r0;
+  const c=Math.abs(dot(d,n));
+  return r0+(1-r0)*Math.pow(1-c,5);
+}
+
+// ----- 장면 -----
+// 구: {c,r,color,reflect,refract,ior,emissive}
+let spheres=[],floor=null,skyColor=v3(0.55,0.65,0.8),lightPos=v3(0,8,2),lightColor=v3(1,1,1),layout='spheres';
+
+function preset(name){
+  layout=name;
+  buildScene();
+  render();
+}
+function buildScene(){
+  spheres=[];
+  lightPos=v3(2,6,3);lightColor=v3(1,0.95,0.9);
+  floor={y:0,checkSize:1.6,reflect:0.2}; // y=0 평면
+  if(layout==='spheres'){
+    spheres=[
+      {c:v3(-1.6,1.2,0),r:1.2,color:v3(0.9,0.25,0.25),reflect:0.15,refract:0,ior:1.5},
+      {c:v3(0,1.0,0.4),r:1.0,color:v3(0.25,0.7,0.25),reflect:0.1,refract:0.35,ior:1.5},
+      {c:v3(1.6,0.9,0),r:0.9,color:v3(0.25,0.4,0.9),reflect:0.6,refract:0,ior:1.5},
+      {c:v3(0,3.5,0),r:2.4,color:v3(1,0.9,0.7),reflect:0.05,emissive:v3(0.5,0.45,0.35)},
+    ];
+  }else if(layout==='mirror'){
+    spheres=[
+      {c:v3(-1.7,1.5,0),r:1.5,color:v3(0.85,0.85,0.9),reflect:0.92,refract:0},
+      {c:v3(0.8,0.7,0.4),r:0.7,color:v3(0.2,0.6,0.9),reflect:0.3,refract:0.4,ior:1.4},
+      {c:v3(-0.2,0.5,2.0),r:0.5,color:v3(0.95,0.7,0.2),emissive:v3(0.5,0.35,0.1)},
+    ];
+  }else{ // checker
+    spheres=[
+      {c:v3(0,1.0,0),r:1.0,color:v3(0.85,0.8,0.7),reflect:0.5,refract:0},
+      {c:v3(-1.9,0.8,-0.6),r:0.8,color:v3(0.3,0.9,0.9),reflect:0.15,refract:0.3,ior:1.52},
+      {c:v3(1.8,0.7,0.5),r:0.7,color:v3(0.95,0.6,0.2),reflect:0.2,refract:0},
+    ];
+  }
+}
+
+function intersectSphere(ro,rd,s){
+  const oc=sub(ro,s.c);
+  const b=dot(oc,rd),c=dot(oc,oc)-s.r*s.r;
+  const disc=b*b-c;
+  if(disc<0)return -1;
+  const sq=Math.sqrt(disc);
+  let t=-b-sq;
+  if(t<1e-4)t=-b+sq;
+  return (t>1e-4)?t:-1;
+}
+function intersectFloor(ro,rd){
+  if(Math.abs(rd.y)<1e-6)return -1;
+  const t=-ro.y/rd.y;
+  return (t>1e-4)?t:-1;
+}
+function shadeFloor(hit,rd){
+  const p=hit.p;
+  const ch=Math.floor(p.x/hit.checkSize+0.5)+Math.floor(p.z/hit.checkSize+0.5);
+  const check=(ch%2===0)?v3(0.95,0.93,0.88):v3(0.32,0.33,0.38);
+  let col=check;
+  // 체커 라인 하이라이트
+  const fx=Math.abs(p.x-hit.checkSize*Math.round(p.x/hit.checkSize));
+  const fz=Math.abs(p.z-hit.checkSize*Math.round(p.z/hit.checkSize));
+  if((fx<0.03&&p.x>1e-4)||fz<0.03&&p.z>1e-4)col=mul(col,1.15);
+  return {col,n:v3(0,1,0),refl:hit.reflect};
+}
+
+// 장면 교차: 최단 t
+function trace(ro,rd){
+  let bestT=1e9,best=null,type=null;
+  for(const s of spheres){
+    const t=intersectSphere(ro,rd,s);
+    if(t>0&&t<bestT){bestT=t;best=s;type='sphere';}
+  }
+  if(layout!=='mirror'||true){
+    const t=intersectFloor(ro,rd);
+    if(t>0&&t<bestT){bestT=t;best={p:null,checkSize:floor.checkSize,reflect:floor.reflect,y:0};type='floor';}
+  }
+  if(bestT>1e8)return null;
+  const p=add(ro,mul(rd,bestT));
+  if(type==='sphere'){
+    const n=norm(sub(p,best.c));
+    return {p,n,mat:{color:best.color,reflect:best.reflect,refract:best.refract,ior:best.ior,emissive:best.emissive||v3(0,0,0)}};
+  }else{
+    return {p,n:v3(0,1,0),mat:{color:null,reflect:best.reflect,useFloor:true,checkSize:best.checkSize}};
+  }
+}
+
+const TINY=1e-4;
+function shade(ro,rd,depth){
+  const hit=trace(ro,rd);
+  if(!hit)return skyColor;
+  // self-emissive (조명 구)
+  const mat=hit.mat;
+  if(mat.emissive&&(mat.emissive.x+mat.emissive.y+mat.emissive.z)>0.01&&!mat.useFloor)
+    return mat.emissive;
+  let col=v3(0,0,0);
+  if(mat.useFloor){
+    const sh=shadeFloor(hit,rd);
+    col=sh.col; hit.n=sh.n; mat.refl=sh.refl; mat.reflect=sh.refl;
+  }else{
+    col=mat.color;
+  }
+  const n=hit.n;
+  // diffuse + specular (Phong)
+  const l=norm(sub(lightPos,hit.p));
+  const ndl=Math.max(0,dot(n,l));
+  const diffuse=mul(lightColor,ndl);
+  const vrn=norm(mul(rd,-1));
+  const hvec=norm(add(l,vrn));
+  const spec=Math.pow(Math.max(0,dot(n,hvec)),40);
+  let ambient=v3(0.15,0.15,0.18);
+  let final=v3(
+    col.x*(ambient.x+diffuse.x)+(spec*lightColor.x),
+    col.y*(ambient.y+diffuse.y)+(spec*lightColor.y),
+    col.z*(ambient.z+diffuse.z)+(spec*lightColor.z));
+
+  // 그림자 검사 (하드 섀도우)
+  const shd=shadow(hit.p,lightPos);
+  if(!shd){
+    final=v3(final.x*0.3,final.y*0.3,final.z*0.3);
+  }
+  // 반사
+  if(mat.reflect>0&&depth>0){
+    const d=norm(reflect(rd,n));
+    const rcol=shade(hit.p,d,depth-1);
+    final=v3(final.x*(1-mat.reflect)+rcol.x*mat.reflect,
+             final.y*(1-mat.reflect)+rcol.y*mat.reflect,
+             final.z*(1-mat.reflect)+rcol.z*mat.reflect);
+  }
+  // 굴절
+  if(mat.refract>0&&depth>0){
+    const rd2=refract(rd,n,1,mat.ior);
+    if(rd2){
+      const tcol=shade(hit.p,rd2,depth-1);
+      const refl=0.1;
+      final=v3(final.x*(1-refl)+tcol.x*refl,
+               final.y*(1-refl)+tcol.y*refl,
+               final.z*(1-refl)+tcol.z*refl);
+    }
+  }
+  return final;
+}
+function shadow(p,light){
+  const l=norm(sub(light,p));
+  for(const s of spheres){
+    const t=intersectSphere(p,l,s);
+    if(t>0&&t<Math.hypot(light.x-p.x,light.y-p.y,light.z-p.z)-1e-3)return true;
+  }
+  return false;
+}
+
+function render(){
+  buildScene();
+  const img=ctx.createImageData(W,H);
+  const cam=v3(0,3.2,8),lookAt=v3(0,1.4,0),fov=0.75;
+  const fw=norm(sub(lookAt,cam));
+  const up=v3(0,1,0);
+  const right=norm(cross(fw,up));
+  const up2=norm(cross(right,fw));
+  const depth=+document.getElementById('recdepth').value;
+  for(let py=0;py<H;py++){
+    for(let px=0;px<W;px++){
+      // 픽셀→월드 광선 (최소 2x2 수퍼샘플링 억제 - 속도)
+      const sx=(px/W*2-1)*fov*(W/H);
+      const sy=(1-py/H*2)*fov;
+      const dir=norm(add(add(mul(right,sx),mul(up2,sy)),fw));
+      let c=shade(cam,dir,depth);
+      const idx=(py*W+px)*4;
+      img.data[idx]=Math.min(255,c.x*255);
+      img.data[idx+1]=Math.min(255,c.y*255);
+      img.data[idx+2]=Math.min(255,c.z*255);
+      img.data[idx+3]=255;
+    }
+    if(py%60===59){drawProgress(py);}
+  }
+  ctx.putImageData(img,0,0);
+  document.getElementById('stats').innerHTML='렌더 완료 · '+W+'×'+H+' · '+spheres.length+'개 구 · 반사심도 '+depth+' · 광선수 '+(W*H*depth+1).toLocaleString();
+}
+function drawProgress(py){
+  ctx.fillStyle='#0a0d14';ctx.fillRect(0,py,80,4);
+  ctx.fillStyle='#60a5fa';ctx.fillRect(0,py,80*(py/H),4);
+}
+render();
+</script>
+</body>
+</html>

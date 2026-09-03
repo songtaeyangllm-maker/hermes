@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Lorenz</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--accent:#60a5fa;--muted:#9ca3af;--card2:#1f2434;--border:#2a3042}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px;min-height:100vh;overflow:hidden}
+h1{font-size:24px;letter-spacing:2px}h1 span{color:var(--accent)}
+.sub{color:var(--muted);font-size:13px;margin-bottom:12px}
+.controls{display:flex;gap:16px;align-items:center;margin-bottom:12px;flex-wrap:wrap;justify-content:center}
+button{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:7px 13px;font-size:12px;border-radius:7px;cursor:pointer;transition:all .2s}
+button:hover{border-color:var(--accent)}
+canvas{background:#0a0d14;border:1px solid var(--border);border-radius:12px}
+.metrics{color:var(--muted);font-size:12px;background:var(--card2);padding:10px 16px;border-radius:10px;border:1px solid var(--border);margin-top:10px;min-width:300px;text-align:center}
+.metrics b{color:var(--accent)}
+input[type=range]{accent-color:var(--accent)}
+</style>
+</head>
+<body>
+<h1>HERMES <span>LORENZ</span></h1>
+<div class="sub">초난수계 · 나비 효과 · RK4 적분</div>
+<div class="controls">
+  <label style="font-size:12px;color:var(--muted)">σ <input type="range" id="sigma" min="1" max="20" value="10" style="width:80px"></label>
+  <label style="font-size:12px;color:var(--muted)">ρ <input type="range" id="rho" min="1" max="50" value="28" style="width:120px"></label>
+  <label style="font-size:12px;color:var(--muted)">β <input type="range" id="beta" min="1" max="10" value="2.667" step="0.1" style="width:80px"></label>
+  <button onclick="resetTraj()">⟳ 리셋</button>
+  <button onclick="twoTraj=!twoTraj;this.textContent=twoTraj?'🌡 두 궤적':'🌡 단일 궤적'">🌡 두 궤적</button>
+</div>
+<canvas id="cv"></canvas>
+<div class="metrics" id="stats">계산 중...</div>
+<script>
+'use strict';
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const W=720,H=460;cv.width=W;cv.height=H;
+
+// Lorenz 시스템
+function deriv(s,σ,ρ,β){ // s=[x,y,z]
+  return [σ*(s[1]-s[0]), s[0]*(ρ-s[2])-s[1], s[0]*s[1]-β*s[2]];
+}
+function rk4(s,σ,ρ,β,dt){
+  const k1=deriv(s,σ,ρ,β),t1=s.map((v,i)=>v+k1[i]*dt/2);
+  const k2=deriv(t1,σ,ρ,β),t2=s.map((v,i)=>v+k2[i]*dt/2);
+  const k3=deriv(t2,σ,ρ,β),t3=s.map((v,i)=>v+k3[i]*dt);
+  const k4=deriv(t3,σ,ρ,β);
+  return s.map((v,i)=>v+(dt/6)*(k1[i]+2*k2[i]+2*k3[i]+k4[i]));
+}
+
+// 3D 회전 투영 (yaw/pitch)
+let yaw=0.7,pitch=0.4,scale=6.5;
+function project(p){
+  const cx=p[0],cy=p[1],cz=p[2];
+  const cyw=Math.cos(yaw),syw=Math.sin(yaw);
+  const cp=Math.cos(pitch),sp=Math.sin(pitch);
+  const x1=cx*cyw-cz*syw,  z1=cx*syw+cz*cyw; // yaw
+  const y2=cy*cp-z1*sp,    z2=cy*sp+z1*cp;   // pitch
+  return {
+    x:W/2+x1*scale,
+    y:H/2-y2*scale,
+    z:z2 // depth
+  };
+}
+// 깊이 색상 (z → 파랑→빨강)
+function zcolor(z,minZ,maxZ){
+  const t=(z-minZ)/(maxZ-minZ+1e-9);
+  const r=Math.min(255,Math.round(30+225*t));
+  const g=Math.round(90+120*Math.sin(t*3.14));
+  const b=Math.min(255,Math.round(235-210*t));
+  return `rgb(${r},${g},${b})`;
+}
+
+let traj1=[],traj2=[],twoTraj=false;
+let curσ=10,curρ=28,curβ=8/3; // 현재 파라미터 (draw 통계용)
+const MAXPTS=3500;
+function push1(p){traj1.push(p.slice());if(traj1.length>MAXPTS)traj1.shift();}
+function push2(p){traj2.push(p.slice());if(traj2.length>MAXPTS)traj2.shift();}
+function step(){
+  curσ=+document.getElementById('sigma').value;
+  curρ=+document.getElementById('rho').value;
+  curβ=+document.getElementById('beta').value;
+  const σ=curσ,ρ=curρ,β=curβ;
+  const dt=0.005;
+  if(!traj1.length){traj1=[ [1,1,1.05] ];traj2=[ [1.0001,1,1.05] ];}
+  let s1=traj1[traj1.length-1], s2=traj2[traj2.length-1];
+  for(let i=0;i<4;i++){
+    s1=rk4(s1,σ,ρ,β,dt); if(twoTraj)s2=rk4(s2,σ,ρ,β,dt);
+  }
+  push1(s1); if(twoTraj)push2(s2);
+}
+function resetTraj(){traj1=[];traj2=[];}
+function draw(){
+  step();
+  ctx.fillStyle='#0a0d14';ctx.fillRect(0,0,W,H);
+  // z 범위
+  const all=(twoTraj?traj1.concat(traj2):traj1);
+  if(all.length<2)return;
+  let minZ=1e9,maxZ=-1e9;
+  for(const p of all){if(p[2]<minZ)minZ=p[2];if(p[2]>maxZ)maxZ=p[2];}
+
+  // 두 번째 궤적 (연한 노랑 - 민감성 시현)
+  if(twoTraj){
+    ctx.beginPath();
+    const p0=project(traj2[0]);
+    ctx.moveTo(p0.x,p0.y);
+    for(let i=1;i<traj2.length;i++){
+      const p=project(traj2[i]);
+      ctx.lineTo(p.x,p.y);
+    }
+    ctx.strokeStyle='rgba(251,191,36,0.35)';ctx.lineWidth=1;ctx.stroke();
+  }
+  // 주 궤적 (색상 그라데이션)
+  for(let i=1;i<traj1.length;i++){
+    const a=project(traj1[i-1]),b=project(traj1[i]);
+    ctx.strokeStyle=zcolor(b.z,minZ,maxZ);
+    ctx.globalAlpha=0.5+0.5*(i/traj1.length);
+    ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+  }
+  ctx.globalAlpha=1;
+
+  const s1=traj1[traj1.length-1];
+  // 시작점
+  const p0=project(traj1[0]);
+  ctx.fillStyle='#22c55e';ctx.beginPath();ctx.arc(p0.x,p0.y,4,0,7);ctx.fill();
+
+  // 통계
+  const t=traj1.length;
+  const div=twoTraj?sep2():0;
+  document.getElementById('stats').innerHTML=
+    'σ='+curσ+' ρ='+curρ+' β='+curβ.toFixed(2)+' · 포인트 <b>'+t+'</b>'+
+    (twoTraj?'<br>🐛 두 궤적 분리거리 <b style="color:var(--yellow)">'+div.toExponential(2)+'</b> (초기 1e-4 차이)':'');
+}
+function sep2(){
+  if(traj1.length<2||traj2.length<2)return 0;
+  const a=traj1[traj1.length-1],b=traj2[traj2.length-1];
+  return Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
+}
+// 드래그 회전
+let drag=null;
+cv.addEventListener('mousedown',e=>{drag={x:e.offsetX,y:e.offsetY};cv.style.cursor='grabbing';});
+window.addEventListener('mousemove',e=>{
+  if(!drag)return;
+  yaw+=(e.clientX-drag.x)*0.01; pitch+=(e.clientY-drag.y)*0.01;
+  pitch=Math.max(-1.4,Math.min(1.4,pitch));
+  drag={x:e.clientX,y:e.clientY};
+});
+window.addEventListener('mouseup',()=>{drag=null;cv.style.cursor='grab';});
+cv.style.cursor='grab';
+
+function loop(){draw();requestAnimationFrame(loop);}
+loop();
+</script>
+</body>
+</html>

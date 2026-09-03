@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes SIR Epidemic</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--accent:#60a5fa;--muted:#9ca3af;--card2:#1f2434;--border:#2a3042;--red:#ef4444;--yellow:#fbbf24;--green:#22c55e}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px;min-height:100vh}
+h1{font-size:24px;letter-spacing:2px}h1 span{color:var(--red)}
+.sub{color:var(--muted);font-size:13px;margin-bottom:14px}
+.params{display:grid;grid-template-columns:repeat(3,auto);gap:10px 22px;background:var(--card2);padding:14px 22px;border-radius:12px;border:1px solid var(--border);margin-bottom:14px}
+.params label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.controls{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;justify-content:center}
+button{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:7px 14px;font-size:12px;border-radius:7px;cursor:pointer;transition:all .2s}
+button:hover{border-color:var(--accent)}
+button.run{background:var(--red);color:#fff;border:none;font-weight:600}
+canvas{background:#0d0f16;border:1px solid var(--border);border-radius:12px}
+.legend{display:flex;gap:18px;margin-top:12px;font-size:12px;color:var(--muted)}
+.legend span{display:flex;align-items:center;gap:6px}
+.dot{width:11px;height:11px;border-radius:50%;display:inline-block}
+.metrics{color:var(--muted);font-size:13px;background:var(--card2);padding:12px 18px;border-radius:10px;border:1px solid var(--border);margin-top:12px;text-align:center}
+.metrics b{color:var(--text)}
+input[type=range]{accent-color:var(--red);width:120px}
+</style>
+</head>
+<body>
+<h1>HERMES <span>SIR</span> EPIDEMIC</h1>
+<div class="sub">전염병 모델 · Susceptible–Infected–Recovered · RK4 적분</div>
+<div class="params">
+  <label>감염률 β <input type="range" id="beta" min="0.05" max="1.0" step="0.01" value="0.3"></label>
+  <label>회복률 γ <input type="range" id="gamma" min="0.02" max="0.3" step="0.01" value="0.1"></label>
+  <label>초기감염 I₀ <input type="range" id="i0" min="1" max="50" step="1" value="5"></label>
+</div>
+<div class="controls">
+  <button class="run" onclick="resetRun()">▶ 실행</button>
+  <button class="run" onclick="resetRun2()" style="background:var(--accent)">🛡 방역 비교</button>
+  <button onclick="speed=Math.max(1,speed-2);lbl.textContent='×'+speed">⏪</button>
+  <b id="lbl" style="font-size:12px">×5</b>
+  <button onclick="speed=Math.min(40,speed+2);lbl.textContent='×'+speed">⏩</button>
+</div>
+<canvas id="cv"></canvas>
+<div class="legend">
+  <span><span class="dot" style="background:var(--green)"></span>비감염 S</span>
+  <span><span class="dot" style="background:var(--red)"></span>감염 I</span>
+  <span><span class="dot" style="background:var(--yellow)"></span>회복 R</span>
+  <span><span class="dot" style="background:#818cf8"></span>방역 R'</span>
+</div>
+<div class="metrics" id="stats">실행을 누르세요</div>
+<script>
+'use strict';
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const W=760,H=400;cv.width=W;cv.height=H;
+const POP=1000;
+let speed=5,animId=null,runLock=false;
+
+// SIR ODE: dS=-βSI/N, dI=βSI/N-γI, dR=γI
+function derive(S,I,β,γ,N){return [-β*S*I/N,(β*S*I/N)-γ*I,γ*I];}
+function rk4(S,I,R,β,γ,N,dt){
+  const d1=derive(S,I,β,γ,N), t=[S+d1[0]*dt/2,I+d1[1]*dt/2,R+d1[2]*dt/2];
+  const d2=derive(t[0],t[1],β,γ,N), t2=[S+d2[0]*dt/2,I+d2[1]*dt/2,R+d2[2]*dt/2];
+  const d3=derive(t2[0],t2[1],β,γ,N), t3=[S+d3[0]*dt,I+d3[1]*dt,R+d3[2]*dt];
+  const d4=derive(t3[0],t3[1],β,γ,N);
+  return [S+(dt/6)*(d1[0]+2*d2[0]+2*d3[0]+d4[0]),
+          I+(dt/6)*(d1[1]+2*d2[1]+2*d3[1]+d4[1]),
+          R+(dt/6)*(d1[2]+2*d2[2]+2*d3[2]+d4[2])];
+}
+
+let hist=[],hist2=[],tSim=0;
+const TMAX=60*80; // 60일 × 80스텝/일
+let dt=1/80;
+
+// 단일 실행
+function resetRun(){
+  const β=+document.getElementById('beta').value;
+  const γ=+document.getElementById('gamma').value;
+  const I0=+document.getElementById('i0').value;
+  let S=POP-I0,I=I0,R=0;hist=[];hist2=[];tSim=0;
+  for(let k=0;k<TMAX;k++){
+    hist.push([S,I,R]);
+    const n=rk4(S,I,R,β,γ,POP,dt); S=n[0];I=n[1];R=n[2];
+    if(I<1e-9)break;
+  }
+  // 방역 비교: 시점 30일에 β 절반 (봉쇄 효과)
+  let S2=POP-I0,I2=I0,R2=0;
+  for(let k=0;k<TMAX;k++){
+    hist2.push([S2,I2,R2]);
+    let b=β;
+    if(k/80>=30)b=β*0.5; // 30일부터 방역
+    const n=rk4(S2,I2,b,γ,POP,dt); S2=n[0];I2=n[1];R2=n[2];
+    if(I2<1e-9)break;
+  }
+  draw();
+}
+// 이중 실행 (방역 비교)
+function resetRun2(){resetRun();}
+
+function draw(){
+  ctx.fillStyle='#0d0f16';ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=1;
+  for(let i=0;i<5;i++){const y=H*0.15+i*H*0.175;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  // 축
+  ctx.fillStyle='rgba(255,255,255,0.3)';ctx.font='10px sans-serif';
+  const xMax=tSim/80;
+  ctx.fillText('0일',4,H-4);ctx.fillText(Math.round(xMax)+'일',W-46,H-4);
+  ctx.fillText('인구',4,14);
+
+  // 히스토리 플롯
+  function plot(h,color,name,offsetY){
+    if(h.length<2)return;
+    ctx.strokeStyle=color;ctx.lineWidth=2;
+    ctx.beginPath();
+    for(let i=0;i<h.length;i++){
+      const x=i/(TMAX)*W;
+      const y=H-10-(h[i][0]/POP)*(H-40);
+      if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+  // 배경: 원래 S/I/R (기본 방역없음)
+  ctx.strokeStyle='#22c55e';ctx.lineWidth=1.6;ctx.beginPath();
+  for(let i=0;i<hist.length;i++){const x=i/(TMAX)*W;const y=H-10-(hist[i][0]/POP)*(H-40);i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();
+  ctx.strokeStyle='#f87171';ctx.lineWidth=2.4;ctx.beginPath();
+  for(let i=0;i<hist.length;i++){const x=i/(TMAX)*W;const y=H-10-(hist[i][1]/POP)*(H-40);i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();
+  ctx.strokeStyle='#fbbf24';ctx.lineWidth=1.6;ctx.beginPath();
+  for(let i=0;i<hist.length;i++){const x=i/(TMAX)*W;const y=H-10-(hist[i][2]/POP)*(H-40);i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();
+  tSim=hist.length/80;
+
+  // 방역비교 I' (파란 점선)
+  if(hist2.length){
+    ctx.setLineDash([5,4]);ctx.strokeStyle='#818cf8';ctx.lineWidth=2;ctx.beginPath();
+    for(let i=0;i<hist2.length;i++){const x=i/(TMAX)*W;const y=H-10-(hist2[i][1]/POP)*(H-40);i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();
+    ctx.setLineDash([]);
+    // 방역 시작 마커
+    const ms=Math.min(30,TMAX/80);ctx.fillStyle='rgba(129,140,248,0.7)';
+    ctx.beginPath();ctx.arc((30*80/TMAX)*W,H-10-(hist2[30*80]?hist2[30*80][1]/POP*(H-40):0),4,0,7);ctx.fill();
+  }
+
+  // 통계
+  const pkI=Math.max(...hist.slice(0,tSim*80).map(h=>h[1]));
+  const pkI2=hist2.length?Math.max(...hist2.map(h=>h[1])):0;
+  const finalS=hist[hist.length-1][0];
+  const finalR=hist[hist.length-1][2];
+  const attack=(1-finalS/POP)*100;
+  const β=+document.getElementById('beta').value,γ=+document.getElementById('gamma').value;
+  const R0=β/γ;
+  document.getElementById('stats').innerHTML=
+    '기본재생산수 R₀=<b style="color:'+(R0>=1?'var(--red)':'var(--green)')+'">'+R0.toFixed(2)+'</b>'+
+    ' · 최대감염 <b>'+Math.round(pkI)+'</b>('+(pkI/POP*100).toFixed(1)+'%)'+
+    (hist2.length?' → 방역 시 <b style="color:var(--accent)">'+Math.round(pkI2)+'</b>':'')+
+    ' · 누적감염 <b>'+attack.toFixed(1)+'%</b>'+
+    '<br>R₀'+(R0>=1?' ≥ 1 →  '+'🧪 유행 확산':' < 1 → ✅ 박멸')+
+    (hist2.length?(' · 방역이 최대감염을 <b>'+(100-(pkI2/pkI*100)).toFixed(0)+'%</b> 줄임'):'');
+}
+
+// 일시정지/재생 대신 애니메이션 루프 (드로잉 스텝)
+function loop(){
+  draw();
+  setTimeout(loop,120);
+}
+document.getElementById('beta').addEventListener('input',()=>{resetRun();lbl2();});
+document.getElementById('gamma').addEventListener('input',()=>{resetRun();lbl2();});
+document.getElementById('i0').addEventListener('input',()=>{resetRun();lbl2();});
+function lbl2(){}
+resetRun();loop();
+</script>
+</body>
+</html>
