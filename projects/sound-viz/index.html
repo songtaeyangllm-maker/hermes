@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Sound Visualizer</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px}h1{font-size:28px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}.sub{color:var(--muted);font-size:14px;margin-bottom:24px}#canvas{border:2px solid var(--border);border-radius:8px}#controls{margin-top:16px;display:flex;justify-content:center;gap:16px;flex-wrap:wrap}.ctrl{background:var(--card);border:1px solid var(--border);padding:12px 20px;border-radius:8px;display:flex;gap:8px;align-items:center}.ctrl label{color:var(--muted);font-size:13px}.ctrl select,.ctrl input[type="range"]{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:4px}.btn{background:var(--accent);color:#0b0e16;border:none;padding:10px 20px;font-size:14px;border-radius:6px;cursor:pointer}.btn:hover{opacity:.9}.footer{margin-top:32px;color:var(--muted);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<h1>SOUND <span>VISUALIZER</span></h1>
+<div class="sub">마이크/오디오 파일/생성 사운드 실시간 시각화</div>
+<canvas id="canvas" width="800" height="400"></canvas>
+<div id="controls">
+  <div class="ctrl">
+    <label>소스:</label>
+    <select id="source">
+      <option value="mic">마이크</option>
+      <option value="file">오디오 파일</option>
+      <option value="synth">생성 사운드</option>
+    </select>
+  </div>
+  <div class="ctrl">
+    <label>모드:</label>
+    <select id="mode">
+      <option value="bars">막대 그래프</option>
+      <option value="wave">파형</option>
+      <option value="circle">원형</option>
+      <option value="particle">파티클</option>
+    </select>
+  </div>
+  <div class="ctrl">
+    <label>감도:</label>
+    <input type="range" id="sensitivity" min="0.1" max="3" step="0.1" value="1">
+    <span id="sensVal">1.0</span>
+  </div>
+  <div class="ctrl">
+    <label>색상:</label>
+    <input type="color" id="color" value="#60a5fa">
+  </div>
+  <input type="file" id="fileInput" accept="audio/*" style="display:none">
+  <button class="btn" id="playBtn" onclick="togglePlay()">재생</button>
+</div>
+<div class="footer">Hermes Sound Visualizer | Web Audio API 실시간 분석 | 계속 업데이트됨</div>
+
+<script>
+const canvas=document.getElementById('canvas');const ctx=canvas.getContext('2d');
+const W=800,H=400;
+let audioCtx=null,analyser=null,sourceNode=null,stream=null,dataArray=null;
+let isPlaying=false,animationId=null;
+let synthOsc=null,synthGain=null;
+
+function initAudio(){
+  audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  analyser=audioCtx.createAnalyser();
+  analyser.fftSize=256;
+  analyser.smoothingTimeConstant=0.8;
+  dataArray=new Uint8Array(analyser.frequencyBinCount);
+}
+
+function setupMic(){
+  if(!audioCtx)initAudio();
+  navigator.mediaDevices.getUserMedia({audio:true}).then(s=>{
+    stream=s;
+    sourceNode=audioCtx.createMediaStreamSource(stream);
+    sourceNode.connect(analyser);
+  }).catch(e=>alert('마이크 권한 필요'));
+}
+
+function setupFile(file){
+  if(!audioCtx)initAudio();
+  const url=URL.createObjectURL(file);
+  const audio=new Audio(url);
+  sourceNode=audioCtx.createMediaElementSource(audio);
+  sourceNode.connect(analyser);
+  analyser.connect(audioCtx.destination);
+  audio.play();
+}
+
+function setupSynth(){
+  if(!audioCtx)initAudio();
+  synthOsc=audioCtx.createOscillator();
+  synthGain=audioCtx.createGain();
+  synthOsc.type='sawtooth';
+  synthOsc.frequency.value=220;
+  synthGain.gain.value=0.3;
+  synthOsc.connect(synthGain);
+  synthGain.connect(analyser);
+  analyser.connect(audioCtx.destination);
+  synthOsc.start();
+}
+
+function stopAll(){
+  if(sourceNode){try{sourceNode.disconnect()}catch(e){}sourceNode=null}
+  if(synthOsc){try{synthOsc.stop();synthOsc.disconnect()}catch(e){}synthOsc=null}
+  if(synthGain){try{synthGain.disconnect()}catch(e){}synthGain=null}
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
+  if(audioCtx){audioCtx.suspend()}
+}
+
+function togglePlay(){
+  const src=document.getElementById('source').value;
+  if(isPlaying){
+    stopAll();
+    isPlaying=false;
+    document.getElementById('playBtn').textContent='재생';
+    cancelAnimationFrame(animationId);
+  }else{
+    if(src==='mic')setupMic();
+    else if(src==='file')document.getElementById('fileInput').click();
+    else if(src==='synth')setupSynth();
+    isPlaying=true;
+    document.getElementById('playBtn').textContent='정지';
+    draw();
+  }
+}
+
+document.getElementById('fileInput').onchange=e=>{if(e.target.files[0]){setupFile(e.target.files[0]);isPlaying=true;document.getElementById('playBtn').textContent='정지';draw()}}
+
+function draw(){
+  if(!analyser)return;
+  analyser.getByteFrequencyData(dataArray);
+  const sens=parseFloat(document.getElementById('sensitivity').value);
+  const mode=document.getElementById('mode').value;
+  const color=document.getElementById('color').value;
+  
+  ctx.fillStyle='rgba(11,14,22,0.2)';
+  ctx.fillRect(0,0,W,H);
+  
+  const bufferLength=dataArray.length;
+  
+  if(mode==='bars'){
+    const barW=(W/bufferLength)*2.5;
+    let x=0;
+    for(let i=0;i<bufferLength;i++){
+      const v=dataArray[i]/255*sens;
+      const h=Math.min(H,v*H);
+      ctx.fillStyle=color;
+      ctx.fillRect(x,H-h,barW,h);
+      x+=barW+1;
+    }
+  }else if(mode==='wave'){
+    const timeData=new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteTimeDomainData(timeData);
+    ctx.beginPath();
+    ctx.strokeStyle=color;
+    ctx.lineWidth=2;
+    for(let i=0;i<timeData.length;i++){
+      const x=(i/timeData.length)*W;
+      const y=(timeData[i]/128-1)*H/2*H/200+H/2;
+      if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }else if(mode==='circle'){
+    const cx=W/2,cy=H/2;
+    const radius=Math.min(W,H)/3;
+    ctx.beginPath();
+    ctx.strokeStyle=color;
+    ctx.lineWidth=3;
+    for(let i=0;i<bufferLength;i++){
+      const angle=(i/bufferLength)*Math.PI*2;
+      const v=dataArray[i]/255*sens;
+      const r=radius+v*radius*0.8;
+      const x=cx+Math.cos(angle)*r;
+      const y=cy+Math.sin(angle)*r;
+      if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }else if(mode==='particle'){
+    for(let i=0;i<bufferLength;i+=4){
+      const v=dataArray[i]/255*sens;
+      if(v>0.1){
+        const x=Math.random()*W;
+        const y=H-v*H;
+        const size=2+v*10;
+        ctx.fillStyle=color;
+        ctx.globalAlpha=v;
+        ctx.beginPath();
+        ctx.arc(x,y,size,0,Math.PI*2);
+        ctx.fill();
+        ctx.globalAlpha=1;
+      }
+    }
+  }
+  
+  document.getElementById('sensVal').textContent=sens.toFixed(1);
+  animationId=requestAnimationFrame(draw);
+}
+
+document.getElementById('sensitivity').oninput=e=>document.getElementById('sensVal').textContent=parseFloat(e.target.value).toFixed(1);
+document.getElementById('source').onchange=()=>{if(isPlaying)togglePlay()};
+document.getElementById('mode').onchange=()=>{};
+document.getElementById('color').onchange=()=>{};
+</script>
+</body>
+</html>

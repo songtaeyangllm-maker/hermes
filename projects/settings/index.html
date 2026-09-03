@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Settings</title>
+<style>
+:root { --bg:#0b0e16; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; --accent:#60a5fa; --good:#4ade80; --bad:#ef4444; }
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:32px}h1{font-size:28px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}.sub{color:var(--muted);font-size:14px;margin-bottom:32px}.settings-grid{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;width:100%;max-width=800px}.setting-row{display:flex;gap:16px;align-items:center;margin-bottom:20px}.setting-row.label{width:120px;font-size:13px;color:var(--muted)}.setting-row select,.setting-row input{background:var(--card2);border:1px solid var(--border);padding:10px;font-size:14px;color:var(--text);border-radius:6x;width:200px}.toggle{width:60px;height:30;background:#1a2540;border:1px solid var(--border);border-radius:15px;position:relative;cursor:pointer}.toggle-on{background:var(--good);position:absolute;left:0;top:0;width:30;height:30;border-radius:15px;transition:.3s}.theme-select{flex:1}.save-btn{background:var(--accent);color:#0b0e16;border:none;padding:12px 24px;font-size:14px;font-weight:bold;margin-top:32px;cursor}.save-btn:hover{opacity:.9}.default-btn{background:var(--card2);border:1px solid var(--border);padding:12px 24px;font-size:14px;color:var(--text);margin-left:16px;cursor}.default-btn:hover{background:var(--card3)}.empty{color:var(--muted);text-align:center;padding:20px}.footer{margin-top:32px;color:var(--muted);font-size:12px;text-align:center}.link{color:var(--accent);text-decoration:none;font-weight:bold;font-size:13px}.link:hover{text-decoration:underline}</style>
+</head>
+<body>
+<h1>SETTINGS <span></span></h1>
+<div class="sub">Hermes workspace 환경 설정 및 테마 맞춤</div>
+<div class="settings-grid">
+  <div class="setting-row">
+    <span class="label">테마</span>
+    <select class="theme-select" id="themeSelect">
+      <option value="dark">다크(dark)</option>
+      <option value="lavender">라벤더(lavender)</option>
+      <option value="ocean">오션(ocean)</option>
+    </select>
+  </div>
+  <div class="setting-row">
+    <span class="label">시작 페이지</span>
+    <select class="setting-row select" id="startPage">
+      <option value="dashboard">대시보드</option>
+      <option value="calendar">달력</option>
+      <option value="intelligence-center">AI 대시보드</option>
+    </select>
+  </div>
+  <div class="setting-row">
+    <span class="label">시스템 언어</span>
+    <select class="setting-row select" id="systemLang">
+      <option value="ko-KR">한국어</option>
+      <option value="en-US">English</option>
+    </select>
+  </div>
+  <div class="setting-row">
+    <span class="label">알림</span>
+    <div class="toggle" id="notificationToggle"></div>
+    <span class="status" id="notificationStatus">끄기</span>
+  </div>
+  <button class="save-btn" onclick="saveSettings()">저장</button>
+  <button class="default-btn" onclick="defaultSettings()">기본값 재설정</button>
+</div>
+<div class="empty" id="settingsEmpty" style="display:none">설정이 없습니다.</div>
+<div class="footer">Hermes Settings | 계속 업데이트됨 | 9시 동기화 재개</div>
+
+<script>
+// 저장된 설정 로드
+const savedSettings=JSON.parse(localStorage.getItem('hermesSettings')||'{}');
+const themeSelect=document.getElementById('themeSelect');
+const startPageSelect=document.getElementById('startPage');
+const systemLangSelect=document.getElementById('systemLang');
+const notificationToggle=document.getElementById('notificationToggle');
+const notificationStatus=document.getElementById('notificationStatus');
+const savedTheme=savedSettings.theme||'dark';
+const savedStartPage=savedSettings.startPage||'dashboard';
+const savedSystemLang=savedSettings.systemLang||'ko-KR';
+const savedNotification=savedSettings.notification||false;
+
+themeSelect.value=savedTheme;document.body.classList.add(savedTheme);
+startPageSelect.value=savedStartPage;
+systemLangSelect.value=savedSystemLang;
+
+function updateToggle(){notificationToggle.classList.toggle('toggle-on',savedNotification);notificationStatus.textContent=savedNotification?'켜기':'끄기'}
+updateToggle()
+
+function saveSettings(){const newSettings={
+  theme:themeSelect.value,
+  startPage:startPageSelect.value,
+  systemLang:systemLangSelect.value,
+  notification:savedNotification
+};localStorage.setItem('hermesSettings',JSON.stringify(newSettings));alert('설정이 저장되었습니다')}
+
+function defaultSettings(){localStorage.removeItem('hermesSettings');location.reload()}
+
+// 토글 상호작용
+notificationToggle.addEventListener('click',()=>{savedNotification=!savedNotification;updateToggle()})
+</script>
+</body>
+</html>

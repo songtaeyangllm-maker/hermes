@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Regex Tester</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:32px}h1{font-size:28px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}.sub{color:var(--muted);font-size:14px;margin-bottom:32px}.tester{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;width:100%;max-width=900px}.row{display:flex;gap:16px;margin-bottom:24px}.col{flex:1;display:flex;flex-direction:column}.label{font-size:12px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px}textarea,input{background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Consolas',monospace;font-size:14px;padding:12px;border-radius:8px;resize:vertical}.regex-input{height:80px}.test-input{height:200px}.flags{display:flex;gap:12px;margin-top:8px}.flag{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer}.flag input{width:16px;height:16px;accent-color:var(--accent)}.result{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:20px;margin-top:16px;min-height:150px}.match{background:rgba(96,165,250,0.3);border-radius:2px}.group{background:rgba(74,222,128,0.3);border-radius:2px}.info{font-size:13px;color:var(--muted);margin-top:12px}.error{color:var(--bad)}.success{color:var(--good)}.footer{margin-top:32px;color:var(--muted);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<h1>REGEX <span>TESTER</span></h1>
+<div class="sub">정규표현식 실시간 테스트 및 디버깅</div>
+<div class="tester">
+  <div class="row">
+    <div class="col">
+      <div class="label">정규표현식</div>
+      <input type="text" class="regex-input" id="regexInput" placeholder="/pattern/flags" value="/\\b\\w+@\\w+\\.\\w+\\b/g">
+      <div class="flags">
+        <label class="flag"><input type="checkbox" id="flagG" checked> g (전역)</label>
+        <label class="flag"><input type="checkbox" id="flagI"> i (대소문자 무시)</label>
+        <label class="flag"><input type="checkbox" id="flagM"> m (다중행)</label>
+        <label class="flag"><input type="checkbox" id="flagS"> s (dotAll)</label>
+        <label class="flag"><input type="checkbox" id="flagU"> u (유니코드)</label>
+      </div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col">
+      <div class="label">테스트 문자열</div>
+      <textarea class="test-input" id="testInput" placeholder="테스트할 텍스트를 입력하세요...">연락처: user@example.com, admin@test.co.kr, support@company.org
+전화: 010-1234-5678, 02-123-4567
+URL: https://github.com/user, http://example.com/path
+날짜: 2024-01-15, 2024/12/31
+IP: 192.168.1.1, 10.0.0.1</textarea>
+    </div>
+  </div>
+  <div class="result" id="result"></div>
+  <div class="info" id="info"></div>
+</div>
+<div class="footer">Hermes Regex Tester | JavaScript RegExp 엔진 | 계속 업데이트됨</div>
+
+<script>
+const regexInput=document.getElementById('regexInput');
+const testInput=document.getElementById('testInput');
+const resultDiv=document.getElementById('result');
+const infoDiv=document.getElementById('info');
+const flagInputs=['flagG','flagI','flagM','flagS','flagU'];
+
+function testRegex(){
+  const pattern=regexInput.value.trim();
+  const text=testInput.value;
+  let regex,flags='';
+  
+  try{
+    if(pattern.startsWith('/')){
+      const lastSlash=pattern.lastIndexOf('/');
+      const body=pattern.slice(1,lastSlash);
+      flags=pattern.slice(lastSlash+1);
+    }else{
+      flagInputs.forEach(id=>{if(document.getElementById(id).checked)flags+=id[4].toLowerCase()});
+    }
+    regex=new RegExp(body||pattern,flags);
+  }catch(e){
+    resultDiv.innerHTML=`<span class="error">잘못된 정규표현식: ${e.message}</span>`;
+    infoDiv.textContent='';
+    return;
+  }
+  
+  if(!text){
+    resultDiv.innerHTML='<span style="color:var(--muted)">테스트 문자열을 입력하세요</span>';
+    infoDiv.textContent='';
+    return;
+  }
+  
+  // 매치 강조 표시
+  let highlighted=text;
+  const matches=[...text.matchAll(regex)];
+  let offset=0;
+  
+  matches.forEach((match,i)=>{
+    const start=match.index+offset;
+    const end=start+match[0].length;
+    const before=highlighted.slice(0,start);
+    const matched=highlighted.slice(start,end);
+    const after=highlighted.slice(end);
+    const replacement=`<span class="match">${escapeHtml(matched)}</span>`;
+    highlighted=before+replacement+after;
+    offset+=replacement.length-matched.length;
+    
+    // 캡처 그룹 강조
+    if(match.length>1){
+      let groupOffset=0;
+      for(let g=1;g<match.length;g++){
+        if(match[g]){
+          const gs=match.index+offset+groupOffset+highlighted.indexOf(match[g],match.index+offset+groupOffset);
+          // 단순화: 그룹은 별도 표시
+        }
+      }
+    }
+  });
+  
+  resultDiv.innerHTML=highlighted.replace(/\n/g,'<br>');
+  
+  // 정보 표시
+  if(matches.length>0){
+    infoDiv.innerHTML=`<span class="success">${matches.length}개 매치 발견</span> | 플래그: ${flags||'(없음)'}`;
+    if(matches[0].length>1){
+      infoDiv.innerHTML+=` | 그룹: ${matches[0].length-1}개`;
+      matches.forEach((m,i)=>{
+        if(m.length>1){
+          infoDiv.innerHTML+=`<br>매치 ${i+1}: `+m.slice(1).map((g,gi)=>`$${gi+1}="${escapeHtml(g)}"`).join(', ');
+        }
+      });
+    }
+  }else{
+    infoDiv.innerHTML=`<span class="error">매치 없음</span> | 플래그: ${flags||'(없음)'}`;
+  }
+}
+
+function escapeHtml(text){
+  const div=document.createElement('div');
+  div.textContent=text;
+  return div.innerHTML;
+}
+
+['regexInput','testInput',...flagInputs].forEach(id=>{
+  document.getElementById(id).addEventListener('input',testRegex);
+  document.getElementById(id).addEventListener('change',testRegex);
+});
+
+testRegex();
+</script>
+</body>
+</html>

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Database Browser</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;height:100vh}
+header{background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;justify-content:space-between;align-items:center}
+header h1{font-size:18px;letter-spacing:1px}header h1 span{color:var(--accent)}
+.toolbar{display:flex;gap:8px;align-items:center}.btn{background:var(--accent);color:#0b0e16;border:none;padding:8px 16px;font-size:13px;border-radius:6px;cursor:pointer}.btn:hover{opacity:.9}.btn.secondary{background:var(--border);color:var(--text)}
+#main{flex:1;display:flex}
+#sidebar{width:280px;background:var(--card);border-right:1px solid var(--border);padding:16px;overflow-y:auto}
+#sidebar h3{font-size:12px;color:var(--muted);margin-bottom:12px;text-transform:uppercase}
+.db-item{padding:10px 12px;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:6px;background:var(--bg);border:1px solid var(--border)}
+.db-item:hover{background:var(--border)}.db-item.active{background:var(--accent);color:#0b0e16;border-color:var(--accent)}
+.table-item{padding:8px 12px;margin:2px 0;border-radius:4px;cursor:pointer;font-size:12px;color:var(--muted)}
+.table-item:hover{color:var(--text);background:var(--border)}.table-item.active{color:var(--accent);background:var(--bg)}
+#content{flex:1;display:flex;flex-direction:column;background:var(--bg);overflow:hidden}
+#query-bar{background:var(--card);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;gap:8px}
+#queryInput{flex:1;background:#0d1117;border:1px solid var(--border);color:var(--text);font-family:'Consolas',monospace;font-size:13px;padding:10px;border-radius:6px;resize:none;min-height:60px}
+#resultArea{flex:1;overflow:auto;padding:16px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border)}th{background:var(--card);color:var(--accent);position:sticky;top:0}tr:hover{background:var(--card)}.null{color:var(--muted);font-style:italic}
+#stats{background:var(--card);border-top:1px solid var(--border);padding:10px 16px;font-size:12px;color:var(--muted);display:flex;justify-content:space-between}
+.footer{padding:8px;color:var(--muted);font-size:11px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>DATABASE <span>BROWSER</span></h1>
+  <div class="toolbar">
+    <button class="btn" onclick="createSampleDB()">샘플 DB 생성</button>
+    <button class="btn secondary" onclick="exportDB()">내보내기</button>
+    <button class="btn secondary" onclick="importDB()">가져오기</button>
+    <input type="file" id="importFile" accept=".json,.sqlite" style="display:none" onchange="loadDBFile(event)">
+  </div>
+</header>
+<div id="main">
+  <div id="sidebar">
+    <h3>데이터베이스</h3>
+    <div id="dbList"></div>
+    <h3 style="margin-top:24px">테이블</h3>
+    <div id="tableList"></div>
+  </div>
+  <div id="content">
+    <div id="query-bar">
+      <textarea id="queryInput" placeholder="SQL 쿼리 입력 (SELECT * FROM users 등)..." spellcheck="false"></textarea>
+      <button class="btn" onclick="runQuery()">실행 (Ctrl+Enter)</button>
+      <button class="btn secondary" onclick="clearQuery()">지우기</button>
+    </div>
+    <div id="resultArea">
+      <div style="color:var(--muted);text-align:center;padding:40px">데이터베이스를 선택하거나 샘플 DB를 생성하세요</div>
+    </div>
+    <div id="stats"></div>
+  </div>
+</div>
+<div class="footer">Hermes Database Browser | SQL.js (SQLite in WASM) | 계속 업데이트됨</div>
+
+<script>
+// SQL.js 로드 (CDN)
+let SQL=null;
+async function initSQL(){
+  if(window.SQL){SQL=window.SQL;return}
+  const script=document.createElement('script');
+  script.src='https://cdn.jsdelivr.net/npm/sql.js@1.8.0/dist/sql-wasm.js';
+  document.head.appendChild(script);
+  await new Promise(r=>script.onload=r);
+  SQL=await window.SQL();
+}
+
+let db=null;let currentDB=null;let currentTable=null;
+
+async function createSampleDB(){
+  await initSQL();
+  db=new SQL.Database();
+  
+  // 샘플 테이블 생성
+  db.run(`CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT, age INTEGER, city TEXT, created_at TEXT)`);
+  db.run(`CREATE TABLE products (id INTEGER PRIMARY KEY, name TEXT, price REAL, category TEXT, stock INTEGER)`);
+  db.run(`CREATE TABLE orders (id INTEGER PRIMARY KEY, user_id INTEGER, product_id INTEGER, quantity INTEGER, total REAL, date TEXT)`);
+  
+  // 샘플 데이터
+  const users=[
+    [1,'김철수','chulsoo@email.com',28,'서울','2024-01-15'],
+    [2,'이영희','younghee@email.com',34,'부산','2024-02-20'],
+    [3,'박민수','minsu@email.com',22,'대구','2024-03-10'],
+    [4,'최수진','sujin@email.com',29,'인천','2024-04-05'],
+    [5,'정태양','taeyang@email.com',31,'광주','2024-05-12']
+  ];
+  users.forEach(u=>db.run('INSERT INTO users VALUES (?,?,?,?,?,?)',u));
+  
+  const products=[
+    [1,'무선 마우스',25000,'전자기기',100],
+    [2,'기계식 키보드',120000,'전자기기',50],
+    [3,'모니터 27인치',350000,'전자기기',30],
+    [4,'USB-C 허브',45000,'액세서리',80],
+    [5,'노트북 스탠드',35000,'액세서리',60]
+  ];
+  products.forEach(p=>db.run('INSERT INTO products VALUES (?,?,?,?,?)',p));
+  
+  const orders=[
+    [1,1,2,1,120000,'2024-06-01'],
+    [2,2,1,2,50000,'2024-06-05'],
+    [3,3,4,1,45000,'2024-06-10'],
+    [4,1,3,1,350000,'2024-06-15'],
+    [5,4,5,3,105000,'2024-06-20']
+  ];
+  orders.forEach(o=>db.run('INSERT INTO orders VALUES (?,?,?,?,?,?)',o));
+  
+  currentDB='sample';
+  updateDBList();
+  selectDB('sample');
+  showResult('샘플 데이터베이스 생성 완료',true);
+}
+
+function updateDBList(){
+  const list=document.getElementById('dbList');
+  list.innerHTML='';
+  const div=document.createElement('div');
+  div.className='db-item active';
+  div.textContent='📁 sample (SQLite)';
+  div.onclick=()=>selectDB('sample');
+  list.appendChild(div);
+}
+
+function selectDB(name){
+  currentDB=name;
+  document.querySelectorAll('.db-item').forEach(d=>d.classList.remove('active'));
+  document.querySelector('.db-item').classList.add('active');
+  updateTableList();
+}
+
+function updateTableList(){
+  if(!db)return;
+  const tables=db.exec('SELECT name FROM sqlite_master WHERE type="table"');
+  const list=document.getElementById('tableList');
+  list.innerHTML='';
+  if(tables[0]){
+    tables[0].values.forEach(row=>{
+      const div=document.createElement('div');
+      div.className='table-item';
+      div.textContent=row[0];
+      div.onclick=()=>selectTable(row[0]);
+      list.appendChild(div);
+    });
+  }
+}
+
+function selectTable(name){
+  currentTable=name;
+  document.querySelectorAll('.table-item').forEach(t=>t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('queryInput').value=`SELECT * FROM ${name}`;
+  runQuery();
+}
+
+function runQuery(){
+  if(!db){showResult('데이터베이스가 없습니다. 샘플 DB를 생성하세요.');return}
+  const sql=document.getElementById('queryInput').value.trim();
+  if(!sql){showResult('쿼리를 입력하세요');return}
+  
+  const start=performance.now();
+  try{
+    const results=db.exec(sql);
+    const elapsed=(performance.now()-start).toFixed(2);
+    renderResults(results,elapsed);
+  }catch(e){
+    showResult(`오류: ${e.message}`,false);
+  }
+}
+
+function renderResults(results,time){
+  const area=document.getElementById('resultArea');
+  if(!results||results.length===0||results[0].values.length===0){
+    area.innerHTML=`<div style="color:var(--muted);text-align:center;padding:40px">결과 없음 (${time}ms)</div>`;
+    updateStats(0,time);
+    return;
+  }
+  
+  const r=results[0];
+  let html=`<table><thead><tr>`;
+  r.columns.forEach(c=>html+=`<th>${c}</th>`);
+  html+=`</tr></thead><tbody>`;
+  r.values.forEach(row=>{
+    html+=`<tr>`;
+    row.forEach(v=>html+=`<td>${v===null?'<span class="null">NULL</span>':v}</td>`);
+    html+=`</tr>`;
+  });
+  html+=`</tbody></table>`;
+  area.innerHTML=html;
+  updateStats(r.values.length,time);
+}
+
+function updateStats(rows,time){
+  document.getElementById('stats').innerHTML=`행: ${rows} | 실행 시간: ${time}ms | 테이블: ${currentTable||'-'}`;
+}
+
+function showResult(msg,success=false){
+  const area=document.getElementById('resultArea');
+  area.innerHTML=`<div style="color:${success?'var(--good)':'var(--bad)'};text-align:center;padding:40px">${msg}</div>`;
+}
+
+function clearQuery(){
+  document.getElementById('queryInput').value='';
+}
+
+function exportDB(){
+  if(!db){alert('데이터베이스가 없습니다');return}
+  const data=db.export();
+  const blob=new Blob([data],{type:'application/octet-stream'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='database.sqlite';
+  a.click();
+}
+
+function importDB(){document.getElementById('importFile').click()}
+
+async function loadDBFile(e){
+  await initSQL();
+  const file=e.target.files[0];
+  if(!file)return;
+  const arrayBuffer=await file.arrayBuffer();
+  const u8=new Uint8Array(arrayBuffer);
+  db=new SQL.Database(u8);
+  currentDB='imported';
+  updateDBList();
+  selectDB('imported');
+  showResult('데이터베이스 가져오기 완료',true);
+}
+
+// 키보드 단축키
+document.addEventListener('keydown',e=>{
+  if(e.ctrlKey&&e.key==='Enter')runQuery();
+  if(e.ctrlKey&&e.key==='s'){e.preventDefault();exportDB()}
+});
+
+// 초기화
+initSQL().then(()=>console.log('SQL.js ready'));
+</script>
+</body>
+</html>

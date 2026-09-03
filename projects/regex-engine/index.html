@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Regex Engine</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;height:100vh;display:flex;flex-direction:column}
+header{background:var(--card);border-bottom:1px solid var(--border);padding:8px 16px}header h1{font-size:14px}header h1 span{color:var(--accent)}
+.main{flex:1;display:flex;gap:2px}
+.panel{background:var(--card);border:1px solid var(--border)}
+.input-panel{width:480px;display:flex;flex-direction:column}
+.regex-panel{width:320px;display:flex;flex-direction:column}
+#regexInput,#testString{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;font-family:monospace;font-size:13px;border-radius:4px;box-sizing:border-box}
+#regexInput{border-radius:4px 4px 0 0}
+#testString{border-radius:0;border-top:none}
+.regex-options{display:flex;gap:8px;padding:8px;background:var(--bg);border-bottom:1px solid var(--border)}
+.option-label{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
+.option-label input{width:14px;height:14px}
+.action-bar{padding:8px;background:var(--bg);display:flex;gap:8px;border-bottom:1px solid var(--border)}
+.btn{flex:1;background:var(--accent);color:#0b0e16;border:none;padding:8px;font-size:12px;border-radius:4px;cursor:pointer}
+.btn:hover{opacity:.9}.btn.secondary{background:var(--border);color:var(--text)}
+.match-display{padding:8px;font-family:monospace;font-size:12px;background:var(--bg);min-height:24px;border-bottom:1px solid var(--border);word-break:break-all}
+.match-display .match{background:rgba(74,222,128,.2);padding:2px 4px;border-radius:2px}
+.match-display .group{background:rgba(96,165,250,.2);padding:2px 4px;border-radius:2px;margin-left:4px}
+#dfaCanvas{width:100%;height:300px;border-bottom:1px solid var(--border)}
+#nfaCanvas{width:100%;height:300px;border-bottom:1px solid var(--border)}
+#stepCanvas{width:100%;height:150px;padding:8px;font-family:monospace;font-size:11px;overflow-y:auto}
+#transitionTable{width:100%;height:200px;padding:8px;font-family:monospace;font-size:11px;overflow-y:auto}
+.status-bar{background:var(--card);border-top:1px solid var(--border);padding:4px 12px;font-size:11px;color:var(--muted);display:flex;gap:16px}
+.status-bar span{color:var(--accent)}
+</style>
+</head>
+<body>
+<header><h1>REGEX <span>ENGINE</span> <span style="color:var(--muted);font-size:12px">DFA/NFA 시각화 + 단계별 매칭</span></h1></header>
+<div class="main">
+  <div class="panel input-panel">
+    <div style="padding:12px">
+      <input id="regexInput" placeholder="정규식 입력 (예: a(b|c)*d)" value="(a|b)*abb">
+      <div class="regex-options">
+        <label class="option-label"><input type="checkbox" id="caseInsensitive"> 대소문자 무시</label>
+        <label class="option-label"><input type="checkbox" id="global"> 전역 (g)</label>
+        <label class="option-label"><input type="checkbox" id="multiline"> 다중행 (m)</label>
+        <label class="option-label"><input type="checkbox" id="dotAll"> 모든 문자 (s)</label>
+      </div>
+      <input id="testString" placeholder="검색할 문자열 입력" value="abababbabb">
+      <div class="action-bar">
+        <button class="btn" onclick="compileRegex()">컴파일</button>
+        <button class="btn" onclick="matchString()">매칭</button>
+        <button class="btn" onclick="stepMatch()">단계별 실행</button>
+        <button class="btn secondary" onclick="resetEngine()">초기화</button>
+      </div>
+    </div>
+    <div class="match-display" id="matchDisplay"></div>
+    <div style="padding:8px;border-top:1px solid var(--border);font-size:12px">
+      <div style="color:var(--muted)">정규식 트리:</div>
+      <pre id="parseTree" style="font-family:monospace;font-size:11px;line-height:1.4"></pre>
+    </div>
+  </div>
+  
+  <div class="panel regex-panel">
+    <div style="padding:8px;font-size:11px;color:var(--muted)">NFA 상태도</div>
+    <canvas id="nfaCanvas"></canvas>
+    <div style="padding:8px;font-size:11px;color:var(--muted)">DFA 전이도</div>
+    <canvas id="dfaCanvas"></canvas>
+  </div>
+  
+  <div class="panel" style="width:500px;display:flex;flex-direction:column">
+    <div style="padding:8px;font-size:11px;color:var(--muted)">실행 단계</div>
+    <div id="stepCanvas"></div>
+    <div style="padding:8px;font-size:11px;color:var(--muted)">전이 테이블</div>
+    <div id="transitionTable"></div>
+  </div>
+</div>
+<div class="status-bar">
+  <span>매칭 결과: <span id="matchCount">0</span>개</span>
+  <span>실행 시간: <span id="execTime">-</span></span>
+  <span>상태: <span id="engineStatus">대기 중</span></span>
+</div>
+
+<script>
+// 정규식 AST 파싱기
+class RegexParser {
+  constructor(pattern, flags='') {
+    this.pattern = pattern;
+    this.flags = flags;
+    this.pos = 0;
+    this.chars = [...pattern];
+  }
+  
+  parse() {
+    const ast = this.parseExpr();
+    return { type: 'root', children: [ast] };
+  }
+  
+  parseExpr() {
+    let node = this.parseTerm();
+    while (this.peek() === '|') {
+      this.consume('|');
+      const right = this.parseTerm();
+      node = { type: 'union', left: node, right };
+    }
+    return node;
+  }
+  
+  parseTerm() {
+    const children = [];
+    while (this.pos < this.chars.length && !['|', ')', '*','+','?',')'].includes(this.peek())) {
+      let node = this.parseFactor();
+      while (['*','+','?'].includes(this.peek())) {
+        const quant = this.consume();
+        node = { type: 'quantifier', child: node, quantifier: quant };
+      }
+      children.push(node);
+    }
+    return children.length === 1 ? children[0] : { type: 'concat', children };
+  }
+  
+  parseFactor() {
+    const c = this.peek();
+    if (c === '(') {
+      this.consume('(');
+      const node = this.parseExpr();
+      this.consume(')');
+      return { type: 'group', child: node };
+    } else if (c === '[') {
+      this.consume('[');
+      const chars = [];
+      while (this.peek() !== ']') chars.push(this.consume());
+      this.consume(']');
+      return { type: 'charclass', chars: chars.join('') };
+    } else if ('.*+?()[]|'.includes(c)) {
+      this.consume();
+      return { type: 'char', value: c };
+    } else {
+      this.consume();
+      return { type: 'char', value: c };
+    }
+  }
+  
+  peek() { return this.chars[this.pos]; }
+  consume(expected) {
+    if (expected && this.chars[this.pos] !== expected) throw new Error(`Expected ${expected}, got ${this.peek()}`);
+    return this.chars[this.pos++];
+  }
+}
+
+// NFA 상태
+class NFANode {
+  constructor() { this.id = Math.random().toString(36).slice(2,8); this.transitions = []; this.epsilon = []; }
+  addTransition(char, to) { this.transitions.push({ char, to }); }
+  addEpsilon(to) { this.epsilon.push(to); }
+}
+
+// 정규식 → NFA (Thompson's Construction)
+function buildNFA(node) {
+  // Thompson 구성법 기반 NFA 빌드
+  const start = new NFANode();
+  const end = new NFANode();
+  switch (node.type) {
+    case 'char': {
+      start.addTransition(node.value, end);
+      break;
+    }
+    case 'concat': {
+      let curr = start;
+      for (const ch of node.children) {
+        const built = buildNFA(ch);
+        curr.addEpsilon(built.start);
+        curr = built.end;
+      }
+      curr.addEpsilon(end);
+      break;
+    }
+    case 'union': {
+      const builtLeft = buildNFA(node.left);
+      const builtRight = buildNFA(node.right);
+      start.addEpsilon(builtLeft.start);
+      start.addEpsilon(builtRight.start);
+      builtLeft.end.addEpsilon(end);
+      builtRight.end.addEpsilon(end);
+      break;
+    }
+    case 'quantifier': {
+      const builtChild = buildNFA(node.child);
+      if (node.quantifier === '*') {
+        start.addEpsilon(builtChild.start);
+        builtChild.end.addEpsilon(start);
+        builtChild.end.addEpsilon(end);
+        start.addEpsilon(end);
+      } else if (node.quantifier === '+') {
+        start.addEpsilon(builtChild.start);
+        builtChild.end.addEpsilon(start);
+        builtChild.end.addEpsilon(end);
+      } else { // '?'
+        start.addEpsilon(builtChild.start);
+        start.addEpsilon(end);
+        builtChild.end.addEpsilon(end);
+      }
+      break;
+    }
+    case 'group': {
+      const built = buildNFA(node.child);
+      start.addEpsilon(built.start);
+      built.end.addEpsilon(end);
+      break;
+    }
+    case 'charclass': {
+      for (const cc of node.chars.split('')) {
+        start.addTransition(cc, end);
+      }
+      if (node.chars.indexOf('-') >= 0) { /* range 처리 생략, 단순화 */ }
+      break;
+    }
+    case 'root': {
+      let cur = start;
+      for (const ch of node.children) {
+        const built = buildNFA(ch);
+        cur.addEpsilon(built.start);
+        cur = built.end;
+      }
+      cur.addEpsilon(end);
+      break;
+    }
+    default: {
+      start.addTransition('.', end);
+    }
+  }
+  return { start, end };
+}// 매칭 엔진
+let nfa = null, dfa = null;
+let parseTreeStr = '', matchResults = [], stepStates = [];
+let currentStep = 0, isMatchRunning = false;
+
+function compileRegex() {
+  const pattern = document.getElementById('regexInput').value;
+  const flags = document.getElementById('global').checked ? 'g' : '';
+  try {
+    const parser = new RegexParser(pattern, flags);
+    const ast = parser.parse();
+    parseTreeStr = formatAST(ast);
+    document.getElementById('parseTree').textContent = parseTreeStr;
+    document.getElementById('engineStatus').textContent = '컴파일 완료';
+    
+    // NFA 생성
+    const nfaResult = buildNFA(ast.children[0]);
+    nfa = { start: nfaResult.start, states: [nfaResult.start, nfaResult.end] };
+    drawNFA(nfaResult.start);
+    
+    // 실제 브라우저 정규식 엔진 사용 (데모 목적)
+    document.getElementById('engineStatus').textContent = '컴파일 완료 (브라우저 RegExp 사용)';
+  } catch (e) {
+    document.getElementById('engineStatus').textContent = '컴파일 오류: ' + e.message;
+    document.getElementById('engineStatus').style.color = 'getCssVar(--bad)';
+  }
+}
+
+function formatAST(node, indent = '') {
+  let result = '';
+  switch (node.type) {
+    case 'char': result = indent + `char: "${node.value}"`; break;
+    case 'concat': result = indent + 'concat:'; (node.children||[]).forEach(c => result += '\n' + formatAST(c, indent + '  ')); break;
+    case 'union': result = indent + 'union:'; result += '\n' + formatAST(node.left, indent + '  '); result += '\n' + formatAST(node.right, indent + '  '); break;
+    case 'quantifier': result = indent + `quantifier(${node.quantifier}):`; result += '\n' + formatAST(node.child, indent + '  '); break;
+    case 'group': result = indent + 'group:'; result += '\n' + formatAST(node.child, indent + '  '); break;
+    default: result = indent + node.type;
+  }
+  return result;
+}
+
+function matchString() {
+  const pattern = document.getElementById('regexInput').value;
+  const str = document.getElementById('testString').value;
+  const flags = ['g','i','m','s'].map(f => document.getElementById(f=='g'?'global':f=='i'?'caseInsensitive':f=='m'?'multiline':'dotAll').checked && f).filter(Boolean).join('');
+  const regex = new RegExp(pattern, flags);
+  
+  const start = performance.now();
+  matchResults = [];
+  let m;
+  const global = regex.global;
+  regex.lastIndex = 0;
+  
+  do {
+    m = regex.exec(str);
+    if (m) {
+      matchResults.push({ match: m[0], index: m.index, groups: m.slice(1) });
+    }
+  } while (m && global);
+  
+  const elapsed = performance.now() - start;
+  document.getElementById('execTime').textContent = elapsed.toFixed(2) + 'ms';
+  document.getElementById('matchCount').textContent = matchResults.length;
+  displayMatches();
+}
+
+function displayMatches() {
+  const str = document.getElementById('testString').value;
+  const html = str.split('').map((c, i) => {
+    const inMatch = matchResults.some(m => i >= m.index && i < m.index + m.match.length);
+    const match = matchResults.find(m => i === m.index);
+    if (match) return `<span class="match">${match.match[0]}</span>`;
+    if (inMatch) return `<span class="match">${c}</span>`;
+    return c;
+  }).join('');
+  document.getElementById('matchDisplay').innerHTML = html;
+}
+
+function stepMatch() {
+  const pattern = document.getElementById('regexInput').value;
+  const str = document.getElementById('testString').value;
+  const regex = new RegExp(pattern, 'g');
+  const matches = [];
+  let m;
+  while ((m = regex.exec(str)) !== null) matches.push({match: m[0], index: m.index});
+  
+  let html = '';
+  matches.forEach((match, i) => {
+    html += `<div style="margin-bottom:4px"><span style="color:getCssVar(--accent)">[${i+1}]</span> 인덱스 ${match.index}: <span class="match">${match.match}</span></div>`;
+  });
+  document.getElementById('stepCanvas').innerHTML = html || '매칭 결과 없음';
+}
+
+function resetEngine() {
+  nfa = null; dfa = null; matchResults = []; stepStates = []; currentStep = 0;
+  document.getElementById('matchDisplay').innerHTML = '';
+  document.getElementById('stepCanvas').textContent = '';
+  document.getElementById('transitionTable').textContent = '';
+  document.getElementById('parseTree').textContent = '';
+  document.getElementById('engineStatus').textContent = '초기화됨';
+  document.getElementById('engineStatus').style.color = '';
+  document.getElementById('nfaCanvas').width = 320;
+  document.getElementById('nfaCanvas').height = 300;
+}
+
+function drawNFA(startNode) {
+  const canvas = document.getElementById('nfaCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.font = '11px monospace';
+  
+  // 단순 시각화 - 실제로는 상태 그래프 그림
+  ctx.fillStyle = '#60a5fa';
+  ctx.beginPath();
+  ctx.arc(40, 60, 12, 0, Math.PI*2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = getCssVar(--text);
+  ctx.fillText('Start', 30, 85);
+  
+  ctx.fillStyle = '#ef4444';
+  ctx.beginPath();
+  ctx.arc(280, 60, 12, 0, Math.PI*2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#4ade80';
+  ctx.fillText('Accept', 265, 85);
+  
+  ctx.strokeStyle = getCssVar(--muted);
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(52, 60);
+  ctx.lineTo(268, 60);
+  ctx.stroke();
+  ctx.font = '10px monospace';
+  ctx.fillStyle = getCssVar(--muted);
+  ctx.fillText('ε-transitions', 140, 50);
+  ctx.fillText('char transitions', 140, 70);
+}
+
+// CSS var 가져오기
+function getCssVar(c) { return getComputedStyle(document.documentElement).getPropertyValue(c).trim(); }
+
+document.getElementById('regexInput').addEventListener('keyup', e => {
+  if (e.key === 'Enter') compileRegex();
+});
+document.getElementById('testString').addEventListener('keyup', e => {
+  if (e.key === 'Enter') matchString();
+});
+
+compileRegex();
+</script>
+</body>
+</html>

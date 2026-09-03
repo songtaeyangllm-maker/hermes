@@ -44,7 +44,7 @@ function pauseSession(){clearInterval(interval);isRunning=false;document.getElem
 
 function resetSession(){clearInterval(interval);isRunning=false;remaining=25*60;updateTimer();document.getElementById('startBtn').disabled=false;document.getElementById('pauseBtn').disabled=true;document.getElementById('sessionInfo').innerHTML='<p>현재 세션: 집중 25분</p>';}
 
-function saveHistory(durationMinutes){history.unshift({minutes:durationMinutes,time:new Date().toISOString(),status:'completed'});history=history.slice(0,20);localStorage.setItem('focusHistory',JSON.stringify(history));renderHistory()}
+function saveHistory(durationMinutes){history.unshift({minutes:durationMinutes,time:new Date().toISOString(),status:'completed'});history=history.slice(0,20);localStorage.setItem('focusHistory',JSON.stringify(history));renderHistory()
 
 function renderHistory(){const list=document.getElementById('historyList');if(history.length===0){list.innerHTML='<div class="empty">세션 이력이 없습니다</div>';return;}list.innerHTML=history.map((h,i)=>`<div><span>${i+1}회</span><span>${h.minutes}분</span><span>${h.status}</span></div>`).join('')}
 

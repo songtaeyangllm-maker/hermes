@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes API Tester</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;height:100vh}
+header{background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;justify-content:space-between;align-items:center}
+header h1{font-size:18px;letter-spacing:1px}header h1 span{color:var(--accent)}
+.toolbar{display:flex;gap:8px;align-items:center}.btn{background:var(--accent);color:#0b0e16;border:none;padding:8px 16px;font-size:13px;border-radius:6px;cursor:pointer}.btn:hover{opacity:.9}.btn.secondary{background:var(--border);color:var(--text)}
+#main{flex:1;display:flex}
+#sidebar{width:300px;background:var(--card);border-right:1px solid var(--border);padding:16px;overflow-y:auto}
+#sidebar h3{font-size:12px;color:var(--muted);margin-bottom:12px;text-transform:uppercase}
+.history-item{padding:10px 12px;border-radius:6px;cursor:pointer;font-size:12px;margin-bottom:6px;background:var(--bg);border:1px solid var(--border)}
+.history-item:hover{background:var(--border)}
+#content{flex:1;display:flex;flex-direction:column;background:var(--bg)}
+#requestPane{flex:1;display:flex;flex-direction:column}
+#requestHeader{display:flex;gap:8px;align-items:center;padding:12px 16px;background:var(--card);border-bottom:1px solid var(--border)}
+#method{background:var(--accent);color:#0b0e16;border:none;padding:6px 12px;border-radius:4px;font-weight:bold;width:80px}
+#url{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:4px;font-size:14px;font-family:monospace}
+#tabs{display:flex;background:var(--card);border-bottom:1px solid var(--border)}
+.tab{padding:8px 16px;cursor:pointer;font-size:12px;color:var(--muted);border-right:1px solid var(--border)}
+.tab.active{color:var(--text);background:var(--bg)}
+.tab-content{display:none;padding:16px;flex:1;overflow:auto}.tab-content.active{display:block}
+#headersTable,#paramsTable{width:100%;border-collapse:collapse;font-size:13px}
+#headersTable th,#paramsTable th{color:var(--accent);text-align:left;padding:8px}
+#headersTable td,#paramsTable td{padding:6px 8px}
+.input-row{display:flex;gap:8px;margin-bottom:8px}
+.input-row input{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:4px;font-size:13px}
+.input-row input.short{width:80px}
+#bodyText{width:100%;height:200px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:monospace;font-size:13px;padding:12px;border-radius:4px;resize:vertical}
+#sendBtn{background:var(--good);color:#0b0e16;border:none;padding:10px 24px;font-size:14px;border-radius:6px;cursor:pointer;margin:16px}
+#sendBtn:hover{opacity:.9}
+#responsePane{height:300px;background:var(--card);border-top:1px solid var(--border);display:flex;flex-direction:column}
+#responseHeader{padding:12px 16px;background:var(--bg);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;font-size:12px}
+#responseTabs{display:flex;background:var(--bg);border-bottom:1px solid var(--border)}
+#responseBody{flex:1;padding:16px;overflow:auto;font-family:monospace;font-size:12px;line-height:1.5;white-space:pre-wrap}
+.status{font-weight:bold}.status-2{color:var(--good)}.status-4{color:var(--bad)}.status-5{color:var(--bad)}
+.json-key{color:#79c0ff}.json-string{color:#a5d6ff}.json-number{color:#79c0ff}.json-bool{color:#d2a8ff}.json-null{color:var(--muted)}
+.footer{padding:8px;color:var(--muted);font-size:11px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>API <span>TESTER</span></h1>
+  <div class="toolbar">
+    <button class="btn secondary" onclick="newRequest()">새 요청</button>
+    <button class="btn secondary" onclick="saveCollection()">컬렉션 저장</button>
+    <button class="btn secondary" onclick="loadCollection()">불러오기</button>
+    <input type="file" id="collFile" accept=".json" style="display:none" onchange="importCollection(event)">
+  </div>
+</header>
+<div id="main">
+  <div id="sidebar">
+    <h3>히스토리</h3>
+    <div id="historyList"></div>
+  </div>
+  <div id="content">
+    <div id="requestPane">
+      <div id="requestHeader">
+        <select id="method" onchange="updateMethodColor()">
+          <option value="GET">GET</option>
+          <option value="POST">POST</option>
+          <option value="PUT">PUT</option>
+          <option value="PATCH">PATCH</option>
+          <option value="DELETE">DELETE</option>
+          <option value="HEAD">HEAD</option>
+          <option value="OPTIONS">OPTIONS</option>
+        </select>
+        <input type="text" id="url" placeholder="https://api.example.com/endpoint" spellcheck="false">
+        <button class="btn" id="sendBtn" onclick="sendRequest()">보내기</button>
+      </div>
+      <div id="tabs">
+        <div class="tab active" onclick="showTab('params')">Params</div>
+        <div class="tab" onclick="showTab('headers')">Headers</div>
+        <div class="tab" onclick="showTab('body')">Body</div>
+        <div class="tab" onclick="showTab('auth')">Auth</div>
+      </div>
+      <div class="tab-content active" id="paramsTab">
+        <table id="paramsTable"><thead><tr><th>Key</th><th>Value</th><th>Description</th><th></th></tr></thead><tbody></tbody></table>
+        <button class="btn secondary" onclick="addParamRow()">파라미터 추가</button>
+      </div>
+      <div class="tab-content" id="headersTab">
+        <table id="headersTable"><thead><tr><th>Key</th><th>Value</th><th></th></tr></thead><tbody><tr><td><input class="short" value="Content-Type"></td><td><input value="application/json"></td><td><button class="btn secondary" onclick="this.closest('tr').remove()">삭제</button></td></tr></tbody></table>
+        <button class="btn secondary" onclick="addHeaderRow()">헤더 추가</button>
+      </div>
+      <div class="tab-content" id="bodyTab">
+        <div style="margin-bottom:8px">
+          <label style="font-size:12px;color:var(--muted)">Content-Type: </label>
+          <select id="bodyType" onchange="updateBodyPlaceholder()">
+            <option value="json">application/json</option>
+            <option value="form">application/x-www-form-urlencoded</option>
+            <option value="text">text/plain</option>
+            <option value="xml">application/xml</option>
+          </select>
+        </div>
+        <textarea id="bodyText" placeholder='{"key": "value"}' spellcheck="false"></textarea>
+      </div>
+      <div class="tab-content" id="authTab">
+        <div style="margin-bottom:16px">
+          <label style="font-size:12px;color:var(--muted)">인증 타입: </label>
+          <select id="authType">
+            <option value="none">없음</option>
+            <option value="bearer">Bearer Token</option>
+            <option value="basic">Basic Auth</option>
+            <option value="apiKey">API Key</option>
+          </select>
+        </div>
+        <div id="authFields"></div>
+      </div>
+    </div>
+    <div id="responsePane">
+      <div id="responseHeader">
+        <div><span id="respStatus">-</span> <span id="respTime">-</span> <span id="respSize">-</span></div>
+        <div><button class="btn secondary" onclick="copyResponse()">응답 복사</button> <button class="btn secondary" onclick="saveResponse()">저장</button></div>
+      </div>
+      <div id="responseTabs">
+        <div class="tab active" onclick="showRespTab('body')">Body</div>
+        <div class="tab" onclick="showRespTab('headers')">Headers</div>
+        <div class="tab" onclick="showRespTab('raw')">Raw</div>
+      </div>
+      <pre id="responseBody">응답이 여기에 표시됩니다...</pre>
+    </div>
+  </div>
+</div>
+<div class="footer">Hermes API Tester | REST API 클라이언트 | 계속 업데이트됨</div>
+
+<script>
+let history=[],collections={};
+
+function updateMethodColor(){
+  const m=document.getElementById('method').value;
+  const colors={'GET':'var(--good)','POST':'var(--accent)','PUT':'#fbbf24','PATCH':'#f97316','DELETE':'var(--bad)','HEAD':'var(--muted)','OPTIONS':'var(--muted)'};
+  document.getElementById('method').style.background=colors[m]||'var(--accent)';
+}
+
+function showTab(name){
+  document.querySelectorAll('#requestPane .tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#requestPane .tab-content').forEach(t=>t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById(name+'Tab').classList.add('active');
+}
+
+function showRespTab(name){
+  document.querySelectorAll('#responseTabs .tab').forEach(t=>t.classList.remove('active'));
+  event.target.classList.add('active');
+  // 탭별 내용은 동적으로 처리
+}
+
+function addParamRow(){
+  const tbody=document.querySelector('#paramsTable tbody');
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td><input placeholder="key"></td><td><input placeholder="value"></td><td><input placeholder="description"></td><td><button class="btn secondary" onclick="this.closest('tr').remove()">삭제</button></td>`;
+  tbody.appendChild(tr);
+}
+
+function addHeaderRow(){
+  const tbody=document.querySelector('#headersTable tbody');
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td><input class="short" placeholder="Key"></td><td><input placeholder="Value"></td><td><button class="btn secondary" onclick="this.closest('tr').remove()">삭제</button></td>`;
+  tbody.appendChild(tr);
+}
+
+function updateBodyPlaceholder(){
+  const type=document.getElementById('bodyType').value;
+  const ph={'json':'{\n  "key": "value"\n}','form':'key=value&foo=bar','text':'Plain text body','xml':'<?xml version="1.0"?>\n<root>\n  <item>value</item>\n</root>'};
+  document.getElementById('bodyText').placeholder=ph[type]||'';
+}
+
+document.getElementById('authType').onchange=e=>{
+  const type=e.target.value;
+  const div=document.getElementById('authFields');
+  const forms={
+    bearer:`<div class="input-row"><input placeholder="Token" id="bearerToken"></div>`,
+    basic:`<div class="input-row"><input placeholder="Username" id="basicUser"></div><div class="input-row"><input placeholder="Password" id="basicPass" type="password"></div>`,
+    apiKey:`<div class="input-row"><input class="short" placeholder="Key" id="apiKeyName"></div><div class="input-row"><input placeholder="Value" id="apiKeyValue"></div><div class="input-row"><input class="short" placeholder="Header/Query" id="apiKeyIn" value="Header"></div>`
+  };
+  div.innerHTML=forms[type]||'';
+};
+
+async function sendRequest(){
+  const method=document.getElementById('method').value;
+  let url=document.getElementById('url').value;
+  if(!url){alert('URL을 입력하세요');return}
+  
+  // 파라미터 추가
+  const params=[];
+  document.querySelectorAll('#paramsTable tbody tr').forEach(tr=>{
+    const inputs=tr.querySelectorAll('input');
+    if(inputs[0].value)params.push(`${encodeURIComponent(inputs[0].value)}=${encodeURIComponent(inputs[1].value)}`);
+  });
+  if(params.length)url+=(url.includes('?')?'&':'?')+params.join('&');
+  
+  // 헤더 수집
+  const headers={};
+  document.querySelectorAll('#headersTable tbody tr').forEach(tr=>{
+    const inputs=tr.querySelectorAll('input');
+    if(inputs[0].value)headers[inputs[0].value]=inputs[1].value;
+  });
+  
+  // 인증
+  const authType=document.getElementById('authType').value;
+  if(authType==='bearer'&&document.getElementById('bearerToken').value){
+    headers['Authorization']=`Bearer ${document.getElementById('bearerToken').value}`;
+  }else if(authType==='basic'){
+    const u=document.getElementById('basicUser').value;
+    const p=document.getElementById('basicPass').value;
+    if(u||p)headers['Authorization']=`Basic ${btoa(u+':'+p)}`;
+  }else if(authType==='apiKey'){
+    const k=document.getElementById('apiKeyName').value;
+    const v=document.getElementById('apiKeyValue').value;
+    const loc=document.getElementById('apiKeyIn').value;
+    if(k&&v){
+      if(loc==='Header')headers[k]=v;
+      else url+=(url.includes('?')?'&':'?')+`${encodeURIComponent(k)}=${encodeURIComponent(v)}`;
+    }
+  }
+  
+  // 바디
+  let body=null;
+  if(['POST','PUT','PATCH'].includes(method)){
+    const type=document.getElementById('bodyType').value;
+    const text=document.getElementById('bodyText').value;
+    if(text){
+      if(type==='json'){body=text;headers['Content-Type']='application/json'}
+      else if(type==='form'){body=text;headers['Content-Type']='application/x-www-form-urlencoded'}
+      else body=text;
+    }
+  }
+  
+  const start=performance.now();
+  document.getElementById('sendBtn').disabled=true;
+  document.getElementById('sendBtn').textContent='보내는 중...';
+  document.getElementById('respStatus').textContent='요청 중...';
+  document.getElementById('responseBody').textContent='응답 대기 중...';
+  
+  try{
+    const res=await fetch(url,{method,headers,body:method==='GET'?undefined:body});
+    const time=Math.round(performance.now()-start);
+    const respText=await res.text();
+    
+    document.getElementById('respStatus').innerHTML=`<span class="status status-${Math.floor(res.status/100)}">${res.status} ${res.statusText}</span>`;
+    document.getElementById('respTime').textContent=`${time}ms`;
+    document.getElementById('respSize').textContent=`${respText.length} bytes`;
+    
+    // 응답 헤더
+    let headerStr='';
+    res.headers.forEach((v,k)=>{headerStr+=`${k}: ${v}\n`});
+    
+    // JSON 포맷팅 시도
+    let displayText=respText;
+    try{displayText=JSON.stringify(JSON.parse(respText),null,2)}catch(e){}
+    
+    document.getElementById('responseBody').textContent=displayText;
+    syntaxHighlight();
+    
+    // 히스토리 저장
+    history.unshift({method,url,time:Date.now(),status:res.status,timeMs:time});
+    if(history.length>50)history.pop();
+    updateHistory();
+    
+  }catch(e){
+    document.getElementById('respStatus').innerHTML=`<span class="status status-5">오류: ${e.message}</span>`;
+    document.getElementById('responseBody').textContent=e.message;
+  }finally{
+    document.getElementById('sendBtn').disabled=false;
+    document.getElementById('sendBtn').textContent='보내기';
+  }
+}
+
+function syntaxHighlight(){
+  const pre=document.getElementById('responseBody');
+  let html=pre.textContent;
+  html=html.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*")(\s*:)?/g,(match,p1,p2,p3)=>`<span class="${p3?'json-key':'json-string'}">${p1}</span>${p3?'':''}`);
+  html=html.replace(/\b(true|false)\b/g,'<span class="json-bool">$1</span>');
+  html=html.replace(/\b(null)\b/g,'<span class="json-null">$1</span>');
+  html=html.replace(/\b(-?\d+\.?\d*)\b/g,'<span class="json-number">$1</span>');
+  pre.innerHTML=html;
+}
+
+function updateHistory(){
+  const list=document.getElementById('historyList');
+  list.innerHTML=history.map((h,i)=>`<div class="history-item" onclick="loadHistory(${i})"><strong>${h.method}</strong> ${h.url} <span style="color:var(--muted)">(${h.status}, ${h.timeMs}ms)</span></div>`).join('');
+}
+
+function loadHistory(i){
+  const h=history[i];
+  document.getElementById('method').value=h.method;
+  document.getElementById('url').value=h.url;
+  updateMethodColor();
+}
+
+function newRequest(){
+  document.getElementById('url').value='';
+  document.querySelector('#paramsTable tbody').innerHTML='';
+  document.querySelector('#headersTable tbody').innerHTML=`<tr><td><input class="short" value="Content-Type"></td><td><input value="application/json"></td><td><button class="btn secondary" onclick="this.closest('tr').remove()">삭제</button></td></tr>`;
+  document.getElementById('bodyText').value='';
+  document.getElementById('authType').value='none';
+  document.getElementById('authFields').innerHTML='';
+  document.getElementById('responseBody').textContent='응답이 여기에 표시됩니다...';
+  document.getElementById('respStatus').textContent='-';
+  document.getElementById('respTime').textContent='-';
+  document.getElementById('respSize').textContent='-';
+}
+
+function saveCollection(){
+  const coll={requests:history,exportedAt:new Date().toISOString()};
+  const blob=new Blob([JSON.stringify(coll,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='api-collection.json';
+  a.click();
+}
+
+function loadCollection(){document.getElementById('collFile').click()}
+
+function importCollection(e){
+  const f=e.target.files[0];
+  if(!f)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const coll=JSON.parse(e.target.result);
+      if(coll.requests)history=coll.requests;
+      updateHistory();
+      alert('컬렉션 로드 완료');
+    }catch(err){alert('파일 형식 오류')}
+  };
+  reader.readAsText(f);
+}
+
+function copyResponse(){
+  navigator.clipboard.writeText(document.getElementById('responseBody').textContent).then(()=>alert('복사 완료'));
+}
+
+function saveResponse(){
+  const text=document.getElementById('responseBody').textContent;
+  const blob=new Blob([text],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`response-${Date.now()}.json`;
+  a.click();
+}
+
+updateMethodColor();
+</script>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Color Palette Generator</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:32px}h1{font-size:28px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}.sub{color:var(--muted);font-size:14px;margin-bottom:32px}.generator{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;width:100%;max-width=900px}.controls{display:flex;gap:16px;margin-bottom:32px;flex-wrap:wrap}.control{background:var(--bg);border:1px solid var(--border);padding:16px;border-radius:8px;display:flex;flex-direction:column;gap:8px;min-width:150px}.control label{font-size:12px;color:var(--muted);text-transform:uppercase}.control input,.control select{background:var(--card);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:4px;font-size:14px}.palette{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}.color-card{flex:1;min-width:120px;height:120px;border-radius:12px;position:relative;cursor:pointer;transition:transform .2s}.color-card:hover{transform:scale(1.02)}.color-card .hex{position:absolute;bottom:8px;left:8px;right:8px;background:rgba(0,0,0,0.7);padding:6px 8px;border-radius:4px;font-family:monospace;font-size:11px;text-align:center}.color-card .copy-btn{position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.7);border:none;color:white;padding:4px 8px;border-radius:4px;font-size:10px;cursor:pointer;opacity:0;transition:.2s}.color-card:hover .copy-btn{opacity:1}.export{display:flex;gap:12px;flex-wrap:wrap}.btn{background:var(--accent);color:#0b0e16;border:none;padding:10px 20px;font-size:13px;border-radius:6px;cursor:pointer}.btn:hover{opacity:.9}.btn.secondary{background:var(--border);color:var(--text)}.footer{margin-top:32px;color:var(--muted);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<h1>COLOR <span>PALETTE</span></h1>
+<div class="sub">색상 팔레트 생성기 — 하모니/명도/채도 조절</div>
+<div class="generator">
+  <div class="controls">
+    <div class="control">
+      <label>베이스 색상</label>
+      <input type="color" id="baseColor" value="#60a5fa">
+    </div>
+    <div class="control">
+      <label>팔레트 유형</label>
+      <select id="paletteType" onchange="generate()">
+        <option value="mono">단색 (Monochromatic)</option>
+        <option value="analogous">유사색 (Analogous)</option>
+        <option value="complement">보색 (Complementary)</option>
+        <option value="split">분할 보색 (Split Complementary)</option>
+        <option value="triadic">삼각 (Triadic)</option>
+        <option value="tetradic">사각 (Tetradic)</option>
+        <option value="shades">명도 단계 (Shades)</option>
+        <option value="tints">채도 단계 (Tints)</option>
+      </select>
+    </div>
+    <div class="control">
+      <label>색상 수</label>
+      <input type="number" id="colorCount" value="5" min="2" max="12" oninput="generate()">
+    </div>
+    <div class="control">
+      <label>명도 범위</label>
+      <input type="range" id="lightnessRange" min="10" max="90" value="40" oninput="generate()">
+      <span id="lrVal">40%</span>
+    </div>
+    <div class="control">
+      <label>채도</label>
+      <input type="range" id="saturation" min="0" max="100" value="70" oninput="generate()">
+      <span id="satVal">70%</span>
+    </div>
+  </div>
+  
+  <div class="palette" id="palette"></div>
+  
+  <div class="export">
+    <button class="btn" onclick="copyCSS()">CSS 변수 복사</button>
+    <button class="btn secondary" onclick="copySCSS()">SCSS 맵 복사</button>
+    <button class="btn secondary" onclick="copyTailwind()">Tailwind 설정 복사</button>
+    <button class="btn secondary" onclick="copyJSON()">JSON 복사</button>
+    <button class="btn secondary" onclick="downloadASE()">ASE 다운로드</button>
+    <button class="btn secondary" onclick="downloadPNG()">PNG 다운로드</button>
+  </div>
+</div>
+<div class="footer">Hermes Color Palette Generator | 색상 이론 기반 팔레트 | 계속 업데이트됨</div>
+
+<script>
+const palette=document.getElementById('palette');
+let currentColors=[];
+
+function hexToHsl(hex){
+  const r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,b=parseInt(hex.slice(5,7),16)/255;
+  const max=Math.max(r,g,b),min=Math.min(r,g,b);let h,s,l=(max+min)/2;
+  if(max===min)h=s=0;else{const d=max-min;s=l>0.5?d/(2-max-min):d/(max+min);switch(max){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;case b:h=(r-g)/d+4;break}h/=6}
+  return{h:h*360,s:s*100,l:l*100};
+}
+
+function hslToHex(h,s,l){
+  s/=100;l/=100;const c=(1-Math.abs(2*l-1))*s,x=c*(1-Math.abs((h/60)%2-1)),m=l-c/2;let r=0,g=0,b=0;
+  if(h<60){r=c;g=x}else if(h<120){r=x;g=c}else if(h<180){g=c;b=x}else if(h<240){g=x;b=c}else if(h<300){r=x;b=c}else{r=c;b=x}
+  const toHex=v=>Math.round((v+m)*255).toString(16).padStart(2,'0');
+  return '#'+toHex(r)+toHex(g)+toHex(b);
+}
+
+function generate(){
+  const base=document.getElementById('baseColor').value;
+  const type=document.getElementById('paletteType').value;
+  const count=parseInt(document.getElementById('colorCount').value);
+  const lr=parseInt(document.getElementById('lightnessRange').value);
+  const sat=parseInt(document.getElementById('saturation').value);
+  
+  document.getElementById('lrVal').textContent=lr+'%';
+  document.getElementById('satVal').textContent=sat+'%';
+  
+  const baseHsl=hexToHsl(base);
+  let colors=[];
+  
+  switch(type){
+    case 'mono':
+      for(let i=0;i<count;i++){const l=10+(90-10)*i/(count-1);colors.push(hslToHex(baseHsl.h,sat,l))}break;
+    case 'analogous':
+      for(let i=0;i<count;i++){const h=(baseHsl.h-30+60*i/(count-1)+360)%360;colors.push(hslToHex(h,sat,50))}break;
+    case 'complement':
+      colors=[base,hslToHex((baseHsl.h+180)%360,sat,50)];
+      for(let i=2;i<count;i++)colors.push(hslToHex((baseHsl.h+360*i/count)%360,sat,50));break;
+    case 'split':
+      colors=[base,hslToHex((baseHsl.h+150)%360,sat,50),hslToHex((baseHsl.h+210)%360,sat,50)];
+      for(let i=3;i<count;i++)colors.push(hslToHex((baseHsl.h+360*i/count)%360,sat,50));break;
+    case 'triadic':
+      for(let i=0;i<count;i++)colors.push(hslToHex((baseHsl.h+120*i)%360,sat,50));break;
+    case 'tetradic':
+      for(let i=0;i<count;i++)colors.push(hslToHex((baseHsl.h+90*i)%360,sat,50));break;
+    case 'shades':
+      for(let i=0;i<count;i++){const l=lr+(90-lr)*i/(count-1);colors.push(hslToHex(baseHsl.h,sat,l))}break;
+    case 'tints':
+      for(let i=0;i<count;i++){const s=sat*i/(count-1);colors.push(hslToHex(baseHsl.h,s,50))}break;
+  }
+  
+  currentColors=colors;
+  renderPalette();
+}
+
+function renderPalette(){
+  palette.innerHTML=currentColors.map((c,i)=>`<div class="color-card" style="background:${c}" onclick="copyColor('${c}')"><div class="copy-btn">복사</div><div class="hex">${c.toUpperCase()}</div></div>`).join('');
+}
+
+function copyColor(hex){
+  navigator.clipboard.writeText(hex).then(()=>alert(`복사: ${hex}`));
+}
+
+function copyCSS(){
+  const vars=currentColors.map((c,i)=>`  --color-${i+1}: ${c};`).join('\n');
+  navigator.clipboard.writeText(`:root{\n${vars}\n}`).then(()=>alert('CSS 변수 복사 완료'));
+}
+
+function copySCSS(){
+  const map='$palette: (\n'+currentColors.map((c,i)=>`  ${i+1}: ${c}`).join(',\n')+'\n);';
+  navigator.clipboard.writeText(map).then(()=>alert('SCSS 맵 복사 완료'));
+}
+
+function copyTailwind(){
+  const config='module.exports={\n  theme:{\n    extend:{\n      colors:{\n'+currentColors.map((c,i)=>`        ${i+1}: "${c}",`).join('\n')+'\n      }\n    }\n  }\n};';
+  navigator.clipboard.writeText(config).then(()=>alert('Tailwind 설정 복사 완료'));
+}
+
+function copyJSON(){
+  navigator.clipboard.writeText(JSON.stringify(currentColors,null,2)).then(()=>alert('JSON 복사 완료'));
+}
+
+function downloadASE(){
+  // Adobe Swatch Exchange 포맷 (단순화)
+  let ase='#ASE\n';
+  currentColors.forEach((c,i)=>{ase+=`${i+1} ${c}\n`});
+  const blob=new Blob([ase],{type:'text/plain'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='palette.ase';
+  a.click();
+}
+
+function downloadPNG(){
+  const canvas=document.createElement('canvas');
+  const ctx=canvas.getContext('2d');
+  const w=currentColors.length*100,h=120;
+  canvas.width=w;canvas.height=h;
+  currentColors.forEach((c,i)=>{ctx.fillStyle=c;ctx.fillRect(i*100,0,100,h);
+    ctx.fillStyle='#fff';ctx.font='14px monospace';ctx.fillText(c.toUpperCase(),i*100+10,h-10)});
+  canvas.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='palette.png';a.click()});
+}
+
+document.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',generate));
+generate();
+</script>
+</body>
+</html>

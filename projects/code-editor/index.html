@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Code Editor</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;height:100vh}
+header{background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;justify-content:space-between;align-items:center}
+header h1{font-size:18px;letter-spacing:1px}header h1 span{color:var(--accent)}
+.toolbar{display:flex;gap:8px;align-items:center}.btn{background:var(--accent);color:#0b0e16;border:none;padding:8px 16px;font-size:13px;border-radius:6px;cursor:pointer}.btn:hover{opacity:.9}.btn.secondary{background:var(--border);color:var(--text)}
+#editor-container{flex:1;display:flex}
+#sidebar{width:240px;background:var(--card);border-right:1px solid var(--border);padding:16px;overflow-y:auto}
+#sidebar h3{font-size:12px;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:1px}
+.file-item{padding:8px 12px;border-radius:4px;cursor:pointer;font-size:13px;margin-bottom:4px}
+.file-item:hover{background:var(--border)}.file-item.active{background:var(--accent);color:#0b0e16}
+#editor-area{flex:1;display:flex;flex-direction:column;background:var(--bg)}
+#tabs{display:flex;background:var(--card);border-bottom:1px solid var(--border)}
+.tab{padding:8px 16px;cursor:pointer;font-size:13px;border-right:1px solid var(--border);color:var(--muted)}
+.tab.active{color:var(--text);background:var(--bg);border-bottom:2px solid var(--accent)}
+.tab .close{margin-left:8px;cursor:pointer;font-size:10px}
+#editor{flex:1;background:#0d1117;font-family:'Consolas','Monaco',monospace;font-size:14px;line-height:1.6;padding:16px;outline:none;tab-size:2}
+#statusbar{background:var(--card);border-top:1px solid var(--border);padding:6px 16px;display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.footer{margin-top:8px;color:var(--muted);font-size:11px;text-align:center;padding:8px}
+</style>
+</head>
+<body>
+<header>
+  <h1>CODE <span>EDITOR</span></h1>
+  <div class="toolbar">
+    <button class="btn" onclick="newFile()">새 파일</button>
+    <button class="btn secondary" onclick="saveFile()">저장</button>
+    <button class="btn secondary" onclick="runCode()">실행</button>
+    <select id="langSelect" onchange="changeLanguage()">
+      <option value="javascript">JavaScript</option>
+      <option value="html">HTML</option>
+      <option value="css">CSS</option>
+      <option value="python">Python</option>
+      <option value="json">JSON</option>
+    </select>
+  </div>
+</header>
+<div id="editor-container">
+  <div id="sidebar">
+    <h3>파일 탐색기</h3>
+    <div id="fileList"></div>
+  </div>
+  <div id="editor-area">
+    <div id="tabs"></div>
+    <textarea id="editor" spellcheck="false" placeholder="코드를 작성하세요..."></textarea>
+  </div>
+</div>
+<div id="statusbar">
+  <div>Ln 1, Col 1</div>
+  <div>UTF-8</div>
+  <div>JavaScript</div>
+</div>
+<div class="footer">Hermes Code Editor | Monaco 스타일 에디터 | 계속 업데이트됨</div>
+
+<script>
+// 기본 템플릿
+const templates={
+  javascript:`// JavaScript 템플릿\nconsole.log('Hello, Hermes!');\n\nfunction greet(name){\n  return \`Hello, \${name}!\`;\n}\n\ngreet('World');`,
+  html:`<!DOCTYPE html>\n<html lang="ko">\n<head>\n  <meta charset="UTF-8">\n  <title>새 문서</title>\n</head>\n<body>\n  <h1>Hello, Hermes!</h1>\n</body>\n</html>`,
+  css:`/* CSS 템플릿 */\n:root {\n  --bg: #0b0e16;\n  --text: #e5e7eb;\n  --accent: #60a5fa;\n}\n\nbody {\n  background: var(--bg);\n  color: var(--text);\n  font-family: sans-serif;\n}`,
+  python:`# Python 템플릿\ndef greet(name):\n    return f"Hello, {name}!"\n\nif __name__ == "__main__":\n    print(greet("World"))`,
+  json:`{\n  "name": "Hermes Project",\n  "version": "1.0.0",\n  "description": "New project"\n}`
+};
+
+let files={};
+let activeTab=null;
+let tabCounter=0;
+
+const editor=document.getElementById('editor');
+const tabs=document.getElementById('tabs');
+const fileList=document.getElementById('fileList');
+const statusbar=document.querySelector('#statusbar div');
+const langSelect=document.getElementById('langSelect');
+
+function newFile(){
+  const id='tab'+(++tabCounter);
+  const lang=langSelect.value;
+  files[id]={id,name:'무제목.'+lang,content:templates[lang]||'',language:lang,modified:false};
+  createTab(id);
+  switchTab(id);
+  updateFileList();
+}
+function createTab(id){
+  const f=files[id];
+  const tab=document.createElement('div');
+  tab.className='tab';
+  tab.dataset.id=id;
+  tab.innerHTML=`${f.name}<span class="close" onclick="event.stopPropagation();closeTab('${id}')">×</span>`;
+  tab.onclick=()=>switchTab(id);
+  tabs.appendChild(tab);
+}
+function switchTab(id){
+  if(activeTab)saveCurrentContent();
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  const tab=document.querySelector(`.tab[data-id="${id}"]`);
+  if(tab)tab.classList.add('active');
+  activeTab=id;
+  const f=files[id];
+  editor.value=f.content;
+  langSelect.value=f.language;
+  updateStatus();
+}
+function closeTab(id){
+  if(Object.keys(files).length<=1){alert('최소 한 개의 탭은 필요합니다');return}
+  delete files[id];
+  const tab=document.querySelector(`.tab[data-id="${id}"]`);
+  if(tab)tab.remove();
+  if(activeTab===id){
+    const firstTab=document.querySelector('.tab');
+    if(firstTab)switchTab(firstTab.dataset.id);
+  }
+  updateFileList();
+}
+function saveCurrentContent(){
+  if(activeTab&&files[activeTab]){
+    files[activeTab].content=editor.value;
+    files[activeTab].modified=true;
+    const tab=document.querySelector(`.tab[data-id="${activeTab}"]`);
+    if(tab&&!tab.textContent.startsWith('●'))tab.innerHTML='● '+tab.innerHTML;
+  }
+}
+editor.oninput=()=>{if(activeTab){files[activeTab].content=editor.value;files[activeTab].modified=true;updateStatus()}}
+editor.onkeyup=updateStatus;
+editor.onclick=updateStatus;
+
+function updateStatus(){
+  const lines=editor.value.substr(0,editor.selectionStart).split('\n');
+  document.querySelector('#statusbar div').textContent=`Ln ${lines.length}, Col ${lines[lines.length-1].length+1}`;
+}
+function changeLanguage(){
+  if(activeTab){
+    files[activeTab].language=langSelect.value;
+    const tab=document.querySelector(`.tab[data-id="${activeTab}"]`);
+    if(tab){
+      const name='무제목.'+langSelect.value;
+      files[activeTab].name=name;
+      tab.innerHTML=`${name}<span class="close" onclick="event.stopPropagation();closeTab('${activeTab}')">×</span>`;
+    }
+    updateFileList();
+  }
+}
+function saveFile(){
+  if(!activeTab)return;
+  const f=files[activeTab];
+  const blob=new Blob([f.content],{type:'text/plain'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=f.name;
+  a.click();
+  f.modified=false;
+  const tab=document.querySelector(`.tab[data-id="${activeTab}"]`);
+  if(tab)tab.innerHTML=tab.innerHTML.replace('● ','');
+}
+function runCode(){
+  if(!activeTab)return;
+  const f=files[activeTab];
+  if(f.language==='javascript'){
+    try{new Function(f.content)();alert('실행 완료')}catch(e){alert('오류: '+e.message)}
+  }else if(f.language==='html'){
+    const w=window.open();
+    w.document.write(f.content);
+    w.document.close();
+  }else{alert('직접 실행은 JavaScript/HTML만 지원합니다')}
+}
+function updateFileList(){
+  fileList.innerHTML='';
+  Object.values(files).forEach(f=>{
+    const div=document.createElement('div');
+    div.className='file-item'+(f.id===activeTab?' active':'');
+    div.textContent=f.name+(f.modified?' ●':'');
+    div.onclick=()=>switchTab(f.id);
+    fileList.appendChild(div);
+  });
+}
+
+// 초기 파일
+newFile();
+</script>
+</body>
+</html>

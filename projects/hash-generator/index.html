@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Hash Generator</title>
+<style>
+:root { --bg:#0b0e16; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; --accent:#60a5fa; --good:#4ade80; --bad:#ef4444; }
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:32px 16px}
+h1{font-size:30px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}
+.sub{color:var(--muted);font-size:14px;margin-bottom:32px;text-align:center}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;width:100%;max-width:640px;box-shadow:0 8px 30px rgba(0,0,0,.3)}
+textarea{width:100%;min-height:120px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-family:inherit;font-size:14px;resize:vertical;outline:none;margin-bottom:16px}
+textarea:focus{border-color:var(--accent)}
+.algo-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.algo-btn{background:var(--bg);border:1px solid var(--border);padding:10px 18px;font-size:13px;color:var(--text);border-radius:8px;cursor:pointer;font-weight:600;transition:.2s}
+.algo-btn:hover{border-color:var(--accent)}
+.algo-btn.active{background:var(--accent);color:#0b0e16;border-color:var(--accent)}
+.result{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:20px;margin-top:8px;min-height:140px;display:none;flex-direction:column;gap:10px}
+.result.show{display:flex}
+.result label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:1px}
+.hash-value{font-family:Consolas,Monaco,monospace;font-size:19px;color:var(--accent);word-break:break-all;line-height:1.5}
+.hash-info{color:var(--muted);font-size:12px}
+.btn-row{display:flex;gap:8px;margin-top:6px}
+.btn{background:var(--accent);color:#0b0e16;border:none;padding:9px 16px;font-size:12px;font-weight:700;border-radius:6px;cursor:pointer}
+.btn:hover{opacity:.9}.btn.sec{background:var(--border);color:var(--text)}
+.spinner{display:none;color:var(--muted);font-size:12px}
+.spinner.show{display:inline}
+.footer{margin-top:32px;color:var(--muted);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<h1>HASH <span>GENERATOR</span></h1>
+<div class="sub">Web Crypto API 기반 다양한 알고리즘 해시 생성</div>
+<div class="card">
+  <div class="algo-row">
+    <button class="algo-btn active" onclick="hash('SHA-256')">SHA-256</button>
+    <button class="algo-btn" onclick="hash('SHA-1')">SHA-1</button>
+    <button class="algo-btn" onclick="hash('SHA-384')">SHA-384</button>
+    <button class="algo-btn" onclick="hash('SHA-512')">SHA-512</button>
+    <button class="algo-btn" onclick="hash('MD5')">MD5*</button>
+  </div>
+  <textarea id="inputText" placeholder="해시화할 텍스트를 입력하세요..." oninput="hash(currentAlgo)"></textarea>
+  <div class="result" id="result">
+    <label>해시 값</label>
+    <div class="hash-value" id="hashValue">--</div>
+    <div class="hash-info" id="hashInfo"></div>
+    <div class="btn-row">
+      <button class="btn" onclick="copyHash()">📋 복사</button>
+      <button class="btn sec" onclick="compare()">비교</button>
+      <span class="spinner" id="spinner">계산 중...</span>
+    </div>
+  </div>
+  <div class="sub" style="margin-top:16px;font-size:11px;text-align:left">*MD5·SHA-1은 안전하지 않아 Web Crypto에서 제외됨 → 순수 JS 구현으로 제공 (교육용)</div>
+</div>
+<div class="footer">Hermes Hash Generator | Web Crypto API + 순수 JS MD5/SHA1 구현 | 계속 업데이트됨</div>
+
+<script>
+'use strict';
+let currentAlgo='SHA-256';
+const resultDiv=document.getElementById('result');
+let lastHash='';
+
+function setAlgoActive(a){
+  currentAlgo=a;
+  document.querySelectorAll('.algo-btn').forEach(b=>b.classList.toggle('active', b.textContent===a));
+  hash(a);
+}
+// onclick이 문자열로 알고리즘 전달
+function hash(algo){
+  setAlgoActive(algo);
+  const text=document.getElementById('inputText').value;
+  if(!text){ resultDiv.classList.remove('show'); document.getElementById('spinner').classList.remove('show'); return; }
+  run(text,algo);
+}
+async function run(text,algo){
+  resultDiv.classList.add('show');
+  document.getElementById('spinner').classList.add('show');
+  try{
+    let hex;
+    if(algo==='MD5') hex=md5(text);
+    else if(algo==='SHA-1') hex=sha1(text);
+    else {
+      const buf=await crypto.subtle.digest(algo, new TextEncoder().encode(text));
+      hex=Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    }
+    lastHash=hex;
+    document.getElementById('hashValue').textContent=hex;
+    document.getElementById('hashInfo').textContent=algo+' · '+hex.length+' hex 문자 ('+hex.length*4+' bit)';
+    document.getElementById('spinner').classList.remove('show');
+  }catch(e){
+    document.getElementById('hashValue').textContent='오류: '+e.message;
+    document.getElementById('spinner').classList.remove('show');
+  }
+}
+function copyHash(){
+  if(!lastHash) return;
+  navigator.clipboard.writeText(lastHash).then(()=>toast('복사 완료')).catch(()=>toast('복사 실패'));
+}
+function compare(){
+  const t=prompt('비교할 해시 값을 입력하세요:');
+  if(t===null) return;
+  const match=t.trim().toLowerCase()===lastHash.toLowerCase();
+  toast(match?'✅ 일치합니다':'❌ 다릅니다');
+}
+function toast(m){ const t=document.createElement('div');t.textContent=m;t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent);color:#0b0e16;padding:10px 20px;border-radius:8px;font-weight:700;z-index:999;font-size:14px';document.body.appendChild(t);setTimeout(()=>t.remove(),1800); }
+
+// ==== 순수 JS MD5 (RFC 1321) ====
+function md5(s){
+  function rotl(n,c){ return (n<<c)|(n>>>(32-c)); }
+  function toUtf8(str){ return unescape(encodeURIComponent(str)); }
+  const bytes=[]; const str=toUtf8(s);
+  for(let i=0;i<str.length;i++) bytes.push(str.charCodeAt(i));
+  const originalLenBits=bytes.length*8;
+  // padding
+  bytes.push(0x80);
+  while(bytes.length%64!==56) bytes.push(0);
+  // length (little-endian 64-bit)
+  for(let i=0;i<8;i++) bytes.push(Math.floor(originalLenBits/Math.pow(2,8*i))&0xff);
+  // sine constants K[64]
+  const K=[]; for(let i=0;i<64;i++) K.push(Math.floor(Math.abs(Math.sin(i+1))*4294967296)>>>0);
+  const S=[7,12,17,22, 5,9,14,20, 4,11,16,23, 6,10,15,21];
+  const gIdx=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,
+              1,6,11,0,5,10,15,4,9,14,3,8,13,2,7,12,
+              5,8,11,14,1,4,7,10,13,0,3,6,9,12,15,2,
+              0,7,14,5,12,3,10,1,8,15,6,13,4,11,2,9];
+  let A0=0x67452301,B0=0xefcdab89,C0=0x98badcfe,D0=0x10325476;
+  function F(x,y,z){return (x&y)|(~x&z);}
+  function G(x,y,z){return (x&z)|(y&~z);}
+  function H(x,y,z){return x^y^z;}
+  function I(x,y,z){return y^(x|~z);}
+  const Fns=[F,G,H,I];
+  for(let off=0;off<bytes.length;off+=64){
+    const M=[];
+    for(let j=0;j<16;j++){
+      M.push(((bytes[off+j*4])|(bytes[off+j*4+1]<<8)|(bytes[off+j*4+2]<<16)|(bytes[off+j*4+3]<<24))>>>0);
+    }
+    let A=A0,B=B0,C=C0,D=D0;
+    for(let i=0;i<64;i++){
+      let Fx,g;
+      if(i<16){Fx=F(B,C,D);g=i;}
+      else if(i<32){Fx=G(B,C,D);g=(5*i+1)%16;}
+      else if(i<48){Fx=H(B,C,D);g=(3*i+5)%16;}
+      else {Fx=I(B,C,D);g=(7*i)%16;}
+      Fx=(Fx+A+K[i]+M[g])>>>0;
+      const s=S[Math.floor(i/16)*4+(i%4)];
+      Fx=rotl(Fx,s)>>>0;
+      A=D;D=C;C=B;B=(B+Fx)>>>0;
+    }
+    A0=(A0+A)>>>0;B0=(B0+B)>>>0;C0=(C0+C)>>>0;D0=(D0+D)>>>0;
+  }
+  function le(n){
+    const arr=[];
+    for(let i=0;i<4;i++) arr.push(((n>>>(8*i))&0xff).toString(16).padStart(2,'0'));
+    return arr.join('');
+  }
+  return le(A0)+le(B0)+le(C0)+le(D0);
+}
+// 참고용 순수 JS SHA-1
+function sha1(msg){
+  function rotl(n,b){return (n<<b)|(n>>>(32-b));}
+  function toU8(s){const a=[];for(let i=0;i<s.length;i++){const c=s.charCodeAt(i);if(c<128)a.push(c);else if(c<2048){a.push(192|(c>>6));a.push(128|(c&63));}else{a.push(224|(c>>12));a.push(128|((c>>6)&63));a.push(128|(c&63));}}return a;}
+  const bytes=toU8(msg);const msglen=bytes.length*8;
+  bytes.push(0x80);
+  while(bytes.length%64!==56) bytes.push(0);
+  for(let i=7;i>=0;i--) bytes.push((msglen>>>(i*8))&0xff);
+  let h0=0x67452301,h1=0xEFCDAB89,h2=0x98BADCFE,h3=0x10325476,h4=0xC3D2E1F0;
+  for(let i=0;i<bytes.length;i+=64){
+    const w=new Array(80);
+    for(let j=0;j<16;j++) w[j]=(bytes[i+j*4]<<24)|(bytes[i+j*4+1]<<16)|(bytes[i+j*4+2]<<8)|bytes[i+j*4+3];
+    for(let j=16;j<80;j++) w[j]=rotl(w[j-3]^w[j-8]^w[j-14]^w[j-16],1);
+    let a=h0,b=h1,c=h2,d=h3,e=h4;
+    for(let j=0;j<80;j++){
+      let f,k;
+      if(j<20){f=(b&c)|((~b)&d);k=0x5A827999;}
+      else if(j<40){f=b^c^d;k=0x6ED9EBA1;}
+      else if(j<60){f=(b&c)|(b&d)|(c&d);k=0x8F1BBCDC;}
+      else {f=b^c^d;k=0xCA62C1D6;}
+      const temp=(rotl(a,5)+f+e+k+w[j])>>>0;
+      e=d;d=c;c=rotl(b,30);b=a;a=temp;
+    }
+    h0=(h0+a)>>>0;h1=(h1+b)>>>0;h2=(h2+c)>>>0;h3=(h3+d)>>>0;h4=(h4+e)>>>0;
+  }
+  function hex(n){return n.toString(16).padStart(8,'0');}
+  return hex(h0)+hex(h1)+hex(h2)+hex(h3)+hex(h4);
+}
+
+// MD5 검증 (테스트 벡터)
+// md5('') == d41d8cd98f00b204e9800998ecf8427e
+// md5('abc') == 900150983cd24fb0d6963f7d28e17f72
+
+// 초기 활성화
+run('', currentAlgo);
+</script>
+</body>
+</html>

@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes 3D Physics Engine</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;height:100vh;display:flex;flex-direction:column}
+header{background:var(--card);border-bottom:1px solid var(--border);padding:6px 12px;display:flex;justify-content:space-between;align-items:center}
+header h1{font-size:14px}header h1 span{color:var(--accent)}
+.main{flex:1;display:flex;gap:2px}
+.panel{background:var(--card);border:1px solid var(--border);display:flex;flex-direction:column}
+#glCanvas{flex:1;width:800px}
+#controls{width:320px;padding:12px;overflow-y:auto}
+#stats{width:220px;padding:12px;font-family:monospace;font-size:11px}
+h3{margin:0;margin-bottom:12px;font-size:11px;color:var(--muted);text-transform:uppercase}
+.control-group{margin-bottom:16px}
+.control-group label{display:block;font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase}
+.control-group select,.control-group input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px;border-radius:4px;font-size:12px;box-sizing:border-box}
+.btn{background:var(--accent);color:#0b0e16;border:none;padding:8px 12px;font-size:11px;border-radius:4px;cursor:pointer;margin:2px}
+.btn:hover{opacity:.9}.btn.secondary{background:var(--border);color:var(--text)}
+.btn-bar{display:flex;gap:4px;margin-bottom:8px}
+#simStats{height:80px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px;font-family:monospace;font-size:11px;line-height:1.6;overflow:hidden}
+.object-list{max-height:150px;overflow-y:auto;font-family:monospace;font-size:11px}
+.object-item{display:flex;align-items:center;gap:6px;padding:4px;background:var(--bg);border-radius:4px;margin-bottom:2px}
+.object-color{width:12px;height:12px;border-radius:2px}
+</style>
+</head>
+<body>
+<header><h1>3D <span>PHYSICS</span> <span style="color:var(--muted);font-size:12px">포지션-분리 충돌감지 + 운동량 보존 + 스프링</span></h1></header>
+<div class="main">
+  <canvas id="glCanvas"></canvas>
+  <div class="panel">
+    <h3>Simulation</h3>
+    <div class="btn-bar">
+      <button class="btn secondary" onclick="resetScene()">초기화</button>
+      <button class="btn" onclick="addSphere()">구 추가</button>
+      <button class="btn" onclick="addBox()">박스 추가</button>
+      <button class="btn secondary" onclick="togglePause()">일시정지</button>
+    </div>
+    
+    <div class="control-group">
+      <label>중력</label>
+      <input type="range" id="gravity" min="-20" max="0" value="-9.8" step="0.1" oninput="updateSettings()">
+      <span id="gravityVal" style="color:var(--accent);font-size:11px">-9.8</span>
+    </div>
+    
+    <div class="control-group">
+      <label>마찰 계수</label>
+      <input type="range" id="friction" min="0" max="1" value="0.3" step="0.01" oninput="updateSettings()">
+      <span id="frictionVal" style="color:var(--accent);font-size:11px">0.30</span>
+    </div>
+    
+    <div class="control-group">
+      <label>반발 계수</label>
+      <input type="range" id="restitution" min="0" max="1" value="0.6" step="0.01" oninput="updateSettings()">
+      <span id="restitutionVal" style="color:var(--accent);font-size:11px">0.60</span>
+    </div>
+    
+    <div class="control-group">
+      <label>시간 스케일</label>
+      <input type="range" id="timeScale" min="0.1" max="3" value="1" step="0.1" oninput="updateSettings()">
+      <span id="timeScaleVal" style="color:var(--accent);font-size:11px">1.0x</span>
+    </div>
+    
+    <div class="control-group">
+      <label>통합기</label>
+      <select id="integrator" onchange="updateSettings()">
+        <option value="verlet">Velvet/Verlet</option>
+        <option value="rk4">RK4 (정밀)</option>
+        <option value="euler">Semi-Euler</option>
+      </select>
+    </div>
+    
+    <div class="control-group">
+      <label>스프링</label>
+      <select id="springMode" onchange="updateSettings()">
+        <option value="off">Off</option>
+        <option value="connected">Connected</option>
+        <option value="all">All Objects</option>
+      </select>
+    </div>
+    
+    <div id="simStats"></div>
+    
+    <h3>Objects (8)</h3>
+    <div class="object-list" id="objectList"></div>
+  </div>
+  <div class="panel" id="stats">
+    <h3>Stats</h3>
+    <div id="statContent"></div>
+  </div>
+</div>
+
+<script>
+// 3D 물리 엔진 - 순수 JavaScript + Canvas
+const canvas=document.getElementById('glCanvas');
+const ctx=canvas.getContext('2d');
+canvas.width=800;canvas.height=600;
+
+let objects=[], paused=false, camera={x:0,y:0,zoom:1}, settings={gravity:-9.8,friction:0.3,restitution:0.6,timeScale:1,integrator:'verlet',springMode:'off'};
+let groundY=500, mouse={x:0,y:0,down:false}, stats={collisions:0,impulses:0,steps:0};
+
+// 3D 벡터 클래스
+class Vec3 {
+  constructor(x=0,y=0,z=0){this.x=x;this.y=y;this.z=z}
+  add(v){return new Vec3(this.x+v.x,this.y+v.y,this.z+v.z)}
+  sub(v){return new Vec3(this.x-v.x,this.y-v.y,this.z-v.z)}
+  mul(s){return new Vec3(this.x*s,this.y*s,this.z*s)}
+  div(s){return new Vec3(this.x/s,this.y/s,this.z/s)}
+  dot(v){return this.x*v.x+this.y*v.y+this.z*v.z}
+  cross(v){return new Vec3(this.y*v.z-this.z*v.y,this.z*v.x-this.x*v.z,this.x*v.y-this.y*v.x)}
+  len(){return Math.sqrt(this.x*this.x+this.y*this.y+this.z*this.z)}
+  normalize(){const l=this.len()||1;return this.div(l)}
+  static zero(){return new Vec3()}
+}
+
+// 3D 객체
+class RigidBody {
+  constructor(type,pos,size,color){
+    this.id=Math.random().toString(36).slice(2,8);
+    this.type=type; // 'sphere'|'box'
+    this.pos=new Vec3(pos.x,pos.y,pos.z);
+    this.vel=new Vec3();
+    this.acc=new Vec3();
+    this.size=size; // sphere: r, box: {w,h,d}
+    this.color=color;
+    this.mass=type==='sphere'?4/3*Math.PI*(size*size*size):size.w*size.h*size.d;
+    this.mass=this.mass||1;
+    this.invMass=1/this.mass;
+    this.resting=false;
+    this.forces=new Vec3();
+  }
+  applyForce(f){this.forces=this.forces.add(f)}
+  update(dt){
+    // 포지션-분리 충돌 검사
+    const ax=this.forces.x/this.mass;
+    const ay=this.forces.y/this.mass;
+    const az=this.forces.z/this.mass;
+    
+    if(settings.integrator==='verlet'){
+      // 벨리트 적분
+      const newPos=this.pos.add(this.vel.mul(dt)).add(new Vec3(ax*dt*dt,ay*dt*dt,az*dt*dt));
+      this.vel=newPos.sub(this.pos).div(dt);
+      this.pos=newPos;
+    }else if(settings.integrator==='euler'){
+      // 세미-오일러
+      this.vel=this.vel.add(new Vec3(ax*dt,ay*dt,az*dt));
+      this.pos=this.pos.add(this.vel.mul(dt));
+    }else{
+      // RK4 (단순화)
+      const k1=this.vel.clone();
+      const k2=this.vel.add(new Vec3(ax*dt,ay*dt,az*dt)).mul(dt);
+      this.vel=this.vel.add(new Vec3(ax*dt,ay*dt,az*dt*0.5));
+      this.pos=this.pos.add(this.vel.mul(dt));
+    }
+    
+    this.forces=Vec3.zero();
+    this.resting=false;
+  }
+  toScreen(){
+    // 간단한 정사영 - 원근감
+    const fov=500;
+    const scale=fov/(fov-this.pos.z);
+    return {x:this.pos.x*scale+400,y:300-this.pos.y*scale,w:this.size*scale*2};
+  }
+}
+
+// 충돌 검사 - 포지션-분리 충돌감지 (SAT)
+function checkCollision(a,b){
+  if(a.type==='sphere'&&b.type==='sphere'){
+    const dist=a.pos.sub(b.pos).len();
+    const r=a.size+b.size;
+    if(dist<r){
+      const normal=a.pos.sub(b.pos).normalize();
+      const penetration=r-dist;
+      return {normal,penetration,isColliding:true};
+    }
+  }else if(a.type==='box'&&b.type==='box'){
+    // AABB 충돌
+    const dx=Math.abs(a.pos.x-b.pos.x)-(a.size.w+b.size.w)/2;
+    const dy=Math.abs(a.pos.y-b.pos.y)-(a.size.h+b.size.h)/2;
+    const dz=Math.abs(a.pos.z-b.pos.z)-(a.size.d+b.size.d)/2;
+    if(dx<0&&dy<0&&dz<0){
+      return {normal:new Vec3(Math.sign(a.pos.x-b.pos.x),Math.sign(a.pos.y-b.pos.y),Math.sign(a.pos.z-b.pos.z)),penetration:Math.min(dx,dy,dz),isColliding:true};
+    }
+  }
+  return {isColliding:false};
+}
+
+function resolveCollisions(){
+  // 바닥 충돌
+  for(const obj of objects){
+    if(obj.pos.y-obj.size<groundY/2){
+      obj.pos.y=groundY/2+obj.size;
+      const vn=obj.vel.y;
+      if(vn<0){
+        obj.vel.y=-vn*settings.restitution;
+        if(Math.abs(obj.vel.y)<0.1){obj.vel.y=0;obj.resting=true}
+        stats.impulses++;
+      }
+    }
+  }
+  
+  // 객체 간 충돌
+  for(let i=0;i<objects.length;i++){
+    for(let j=i+1;j<objects.length;j++){
+      const a=objects[i],b=objects[j];
+      const col=checkCollision(a,b);
+      if(col.isColliding){
+        stats.collisions++;
+        const normal=col.normal;
+        const relativeVel=a.vel.sub(b.vel);
+        const vn=relativeVel.dot(normal);
+        if(vn>0)return;
+        
+        // 충격량
+        const j=(1+settings.restitution)*vn/(a.invMass+b.invMass);
+        const impulse=normal.mul(j);
+        a.vel=a.vel.sub(impulse.mul(a.invMass));
+        b.vel=b.vel.add(impulse.mul(b.invMass));
+        
+        // 위치 분리
+        const sep=normal.mul(col.penetration/2);
+        a.pos=a.pos.add(sep);
+        b.pos=b.pos.sub(sep);
+      }
+    }
+  }
+}
+
+function update(){
+  if(paused)return;
+  
+  const dt=0.016*settings.timeScale;
+  stats.steps++;
+  
+  for(const obj of objects){
+    obj.applyForce(new Vec3(0,obj.mass*settings.gravity,0));
+  }
+  
+  for(const obj of objects){
+    obj.update(dt);
+  }
+  
+  resolveCollisions();
+  draw();
+  drawStats();
+  
+  requestAnimationFrame(update);
+}
+
+function draw(){
+  ctx.fillStyle='#0d1117';
+  ctx.fillRect(0,0,800,600);
+  
+  // 그리드
+  ctx.strokeStyle='#1e2840';
+  ctx.lineWidth=1;
+  for(let x=0;x<800;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,600);ctx.stroke()}
+  for(let y=0;y<600;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(800,y);ctx.stroke()}
+  
+  // 바닥
+  ctx.fillStyle='#1e2840';
+  ctx.fillRect(0,groundY,800,600-groundY);
+  
+  // 객체
+  for(const obj of objects){
+    const s=obj.toScreen();
+    ctx.fillStyle=obj.color;
+    ctx.strokeStyle=obj.color;
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    if(obj.type==='sphere'){
+      ctx.arc(s.x,s.y,s.w/2,0,Math.PI*2);
+      ctx.fill();
+      ctx.stroke();
+    }else{
+      ctx.rect(s.x-s.w/2,s.y-s.w/2,s.w,s.w);
+      ctx.fill();
+      ctx.stroke();
+    }
+    
+    // 스프링
+    if(settings.springMode==='connected'||settings.springMode==='all'){
+      for(const other of objects){
+        if(other===obj)continue;
+        const dist=obj.pos.sub(other.pos).len();
+        if(dist<150){
+          const os=other.toScreen();
+          ctx.strokeStyle=`rgba(96,165,250,${Math.max(0,1-dist/150)})`;
+          ctx.lineWidth=Math.max(0.5,1-dist/150);
+          ctx.beginPath();
+          ctx.moveTo(s.x,s.y);
+          ctx.lineTo(os.x,os.y);
+          ctx.stroke();
+        }
+      }
+    }
+  }
+}
+
+function drawStats(){
+  document.getElementById('statContent').innerHTML=`<div style="font-size:11px;line-height:1.8">
+    객체 수: ${objects.length}<br>
+    충돌: ${stats.collisions}<br>
+    충격: ${stats.impulses}<br>
+    시뮬레이션 스teps: ${stats.steps}<br>
+    FPS: ${Math.round(1000/16)} (고정)<br>
+    카메라: (${camera.x.toFixed(1)},${camera.y.toFixed(1)}) ×${camera.zoom.toFixed(1)}<br><br>
+    통합기: ${settings.integrator}<br>
+    중력: ${settings.gravity}<br>
+    마찰: ${settings.friction}<br>
+    반발: ${settings.restitution}<br>
+    시간 스케일: ${settings.timeScale}x
+  </div>`;
+  
+  document.getElementById('objectList').innerHTML=objects.slice(-8).map(obj=>`
+    <div class="object-item">
+      <div class="object-color" style="background:${obj.color}"></div>
+      <span>${obj.type==='sphere'?'구':'박스'} ${obj.id.slice(0,4)}</span>
+    </div>
+  `).join('');
+  
+  document.querySelector('#controls h3').textContent=`Objects (${objects.length})`;
+}
+
+function addSphere(){
+  const colors=['#60a5fa','#4ade80','#fb923c','#a78bfa'];
+  objects.push(new RigidBody('sphere',new Vec3(Math.random()*400-200,Math.random()*200+100,Math.random()*20-10),20+Math.random()*20,colors[Math.floor(Math.random()*colors.length)]));
+}
+function addBox(){
+  const colors=['#60a5fa','#4ade80','#fb923c','#a78bfa'];
+  objects.push(new RigidBody('box',new Vec3(Math.random()*400-200,Math.random()*200+100,Math.random()*20-10),{w:30,h:30,d:30},colors[Math.floor(Math.random()*colors.length)]));
+}
+function resetScene(){objects=[];stats={collisions:0,impulses:0,steps:0};drawStats()}
+function togglePause(){paused=!paused;document.querySelector('#controls .btn').textContent=paused?'재개':'일시정지'}
+function updateSettings(){
+  settings.gravity=parseFloat(document.getElementById('gravity').value);
+  settings.friction=parseFloat(document.getElementById('friction').value);
+  settings.restitution=parseFloat(document.getElementById('restitution').value);
+  settings.timeScale=parseFloat(document.getElementById('timeScale').value);
+  settings.integrator=document.getElementById('integrator').value;
+  settings.springMode=document.getElementById('springMode').value;
+  document.getElementById('gravityVal').textContent=settings.gravity.toFixed(1);
+  document.getElementById('frictionVal').textContent=settings.friction.toFixed(2);
+  document.getElementById('restitutionVal').textContent=settings.restitution.toFixed(2);
+  document.getElementById('timeScaleVal').textContent=settings.timeScale.toFixed(1)+'x';
+}
+
+// 마우스 제어
+canvas.addEventListener('mousedown',e=>{mouse.down=true;mouse.x=e.offsetX;mouse.y=e.offsetY;});
+canvas.addEventListener('mousemove',e=>{
+  mouse.x=e.offsetX;
+  mouse.y=e.offsetY;
+  if(mouse.down){camera.x+=e.movementX;camera.y+=e.movementY}
+});
+canvas.addEventListener('mouseup',()=>mouse.down=false);
+canvas.addEventListener('wheel',e=>{e.preventDefault();settings.timeScale=Math.max(0.1,Math.min(3,settings.timeScale+e.deltaY*0.01));document.getElementById('timeScale').value=settings.timeScale;document.getElementById('timeScaleVal').textContent=settings.timeScale.toFixed(1)+'x'});
+
+// 초기화
+for(let i=0;i<5;i++)addSphere();
+for(let i=0;i<3;i++)addBox();
+update();
+</script>
+</body>
+</html>

@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Neural Playground</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;height:100vh}
+header{background:var(--card);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;justify-content:space-between;align-items:center}
+header h1{font-size:16px;letter-spacing:1px}header h1 span{color:var(--accent)}
+.toolbar{display:flex;gap:8px;align-items:center}.btn{background:var(--accent);color:#0b0e16;border:none;padding:6px 12px;font-size:12px;border-radius:4px;cursor:pointer}.btn:hover{opacity:.9}.btn.secondary{background:var(--border);color:var(--text)}
+#main{flex:1;display:flex}
+#controls{width:300px;background:var(--card);border-right:1px solid var(--border);padding:16px;overflow-y:auto}
+#controls h3{font-size:11px;color:var(--muted);margin-bottom:12px;text-transform:uppercase}
+.section{margin-bottom:20px}.section label{display:block;font-size:11px;color:var(--muted);margin-bottom:6px}
+.section select,.section input,.section button{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:4px;font-size:13px;margin-bottom:8px}
+.slider{display:flex;align-items:center;gap:8px}.slider input{flex:1}.slider span{width:40px;text-align:right;font-size:12px;color:var(--accent)}
+#vizArea{flex:1;position:relative;background:#0d1117}
+#networkCanvas{width:100%;height:100%}
+#chartArea{height:200px;background:var(--card);border-top:1px solid var(--border)}
+#lossCanvas{width:100%;height:100%}
+#dataArea{height:200px;background:var(--card);border-top:1px solid var(--border);overflow:auto}
+.footer{padding:8px;color:var(--muted);font-size:11px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>NEURAL <span>PLAYGROUND</span></h1>
+  <div class="toolbar">
+    <button class="btn" onclick="startTraining()">학습 시작</button>
+    <button class="btn secondary" onclick="pauseTraining()">일시정지</button>
+    <button class="btn secondary" onclick="resetNetwork()">초기화</button>
+  </div>
+</header>
+<div id="main">
+  <div id="controls">
+    <div class="section">
+      <h3>데이터셋</h3>
+      <select id="dataset" onchange="loadDataset()">
+        <option value="xor">XOR (비선형)</option>
+        <option value="circle">원 분류</option>
+        <option value="spiral">나선형</option>
+        <option value="moon">초승달</option>
+        <option value="gaussian">가우시안</option>
+      </select>
+    </div>
+    <div class="section">
+      <h3>네트워크 구조</h3>
+      <div class="slider"><label>은닉 레이어</label><input type="range" id="hiddenLayers" min="1" max="4" value="2" oninput="hiddenLayersVal.textContent=this.value;buildNetwork()"><span id="hiddenLayersVal">2</span></div>
+      <div class="slider"><label>뉴런 수/레이어</label><input type="range" id="neuronsPerLayer" min="2" max="16" value="8" oninput="neuronsVal.textContent=this.value;buildNetwork()"><span id="neuronsVal">8</span></div>
+      <div class="slider"><label>활성화 함수</label>
+        <select id="activation" onchange="buildNetwork()">
+          <option value="relu">ReLU</option>
+          <option value="tanh" selected>Tanh</option>
+          <option value="sigmoid">Sigmoid</option>
+        </select>
+      </div>
+    </div>
+    <div class="section">
+      <h3>학습 설정</h3>
+      <div class="slider"><label>학습률</label><input type="range" id="lr" min="1" max="100" value="10" oninput="lrVal.textContent=(this.value/100).toFixed(2)"><span id="lrVal">0.10</span></div>
+      <div class="slider"><label>배치 크기</label><input type="range" id="batchSize" min="1" max="64" value="16" oninput="batchVal.textContent=this.value"><span id="batchVal">16</span></div>
+      <div class="slider"><label>정규화</label><input type="range" id="reg" min="0" max="100" value="0" oninput="regVal.textContent=(this.value/10000).toFixed(4)"><span id="regVal">0.0000</span></div>
+    </div>
+    <div class="section">
+      <h3>시각화</h3>
+      <label><input type="checkbox" id="showWeights" checked onchange="draw()">가중치 표시</label><br>
+      <label><input type="checkbox" id="showGradients" onchange="draw()">그라디언트 표시</label><br>
+      <label><input type="checkbox" id="showDecision" checked onchange="draw()">결정 경계</label>
+    </div>
+    <div class="section">
+      <h3>통계</h3>
+      <div style="font-size:12px;line-height:2">
+        반복: <span id="iterCount">0</span><br>
+        손실: <span id="lossVal">-</span><br>
+        정확도: <span id="accVal">-</span><br>
+        학습 시간: <span id="timeVal">0.00s</span>
+      </div>
+    </div>
+  </div>
+  <div id="vizArea">
+    <canvas id="networkCanvas"></canvas>
+  </div>
+  <div id="chartArea"><canvas id="lossCanvas"></canvas></div>
+  <div id="dataArea" style="padding:16px;font-size:12px;color:var(--muted)"></div>
+</div>
+<div class="footer">Hermes Neural Playground | 순수 JS 역전파 구현 | 계속 업데이트됨</div>
+
+<script>
+// 신경망 구현
+class Tensor {
+  constructor(data, shape) { this.data = data; this.shape = shape; }
+  static zeros(shape) { return new Tensor(new Float32Array(shape.reduce((a,b)=>a*b)), shape); }
+  static random(shape) { return new Tensor(Float32Array.from({length: shape.reduce((a,b)=>a*b)}, () => Math.random()*2-1), shape); }
+  get(i,j,k) { if(k!==undefined) return this.data[i*this.shape[1]*this.shape[2]+j*this.shape[2]+k]; if(j!==undefined) return this.data[i*this.shape[1]+j]; return this.data[i]; }
+  set(i,j,k,val) { if(k!==undefined) this.data[i*this.shape[1]*this.shape[2]+j*this.shape[2]+k]=val; else if(j!==undefined) this.data[i*this.shape[1]+j]=val; else this.data[i]=val; }
+}
+
+class Layer {
+  constructor(inputSize, outputSize, activation='tanh') {
+    this.weights = Tensor.random([inputSize, outputSize]);
+    this.biases = Tensor.zeros([outputSize]);
+    this.activation = activation;
+    this.input = null; this.output = null; this.gradWeights = Tensor.zeros([inputSize, outputSize]); this.gradBiases = Tensor.zeros([outputSize]);
+  }
+  forward(input) {
+    this.input = input;
+    const out = Tensor.zeros([input.shape[0], this.weights.shape[1]]);
+    for(let b=0;b<input.shape[0];b++)for(let j=0;j<this.weights.shape[1];j++){let sum=this.biases.get(j);for(let i=0;i<this.weights.shape[0];i++)sum+=input.get(b,i)*this.weights.get(i,j);out.set(b,j,this.activate(sum));}
+    this.output = out;
+    return out;
+  }
+  activate(x) {
+    if(this.activation==='relu') return Math.max(0,x);
+    if(this.activation==='sigmoid') return 1/(1+Math.exp(-x));
+    return Math.tanh(x);
+  }
+  activateDeriv(x) {
+    if(this.activation==='relu') return x>0?1:0;
+    if(this.activation==='sigmoid') {const s=1/(1+Math.exp(-x));return s*(1-s);}
+    return 1-x*x;
+  }
+  backward(gradOutput, lr, reg) {
+    const batchSize = this.input.shape[0];
+    const gradInput = Tensor.zeros(this.input.shape);
+    for(let b=0;b<batchSize;b++)for(let i=0;i<this.weights.shape[0];i++)for(let j=0;j<this.weights.shape[1];j++){
+      const deriv = this.activateDeriv(this.output.get(b,j));
+      const g = gradOutput.get(b,j) * deriv;
+      this.gradWeights.set(i,j,this.gradWeights.get(i,j)+this.input.get(b,i)*g);
+      this.gradBiases.set(j,this.gradBiases.get(j)+g);
+      gradInput.set(b,i,gradInput.get(b,i)+this.weights.get(i,j)*g);
+    }
+    for(let i=0;i<this.weights.shape[0];i++)for(let j=0;j<this.weights.shape[1];j++){
+      const gw = this.gradWeights.get(i,j)/batchSize + reg*this.weights.get(i,j);
+      this.weights.set(i,j,this.weights.get(i,j)-lr*gw);
+      this.gradWeights.set(i,j,0);
+    }
+    for(let j=0;j<this.biases.shape[0];j++){
+      const gb = this.gradBiases.get(j)/batchSize;
+      this.biases.set(j,this.biases.get(j)-lr*gb);
+      this.gradBiases.set(j,0);
+    }
+    return gradInput;
+  }
+}
+
+class Network {
+  constructor(layerSizes, activation) {
+    this.layers = [];
+    for(let i=0;i<layerSizes.length-1;i++) this.layers.push(new Layer(layerSizes[i], layerSizes[i+1], i===layerSizes.length-2?'sigmoid':activation));
+  }
+  forward(input) { let out=input; for(const l of this.layers) out=l.forward(out); return out; }
+  backward(gradOutput, lr, reg) { let g=gradOutput; for(let i=this.layers.length-1;i>=0;i--) g=this.layers[i].backward(g,lr,reg); }
+  train(X, y, lr, reg) { const out=this.forward(X); let loss=0; const grad=Tensor.zeros(out.shape); for(let b=0;b<X.shape[0];b++){const diff=out.get(b,0)-y.get(b,0); loss+=diff*diff; grad.set(b,0,2*diff);} this.backward(grad,lr,reg); return loss/X.shape[0]; }
+  predict(X) { return this.forward(X); }
+}
+
+// 데이터셋 생성
+function generateXOR(n=200) {
+  const X=Tensor.zeros([n,2]), y=Tensor.zeros([n,1]);
+  for(let i=0;i<n;i++){const a=Math.random(),b=Math.random();X.set(i,0,a);X.set(i,1,b);y.set(i,0,a^b?1:0);}
+  return {X,y};
+}
+function generateCircle(n=200) {
+  const X=Tensor.zeros([n,2]), y=Tensor.zeros([n,1]);
+  for(let i=0;i<n;i++){const r=Math.sqrt(Math.random()),theta=Math.random()*Math.PI*2;X.set(i,0,r*Math.cos(theta));X.set(i,1,r*Math.sin(theta));y.set(i,0,r>0.5?1:0);}
+  return {X,y};
+}
+function generateSpiral(n=200) {
+  const X=Tensor.zeros([n,2]), y=Tensor.zeros([n,1]);
+  for(let i=0;i<n;i++){const r=i/n*5,theta=r*2+(y.get(0,0)||0)*Math.PI;X.set(i,0,r*Math.cos(theta)*0.1);X.set(i,1,r*Math.sin(theta)*0.1);y.set(i,0,i%(n/2)<n/4?1:0);}
+  return {X,y};
+}
+function generateMoon(n=200) {
+  const X=Tensor.zeros([n,2]), y=Tensor.zeros([n,1]);
+  for(let i=0;i<n;i++){const a=Math.random()*Math.PI,r=1+Math.random()*0.2;X.set(i,0,Math.cos(a)*r);X.set(i,1,Math.sin(a)*r);y.set(i,0,i<n/2?0:1); if(i>=n/2){X.set(i,0,X.get(i,0)+1);X.set(i,1,X.get(i,1)-0.5);}}
+  return {X,y};
+}
+function generateGaussian(n=200) {
+  const X=Tensor.zeros([n,2]), y=Tensor.zeros([n,1]);
+  for(let i=0;i<n;i++){if(i<n/2){X.set(i,0,-1+Math.random()*0.5);X.set(i,1,Math.random()*0.5);y.set(i,0,0);}else{X.set(i,0,1+Math.random()*0.5);X.set(i,1,Math.random()*0.5);y.set(i,0,1);}}
+  return {X,y};
+}
+
+// 전역 상태
+const netCanvas=document.getElementById('networkCanvas'), lossCanvas=document.getElementById('lossCanvas');
+const netCtx=netCanvas.getContext('2d'), lossCtx=lossCanvas.getContext('2d');
+let network=null, trainData=null, training=false, animationId=null;
+let lossHistory=[], iterCount=0, startTime=0;
+
+function resize() {
+  netCanvas.width=netCanvas.clientWidth; netCanvas.height=netCanvas.clientHeight;
+  lossCanvas.width=lossCanvas.clientWidth; lossCanvas.height=lossCanvas.clientHeight;
+}
+window.addEventListener('resize',resize);
+
+function buildNetwork() {
+  const hidden=document.getElementById('hiddenLayers').value|0;
+  const neurons=document.getElementById('neuronsPerLayer').value|0;
+  const act=document.getElementById('activation').value;
+  const sizes=[2]; for(let i=0;i<hidden;i++) sizes.push(neurons); sizes.push(1);
+  network=new Network(sizes,act);
+  iterCount=0; lossHistory=[]; document.getElementById('iterCount').textContent=0; document.getElementById('lossVal').textContent='-'; document.getElementById('accVal').textContent='-'; document.getElementById('timeVal').textContent='0.00s';
+  draw();
+}
+
+function loadDataset() {
+  const type=document.getElementById('dataset').value;
+  const generators={xor:generateXOR,circle:generateCircle,spiral:generateSpiral,moon:generateMoon,gaussian:generateGaussian};
+  trainData=generators[type](400);
+  draw();
+}
+
+function startTraining() {
+  if(training) return;
+  training=true; startTime=performance.now();
+  requestAnimationFrame(trainStep);
+}
+function pauseTraining() { training=false; if(animationId) cancelAnimationFrame(animationId); }
+function resetNetwork() { pauseTraining(); buildNetwork(); loadDataset(); }
+
+function trainStep() {
+  if(!training) return;
+  const lr=parseFloat(document.getElementById('lr').value)/100;
+  const batch=parseInt(document.getElementById('batchSize').value);
+  const reg=parseFloat(document.getElementById('reg').value)/10000;
+  let totalLoss=0, correct=0;
+  for(let step=0;step<4;step++){
+    const idx=Math.floor(Math.random()*trainData.X.shape[0]);
+    const batchX=Tensor.zeros([batch,2]), batchY=Tensor.zeros([batch,1]);
+    for(let i=0;i<batch;i++){
+      const idxi=(idx+i)%trainData.X.shape[0];
+      batchX.set(i,0,trainData.X.get(idxi,0)); batchX.set(i,1,trainData.X.get(idxi,1));
+      batchY.set(i,0,trainData.y.get(idxi,0));
+    }
+    const loss=network.train(batchX,batchY,lr,reg);
+    totalLoss+=loss;
+    const pred=network.predict(batchX);
+    for(let i=0;i<batch;i++) if((pred.get(i,0)>0.5)===batchY.get(i,0)) correct++;
+  }
+  iterCount+=4;
+  lossHistory.push(totalLoss/4); if(lossHistory.length>500) lossHistory.shift();
+  document.getElementById('iterCount').textContent=iterCount;
+  document.getElementById('lossVal').textContent=(totalLoss/4).toFixed(4);
+  document.getElementById('accVal').textContent=(correct/(4*batch)*100).toFixed(1)+'%';
+  document.getElementById('timeVal').textContent=((performance.now()-startTime)/1000).toFixed(2)+'s';
+  draw();
+  animationId=requestAnimationFrame(trainStep);
+}
+
+function draw() {
+  if(!network) return;
+  resize();
+  netCtx.clearRect(0,0,netCanvas.width,netCanvas.height);
+  lossCtx.clearRect(0,0,lossCanvas.width,lossCanvas.height);
+  
+  // 결정 경계 그리기
+  if(document.getElementById('showDecision').checked && trainData){
+    const w=netCanvas.width,h=netCanvas.height;
+    const img=netCtx.createImageData(w,h);
+    for(let px=0;px<w;px+=4)for(let py=0;py<h;py+=4){
+      const x=(px/w)*4-2, y=(py/h)*4-2;
+      const input=Tensor.zeros([1,2]); input.set(0,0,x); input.set(0,1,y);
+      const out=network.predict(input).get(0,0);
+      const idx=(py*w+px)*4;
+      if(out>0.5){img.data[idx]=96;img.data[idx+1]=165;img.data[idx+2]=250;img.data[idx+3]=30;}
+      else{img.data[idx]=239;img.data[idx+1]=68;img.data[idx+2]=68;img.data[idx+3]=30;}
+    }
+    netCtx.putImageData(img,0,0);
+  }
+  
+  // 데이터 포인트
+  if(trainData){
+    const n=trainData.X.shape[0];
+    for(let i=0;i<n;i++){
+      const x=(trainData.X.get(i,0)+2)/4*netCanvas.width;
+      const y=(2-trainData.X.get(i,1))/4*netCanvas.height;
+      netCtx.beginPath();
+      netCtx.arc(x,y,3,0,Math.PI*2);
+      netCtx.fillStyle=trainData.y.get(i,0)>0.5?'#ef4444':'#60a5fa';
+      netCtx.fill();
+    }
+  }
+  
+  // 네트워크 구조 시각화
+  const layers=network.layers;
+  const layerCount=layers.length+1;
+  const layerX=[]; for(let i=0;i<layerCount;i++) layerX.push((i+0.5)/layerCount*netCanvas.width);
+  const maxNeurons=Math.max(...layers.map(l=>l.weights.shape[1]),2,8);
+  
+  // 뉴런 그리기
+  let prevNeurons=[{x:layerX[0],y:netCanvas.height/2}];
+  netCtx.font='10px monospace';
+  for(let li=0;li<layers.length;li++){
+    const l=layers[li];
+    const nOut=l.weights.shape[1];
+    const currNeurons=[];
+    for(let j=0;j<nOut;j++){
+      const ny=(j+0.5)/nOut*netCanvas.height;
+      currNeurons.push({x:layerX[li+1],y:ny});
+    }
+    // 연결선
+    if(document.getElementById('showWeights').checked){
+      for(let i=0;i<prevNeurons.length;i++)for(let j=0;j<currNeurons.length;j++){
+        const w=l.weights.get(i,j);
+        const alpha=Math.min(1,Math.abs(w)*2);
+        netCtx.beginPath();
+        netCtx.moveTo(prevNeurons[i].x,prevNeurons[i].y);
+        netCtx.lineTo(currNeurons[j].x,currNeurons[j].y);
+        netCtx.strokeStyle=w>0?`rgba(74,222,128,${alpha*0.5})`:`rgba(239,68,68,${alpha*0.5})`;
+        netCtx.lineWidth=Math.max(0.5,alpha*2);
+        netCtx.stroke();
+      }
+    }
+    prevNeurons=currNeurons;
+  }
+  
+  // 손실 그래프
+  if(lossHistory.length>1){
+    lossCtx.beginPath();
+    for(let i=0;i<lossHistory.length;i++){
+      const x=i/lossHistory.length*lossCanvas.width;
+      const y=lossCanvas.height-Math.min(lossHistory[i]*10,1)*lossCanvas.height;
+      if(i===0) lossCtx.moveTo(x,y); else lossCtx.lineTo(x,y);
+    }
+    lossCtx.strokeStyle='#60a5fa'; lossCtx.lineWidth=2; lossCtx.stroke();
+  }
+  
+  // 데이터 영역 업데이트
+  document.getElementById('dataArea').innerHTML=`데이터: ${trainData?.X.shape[0]||0} 샘플 | 레이어: ${layers.length} | 파라미터: ~${layers.reduce((s,l)=>s+l.weights.shape[0]*l.weights.shape[1]+l.biases.shape[0],0)}`;
+}
+
+buildNetwork();
+loadDataset();
+</script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Space Invaders</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px}h1{font-size:28px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}.sub{color:var(--muted);font-size:14px;margin-bottom:24px}#gameCanvas{border:2px solid var(--border);border-radius:8px;background:#000}#ui{margin-top:16px;display:flex;justify-content:center;gap:48px;font-size:18px}.btn{background:var(--accent);color:#0b0e16;border:none;padding:10px 20px;font-size:14px;border-radius:6px;cursor:pointer;margin-top:16px}.footer{margin-top:32px;color:var(--muted);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<h1>SPACE <span>INVADERS</span></h1>
+<div class="sub">←/→ 이동, 스페이스바 발사 — 외계인 격퇴</div>
+<canvas id="gameCanvas" width="600" height="500"></canvas>
+<div id="ui">
+  <div>점수: <span id="score">0</span></div>
+  <div>생명: <span id="lives">3</span></div>
+</div>
+<button class="btn" id="restartBtn" style="display:none" onclick="restart()">재시작</button>
+<div class="footer">Hermes Space Invaders | 계속 업데이트됨</div>
+
+<script>
+const canvas=document.getElementById('gameCanvas');const ctx=canvas.getContext('2d');
+const W=600,H=500;
+const player={x:W/2-25,y:H-50,w:50,h:20,speed:6,color:'#60a5fa'};
+let bullets=[],aliens=[],alienBullets=[],alienDir=1,alienSpeed=0.5,score=0,lives=3,gameOver=false,animId;
+const keys={};
+
+function initAliens(){aliens=[];for(let r=0;r<5;r++){for(let c=0;c<11;c++){aliens.push({x:60+c*45,y:60+r*35,w:30,h:25,alive:true,type:r})}}}
+function reset(){player.x=W/2-25;bullets=[];alienBullets=[];alienDir=1;alienSpeed=0.5;score=0;lives=3;gameOver=false;document.getElementById('score').textContent=0;document.getElementById('lives').textContent=3;document.getElementById('restartBtn').style.display='none';initAliens();loop()}
+function shoot(){if(bullets.length<3)bullets.push({x:player.x+player.w/2-2,y:player.y,w:4,h:10,vy:-10})}
+function alienShoot(){const alive=aliens.filter(a=>a.alive);if(alive.length&&Math.random()<0.01){const a=alive[Math.floor(Math.random()*alive.length)];alienBullets.push({x:a.x+a.w/2-2,y:a.y+a.h,w:4,h:10,vy:4})}}
+function update(){
+  if(keys.ArrowLeft&&player.x>0)player.x-=player.speed;
+  if(keys.ArrowRight&&player.x<W-player.w)player.x+=player.speed;
+  bullets.forEach(b=>b.y+=b.vy);
+  bullets=bullets.filter(b=>b.y>0);
+  alienBullets.forEach(b=>b.y+=b.vy);
+  alienBullets=alienBullets.filter(b=>b.y<H);
+  let hitEdge=false;
+  aliens.forEach(a=>{ if(a.alive){ a.x+=alienDir*alienSpeed; if(a.x<0||a.x+a.w>W) hitEdge=true; } });
+  if(hitEdge){ alienDir*=-1; aliens.forEach(a=>{ if(a.alive) a.y+=20; }); }
+  bullets.forEach(b=>{
+    aliens.forEach(a=>{
+      if(a.alive&&b.x>a.x&&b.x<a.x+a.w&&b.y>a.y&&b.y<a.y+a.h){
+        a.alive=false; b.y=-10; score+=10*(6-a.type);
+        document.getElementById('score').textContent=score;
+      }
+    });
+  });
+  alienBullets.forEach(b=>{
+    if(b.x>player.x&&b.x<player.x+player.w&&b.y>player.y&&b.y<player.y+player.h){
+      b.y=H+10; lives--; document.getElementById('lives').textContent=lives;
+      if(lives<=0) endGame();
+    }
+  });
+  aliens.forEach(a=>{ if(a.alive&&a.y+a.h>player.y) endGame(); });
+  if(aliens.every(a=>!a.alive)){ initAliens(); alienSpeed*=1.15; }
+  alienShoot();
+}
+function endGame(){gameOver=true;document.getElementById('restartBtn').style.display='block';cancelAnimationFrame(animId)}
+function draw(){ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+  ctx.fillStyle=player.color;ctx.fillRect(player.x,player.y,player.w,player.h);
+  ctx.fillStyle='#fff';bullets.forEach(b=>ctx.fillRect(b.x,b.y,b.w,b.h));
+  ctx.fillStyle='#ef4444';alienBullets.forEach(b=>ctx.fillRect(b.x,b.y,b.w,b.h));
+  aliens.forEach(a=>{if(a.alive){ctx.fillStyle=a.type<2?'#fbbf24':a.type<4?'#f87171':'#a78bfa';ctx.fillRect(a.x,a.y,a.w,a.h);ctx.fillStyle='#000';ctx.fillRect(a.x+5,a.y+5,5,5);ctx.fillRect(a.x+20,a.y+5,5,5)}});
+  ctx.fillStyle='#334155';ctx.fillRect(0,H-10,W,10)}
+function loop(){if(!gameOver){update();draw();animId=requestAnimationFrame(loop)}}
+window.addEventListener('keydown',e=>{keys[e.key]=true;if(e.code==='Space')shoot()});
+window.addEventListener('keyup',e=>keys[e.key]=false);
+document.getElementById('restartBtn').onclick=reset;
+reset();
+</script>
+</body>
+</html>

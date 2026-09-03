@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Markdown Slides</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;height:100vh;overflow:hidden}
+.slides-container{width:100%;height:100%;position:relative}
+.slide{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;max-width:900px;height:80%;max-height:600px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:60px 80px;display:flex;flex-direction:column;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.3s,z-index 0s;z-index:1}
+.slide.active{opacity:1;pointer-events:auto;z-index:10}
+.slide h1{font-size:48px;letter-spacing:2px;margin-bottom:24px;color:var(--accent);text-align:center}
+.slide h2{font-size:32px;margin-bottom:16px;color:var(--text);text-align:center}
+.slide h3{font-size:24px;margin-bottom:12px;color:var(--muted);text-align:center}
+.slide p{font-size:20px;line-height:1.8;color:var(--muted);text-align:center;margin-bottom:16px}
+.slide ul{font-size:20px;line-height:2;color:var(--text);max-width:700px;margin:0 auto;text-align:left}
+.slide code{background:var(--bg);padding:2px 8px;border-radius:4px;font-family:monospace;color:var(--accent)}
+.slide pre{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:20px;overflow-x:auto;margin:20px auto;max-width:800px;text-align:left}
+.slide pre code{background:transparent;padding:0;color:var(--text);font-size:16px;line-height:1.6}
+.slide blockquote{border-left:4px solid var(--accent);padding-left:24px;margin:24px 0;color:var(--muted);font-style:italic;font-size:20px;text-align:left}
+.slide table{margin:20px auto;border-collapse:collapse;font-size:18px}
+.slide th,.slide td{border:1px solid var(--border);padding:12px 24px;text-align:left}
+.slide th{background:var(--bg);color:var(--accent)}
+.controls{position:fixed;bottom:32px;left:50%;transform:translateX(-50%);display:flex;gap:16px;align-items:center;z-index:100}
+.controls button{background:var(--card);border:1px solid var(--border);color:var(--text);padding:12px 24px;border-radius:8px;font-size:16px;cursor:pointer;transition:.2s}
+.controls button:hover{background:var(--accent);color:#0b0e16;border-color:var(--accent)}
+.controls button:disabled{opacity:0.3;cursor:not-allowed}
+#slideNum{color:var(--muted);font-size:16px;min-width:80px;text-align:center}
+.progress{position:fixed;bottom:0;left:0;height:4px;background:var(--accent);z-index:100;transition:width .3s}
+.editor-toggle{position:fixed;top:24px;right:24px;z-index:100}
+.editor-toggle button{background:var(--card);border:1px solid var(--border);color:var(--text);padding:10px 16px;border-radius:8px;cursor:pointer}
+.editor-panel{position:fixed;top:0;right:0;width:400px;height:100%;background:var(--card);border-left:1px solid var(--border);transform:translateX(100%);transition:transform .3s;z-index:200;display:flex;flex-direction:column}
+.editor-panel.open{transform:translateX(0)}
+.editor-header{padding:16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.editor-header h3{font-size:14px}
+#slideEditor{flex:1;padding:16px;background:var(--bg);border:none;color:var(--text);font-family:monospace;font-size:14px;line-height:1.6;outline:none;resize:none}
+.toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--border);padding:12px 24px;border-radius:8px;z-index:200;opacity:0;transition:.3s}
+.toast.show{opacity:1}
+@media(max-width:768px){.slide{padding:40px 30px}.slide h1{font-size:32px}.slide p,.slide ul{font-size:16px}}
+</style>
+</head>
+<body>
+<div class="slides-container" id="slidesContainer"></div>
+<div class="progress" id="progress"></div>
+<div class="controls">
+  <button id="prevBtn" onclick="prevSlide()">이전</button>
+  <span id="slideNum">1 / 1</span>
+  <button id="nextBtn" onclick="nextSlide()">다음</button>
+</div>
+<div class="editor-toggle"><button onclick="toggleEditor()">편집기 열기</button></div>
+<div class="editor-panel" id="editorPanel">
+  <div class="editor-header">
+    <h3>슬라이드 편집 (마크다운)</h3>
+    <button onclick="toggleEditor()">닫기</button>
+  </div>
+  <textarea id="slideEditor" spellcheck="false" placeholder="# 슬라이드 제목\n\n내용을 마크다운으로 작성하세요..."></textarea>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// marked.js 로드
+const loadMarked=()=>new Promise(r=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js';s.onload=r;document.head.appendChild(s)});
+
+const container=document.getElementById('slidesContainer');
+const editor=document.getElementById('slideEditor');
+const slideNum=document.getElementById('slideNum');
+const progress=document.getElementById('progress');
+const prevBtn=document.getElementById('prevBtn');
+const nextBtn=document.getElementById('nextBtn');
+const toast=document.getElementById('toast');
+
+let slides=[],currentSlide=0,markedLib=null;
+
+const defaultSlides=`# Hermes Workspace
+
+## 91개 프로젝트의 통합 워크스페이스
+
+---
+
+# AI 시스템
+
+- 신경망 시각화
+- Q-러닝 에이전트
+- 유전 알고리즘
+- A* 경로 찾기
+- 셀룰러 오토마타
+- 로렌츠 어트랙터
+- 중력 N-바디 시뮬레이션
+
+---
+
+# 게임 컬렉션
+
+- 테트리스
+- 지뢰찾기
+- 2048
+- 틱택토
+- 스네이크
+- 벽돌깨기
+- 오델로
+- 체스
+- 리듬 게임
+- 플래피 버드
+- 퐁 AI
+- 스페이스 인베이더
+
+---
+
+# 시각화 & 3D
+
+- 3D 엔진 (순수 JS)
+- 태양계 시뮬레이터
+- 라이프 게임
+- 파동 시뮬레이터
+- 프랙탈 뷰어
+- 유체 시뮬레이션
+- 파티클 시스템
+- WebGL 셰이더
+
+---
+
+# 실용 도구
+
+- 시스템 모니터
+- 포커스 타이머
+- 캘린더
+- 메모장
+- 작업 관리자
+- 설정 관리자
+- 진행 대시보드
+- 단위 변환기
+- 색상 변환기
+- 해시 생성기
+- 텍스트 변환기
+- URL 단축기
+
+---
+
+# 개발 도구
+
+- 코드 에디터
+- 터미널 에뮬레이터
+- 데이터베이스 브라우저
+- 마크다운 에디터
+- 정규식 테스터
+- JSON 포맷터
+- Cron 생성기
+- API 테스터
+- 색상 팔레트 생성기
+- SVG 에디터
+- 다이어그램 디자이너
+
+---
+
+# 기술 스택
+
+- Vanilla JavaScript (ES6+)
+- HTML5 Canvas / SVG / WebGL
+- Web Audio API
+- Web Speech API
+- LocalStorage / IndexedDB
+- SQL.js (WASM SQLite)
+- marked.js / highlight.js
+- Zero dependencies (대부분)
+
+---
+
+# 공유 & 배포
+
+- 단일 HTML 파일로 실행
+- GitHub Pages 호환
+- 오프라인 작동
+- 모바일 반응형
+- PWA 지원 가능
+
+---
+
+# 감사합니다
+
+## Hermes Workspace
+
+### 계속 진화 중...
+
+\`\`\`javascript
+while (true) {
+  createProject();
+  share();
+  improve();
+}
+\`\`\``;
+
+async function init(){
+  await loadMarked();
+  markedLib=window.marked;
+  markedLib.setOptions({breaks:true,gfm:true});
+  parseSlides(defaultSlides);
+  renderSlides();
+  updateUI();
+}
+
+function parseSlides(text){
+  const parts=text.split(/^---$/m);
+  slides=parts.map((p,i)=>{
+    const html=markedLib.parse(p.trim());
+    return {id:i,content:p.trim(),html};
+  });
+}
+
+function renderSlides(){
+  container.innerHTML=slides.map((s,i)=>`<div class="slide ${i===currentSlide?'active':''}" id="slide-${i}">${s.html}</div>`).join('');
+}
+
+function updateUI(){
+  slideNum.textContent=`${currentSlide+1} / ${slides.length}`;
+  progress.style.width=`${((currentSlide+1)/slides.length)*100}%`;
+  prevBtn.disabled=currentSlide===0;
+  nextBtn.disabled=currentSlide===slides.length-1;
+}
+
+function showSlide(index){
+  if(index<0||index>=slides.length)return;
+  document.getElementById(`slide-${currentSlide}`)?.classList.remove('active');
+  currentSlide=index;
+  document.getElementById(`slide-${currentSlide}`)?.classList.add('active');
+  updateUI();
+  updateEditor();
+}
+
+function prevSlide(){showSlide(currentSlide-1)}
+function nextSlide(){showSlide(currentSlide+1)}
+
+function updateEditor(){
+  editor.value=slides[currentSlide]?.content||'';
+}
+
+function toggleEditor(){
+  document.getElementById('editorPanel').classList.toggle('open');
+}
+
+editor.addEventListener('input',()=>{
+  if(slides[currentSlide]){
+    slides[currentSlide].content=editor.value;
+    slides[currentSlide].html=markedLib.parse(editor.value);
+    document.getElementById(`slide-${currentSlide}`).innerHTML=slides[currentSlide].html;
+  }
+});
+
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='TEXTAREA'||e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'||e.key===' ')nextSlide();
+  if(e.key==='ArrowLeft')prevSlide();
+  if(e.key==='Home')showSlide(0);
+  if(e.key==='End')showSlide(slides.length-1);
+  if(e.key==='e')toggleEditor();
+});
+
+function showToast(msg){
+  toast.textContent=msg;
+  toast.classList.add('show');
+  setTimeout(()=>toast.classList.remove('show'),2000);
+}
+
+// 터치 스와이프 지원
+let touchStartX=0;
+container.addEventListener('touchstart',e=>touchStartX=e.touches[0].clientX);
+container.addEventListener('touchend',e=>{
+  const dx=e.changedTouches[0].clientX-touchStartX;
+  if(Math.abs(dx)>50){dx>0?prevSlide():nextSlide()}
+});
+
+init();
+</script>
+</body>
+</html>

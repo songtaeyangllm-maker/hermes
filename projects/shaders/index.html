@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes WebGL Shaders</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px}h1{font-size:28px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}.sub{color:var(--muted);font-size:14px;margin-bottom:24px}#glCanvas{border:2px solid var(--border);border-radius:8px}#ui{margin-top:16px;display:flex;justify-content:center;gap:16px;flex-wrap:wrap}.control{background:var(--card);border:1px solid var(--border);padding:12px 20px;border-radius:8px}.control label{color:var(--muted);font-size:13px;margin-right:8px}.control select{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:4px}.footer{margin-top:32px;color:var(--muted);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<h1>WEBGL <span>SHADERS</span></h1>
+<div class="sub">GLSL 프래그먼트 셰이더 실시간 렌더링</div>
+<canvas id="glCanvas" width="800" height="500"></canvas>
+<div id="ui">
+  <div class="control">
+    <label>셰이더:</label>
+    <select id="shaderSelect">
+      <option value="plasma">플라즈마</option>
+      <option value="mandelbrot">만델브로트</option>
+      <option value="julia">줄리아 집합</option>
+      <option value="tunnel">터널</option>
+      <option value="metaball">메타볼</option>
+      <option value="raymarch">레이마칭 구체</option>
+      <option value="fire">절차적 불꽃</option>
+      <option value="water">물 표면</option>
+    </select>
+  </div>
+  <div class="control">
+    <label>해상도:</label>
+    <select id="resolution">
+      <option value="1">1x (800x500)</option>
+      <option value="0.5">0.5x</option>
+      <option value="2">2x</option>
+    </select>
+  </div>
+</div>
+<div class="footer">Hermes WebGL Shaders | GLSL 프래그먼트 셰이더 | 계속 업데이트됨</div>
+
+<script>
+const canvas=document.getElementById('glCanvas');const gl=canvas.getContext('webgl2')||canvas.getContext('webgl');
+if(!gl){alert('WebGL 미지원');throw'WebGL not supported'}
+
+const vsSource=`#version 300 es
+in vec2 a_position;
+void main(){gl_Position=vec4(a_position,0,1);}`;
+const fsSources={
+  plasma:`#version 300 es
+precision highp float;
+uniform float u_time;uniform vec2 u_resolution;
+out vec4 fragColor;
+void main(){
+  vec2 uv=gl_FragCoord.xy/u_resolution;
+  float v=0.0;
+  v+=sin(uv.x*10.0+u_time);
+  v+=sin(uv.y*10.0+u_time);
+  v+=sin((uv.x+uv.y)*10.0+u_time);
+  v+=sin(sqrt((uv.x-0.5)*(uv.x-0.5)+(uv.y-0.5)*(uv.y-0.5))*20.0+u_time);
+  fragColor=vec4(sin(v+u_time)*0.5+0.5,sin(v+u_time+2.0)*0.5+0.5,sin(v+u_time+4.0)*0.5+0.5,1.0);
+}`,
+  mandelbrot:`#version 300 es
+precision highp float;
+uniform float u_time;uniform vec2 u_resolution;
+out vec4 fragColor;
+void main(){
+  vec2 uv=(gl_FragCoord.xy-0.5*u_resolution)/min(u_resolution.x,u_resolution.y)*3.0;
+  vec2 c=vec2(-0.7,0.27015)+0.5*sin(u_time*0.1);
+  vec2 z=uv;
+  float iter=0.0;
+  for(int i=0;i<100;i++){
+    if(dot(z,z)>4.0)break;
+    z=vec2(z.x*z.x-z.y*z.y,2.0*z.x*z.y)+c;
+    iter+=1.0;
+  }
+  float smooth=iter-log2(log2(dot(z,z)));
+  vec3 col=vec3(smooth*0.05);
+  fragColor=vec4(sin(col+u_time*0.5)*0.5+0.5,1.0);
+}`,
+  julia:`#version 300 es
+precision highp float;
+uniform float u_time;uniform vec2 u_resolution;
+out vec4 fragColor;
+void main(){
+  vec2 uv=(gl_FragCoord.xy-0.5*u_resolution)/min(u_resolution.x,u_resolution.y)*2.0;
+  vec2 c=vec2(0.7885*cos(u_time*0.2),0.7885*sin(u_time*0.2));
+  vec2 z=uv;
+  float iter=0.0;
+  for(int i=0;i<80;i++){
+    if(dot(z,z)>4.0)break;
+    z=vec2(z.x*z.x-z.y*z.y,2.0*z.x*z.y)+c;
+    iter+=1.0;
+  }
+  float smooth=iter-log2(log2(dot(z,z)));
+  vec3 col=vec3(sin(smooth*0.1+u_time),sin(smooth*0.1+u_time+2.0),sin(smooth*0.1+u_time+4.0))*0.5+0.5;
+  fragColor=vec4(col,1.0);
+}`,
+  tunnel:`#version 300 es
+precision highp float;
+uniform float u_time;uniform vec2 u_resolution;
+out vec4 fragColor;
+void main(){
+  vec2 uv=(gl_FragCoord.xy-0.5*u_resolution)/min(u_resolution.x,u_resolution.y);
+  float t=u_time*0.5;
+  vec2 p=uv;
+  float a=atan(p.y,p.x);
+  float r=length(p);
+  float f=0.0;
+  f+=sin(20.0*a+10.0*sin(t))/r;
+  f+=sin(50.0/r+t*2.0);
+  vec3 col=vec3(sin(f+t)*0.5+0.5,sin(f+t+2.0)*0.5+0.5,sin(f+t+4.0)*0.5+0.5);
+  fragColor=vec4(col*pow(r,-0.3),1.0);
+}`,
+  metaball:`#version 300 es
+precision highp float;
+uniform float u_time;uniform vec2 u_resolution;
+out vec4 fragColor;
+void main(){
+  vec2 uv=gl_FragCoord.xy/u_resolution;
+  float v=0.0;
+  for(float i=0.0;i<8.0;i++){
+    float a=i*0.785398+t;
+    vec2 p=vec2(0.5+0.3*cos(a+u_time),0.5+0.3*sin(a+u_time));
+    v+=0.015/length(uv-p);
+  }
+  vec3 col=vec3(v*2.0,v*3.0,v*5.0);
+  fragColor=vec4(col,1.0);
+}`,
+  raymarch:`#version 300 es
+precision highp float;
+uniform float u_time;uniform vec2 u_resolution;
+out vec4 fragColor;
+float sdSphere(vec3 p,float r){return length(p)-r;}
+float sdBox(vec3 p,vec3 b){vec3 q=abs(p)-b;return length(max(q,0.0))+min(max(q.x,max(q.y,q.z)),0.0);}
+float map(vec3 p){
+  float d=sdSphere(p-vec3(sin(u_time)*1.5,0,cos(u_time)*1.5),0.5);
+  d=min(d,sdBox(p-vec3(-sin(u_time)*1.5,0,-cos(u_time)*1.5),vec3(0.5)));
+  return d;
+}
+vec3 calcNormal(vec3 p){
+  vec2 e=vec2(0.001,0);
+  return normalize(vec3(map(p+e.xyy)-map(p-e.xyy),map(p+e.yxy)-map(p-e.yxy),map(p+e.yyx)-map(p-e.yyx)));
+}
+void main(){
+  vec2 uv=(gl_FragCoord.xy-0.5*u_resolution)/min(u_resolution.x,u_resolution.y);
+  vec3 ro=vec3(0,0,-5);
+  vec3 rd=normalize(vec3(uv,1));
+  float t=0.0;
+  for(int i=0;i<64;i++){
+    vec3 p=ro+rd*t;
+    float d=map(p);
+    if(d<0.001)break;
+    t+=d;
+    if(t>20.0)break;
+  }
+  vec3 col=vec3(0);
+  if(t<20.0){
+    vec3 p=ro+rd*t;
+    vec3 n=calcNormal(p);
+    vec3 l=normalize(vec3(sin(u_time),1,cos(u_time)));
+    float diff=max(dot(n,l),0.0);
+    col=vec3(0.2,0.4,1.0)*diff+vec3(0.1);
+    col+=pow(max(dot(reflect(-rd,n),l),0.0),32.0)*vec3(1,0.8,0.6);
+  }
+  fragColor=vec4(col,1.0);
+}`,
+  fire:`#version 300 es
+precision highp float;
+uniform float u_time;uniform vec2 u_resolution;
+out vec4 fragColor;
+float noise(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
+float fbm(vec2 p){
+  float v=0.0,a=0.5;
+  for(int i=0;i<6;i++){v+=a*noise(p);p*=2.0;a*=0.5;}
+  return v;
+}
+void main(){
+  vec2 uv=gl_FragCoord.xy/u_resolution;
+  uv.x*=u_resolution.x/u_resolution.y;
+  float t=u_time*0.5;
+  float n=fbm(uv*3.0-vec2(0,t*0.3));
+  n+=fbm(uv*6.0+vec2(t*0.2,0))*0.5;
+  n+=fbm(uv*12.0-vec2(0,t*0.1))*0.25;
+  vec3 col=mix(vec3(0.1,0,0),vec3(1,0.3,0),smoothstep(0.3,0.7,n));
+  col=mix(col,vec3(1,0.8,0.2),smoothstep(0.6,0.8,n));
+  col=mix(col,vec3(1),smoothstep(0.8,0.95,n));
+  fragColor=vec4(col*pow(1.0-uv.y,2.0),1.0);
+}`,
+  water:`#version 300 es
+precision highp float;
+uniform float u_time;uniform vec2 u_resolution;
+out vec4 fragColor;
+float noise(vec3 p){
+  vec3 i=floor(p);vec3 f=fract(p);
+  f=f*f*(3.0-2.0*f);
+  float n=i.x+i.y*57.0+i.z*113.0;
+  return mix(mix(mix(sin(n)*0.5+0.5,sin(n+57.0)*0.5+0.5,f.x),
+    mix(sin(n+113.0)*0.5+0.5,sin(n+170.0)*0.5+0.5,f.x),f.y),
+    mix(mix(sin(n+1.0)*0.5+0.5,sin(n+58.0)*0.5+0.5,f.x),
+    mix(sin(n+114.0)*0.5+0.5,sin(n+171.0)*0.5+0.5,f.x),f.y),f.z);
+}
+float fbm(vec3 p){
+  float v=0.0,a=0.5;
+  for(int i=0;i<5;i++){v+=a*noise(p);p*=2.0;a*=0.5;}
+  return v;
+}
+void main(){
+  vec2 uv=gl_FragCoord.xy/u_resolution;
+  float n=fbm(vec3(uv*10.0,u_time*0.2));
+  n+=fbm(vec3(uv*20.0,u_time*0.1))*0.5;
+  vec3 deep=vec3(0.0,0.1,0.3);
+  vec3 shallow=vec3(0.2,0.5,0.8);
+  vec3 foam=vec3(1.0);
+  vec3 col=mix(deep,shallow,smoothstep(0.3,0.7,n));
+  col=mix(col,foam,smoothstep(0.8,0.95,n));
+  float spec=pow(max(0.0,1.0-abs(n-0.5)*2.0),32.0);
+  col+=spec*vec3(1.0,0.9,0.8);
+  fragColor=vec4(col,1.0);
+}`
+};
+
+const positionBuffer=gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER,positionBuffer);
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
+
+function createShader(gl,type,source){const shader=gl.createShader(type);gl.shaderSource(shader,source);gl.compileShader(shader);if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS)){console.error(gl.getShaderInfoLog(shader));gl.deleteShader(shader);return null}return shader}
+function createProgram(gl,vs,fs){const program=gl.createProgram();gl.attachShader(program,vs);gl.attachShader(program,fs);gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS)){console.error(gl.getProgramInfoLog(program));return null}return program}
+
+const vertexShader=createShader(gl,gl.VERTEX_SHADER,vsSource);
+let currentProgram=null;
+let currentShader='plasma';
+let startTime=performance.now();
+
+function setShader(name){
+  const fsSource=fsSources[name];
+  const fragmentShader=createShader(gl,gl.FRAGMENT_SHADER,fsSource);
+  if(fragmentShader){
+    if(currentProgram)gl.deleteProgram(currentProgram);
+    currentProgram=createProgram(gl,vertexShader,fragmentShader);
+    currentShader=name;
+  }
+}
+
+function render(){
+  gl.viewport(0,0,canvas.width,canvas.height);
+  gl.clearColor(0,0,0,1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  if(currentProgram){
+    gl.useProgram(currentProgram);
+    const posLoc=gl.getAttribLocation(currentProgram,'a_position');
+    gl.enableVertexAttribArray(posLoc);
+    gl.bindBuffer(gl.ARRAY_BUFFER,positionBuffer);
+    gl.vertexAttribPointer(posLoc,2,gl.FLOAT,false,0,0);
+    const timeLoc=gl.getUniformLocation(currentProgram,'u_time');
+    const resLoc=gl.getUniformLocation(currentProgram,'u_resolution');
+    gl.uniform1f(timeLoc,(performance.now()-startTime)*0.001);
+    gl.uniform2f(resLoc,canvas.width,canvas.height);
+    gl.drawArrays(gl.TRIANGLES,0,6);
+  }
+  requestAnimationFrame(render);
+}
+
+document.getElementById('shaderSelect').onchange=e=>setShader(e.target.value);
+document.getElementById('resolution').onchange=e=>{canvas.width=800*parseFloat(e.target.value);canvas.height=500*parseFloat(e.target.value)};
+
+setShader('plasma');
+render();
+</script>
+</body>
+</html>

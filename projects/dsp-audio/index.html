@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes DSP Audio Editor</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;height:100vh;display:flex;flex-direction:column}
+header{background:var(--card);border-bottom:1px solid var(--border);padding:8px 16px}header h1{font-size:14px}header h1 span{color:var(--accent)}
+.main{flex:1;display:flex;gap:2px}
+.panel{background:var(--card);border:1px solid var(--border);display:flex;flex-direction:column}
+#editor-ui{width:400px;padding:12px;overflow-y:auto}
+#waveform{flex:1;width:100%;height:400px}
+#spectrum{height:200px}
+.controls{display:flex;gap:4px;margin-bottom:8px}
+.btn-half{flex:1;background:var(--accent);color:#0b0e16;border:none;padding:10px;font-size:12px;border-radius:4px;cursor:pointer}
+.btn-half:hover{opacity:.9}
+.btn-half.secondary{background:var(--border);color:var(--text)}
+h3{margin:0;margin-bottom:12px;font-size:11px;color:var(--muted);text-transform:uppercase}
+.control-group{margin-bottom:16px}
+.control-group label{display:block;font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase}
+.control-group input[type="range"]{width:100%}
+.control-group input[type="range"]::-webkit-slider-thumb{appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer}
+.slider-val{display:inline-block;width:50px;text-align:right;color:var(--accent);font-family:monospace;font-size:11px;margin-left:8px}
+.filter-btn{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px}
+.filter-btn button{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:4px;cursor:pointer;font-size:11px}
+.filter-btn button:hover{background:var(--accent);color:#0b0e16}
+.filter-btn button.active{background:var(--accent);color:#0b0e16;border-color:var(--accent)}
+#fileInfo{padding:8px;border-top:1px solid var(--border);font-size:11px;color:var(--muted)}
+#fftCanvas{width:100%;height:200px}
+#timeCanvas{width:100%;height:200px}
+#spectrogram{width:100%;height:150px}
+.fft-display{display:flex;flex-direction:column}
+.display-label{padding:2px 4px;font-size:10px;color:var(--muted)}
+</style>
+</head>
+<body>
+<header><h1>DSP <span>AUDIO</span> <span style="color:var(--muted);font-size:12px">FFT/IFFT + 필터 + 파형 편집</span></h1></header>
+<div class="main">
+  <div class="panel" id="editor-ui">
+    <h3>Audio Editor</h3>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <input type="file" id="audioFile" accept="audio/*" style="display:none">
+      <button class="btn-half" onclick="document.getElementById('audioFile').click()">Load Audio</button>
+      <button class="btn-half secondary" onclick="generateTone()">Generate Tone</button>
+    </div>
+    
+    <div class="filter-btn">
+      <button onclick="applyFilter('lowpass')" id="lowpass">Lowpass</button>
+      <button onclick="applyFilter('highpass')" id="highpass">Highpass</button>
+      <button onclick="applyFilter('bandpass')" id="bandpass">Bandpass</button>
+      <button onclick="applyFilter('notch')" id="notch">Notch</button>
+    </div>
+    
+    <div class="control-group">
+      <label>Cutoff Frequency: <span class="slider-val" id="freqVal">1000 Hz</span></label>
+      <input type="range" id="cutoffFreq" min="20" max="20000" value="1000" oninput="updateFilterPreview()">
+    </div>
+    
+    <div class="control-group">
+      <label>Q Factor (Bandwidth): <span class="slider-val" id="qVal">1.0</span></label>
+      <input type="range" id="qFactor" min="0.1" max="10" value="1.0" step="0.1" oninput="updateFilterPreview()">
+    </div>
+    
+    <div class="control-group">
+      <label>Gain: <span class="slider-val" id="gainVal">0 dB</span></label>
+      <input type="range" id="gainDb" min="-20" max="20" value="0" oninput="updateFilterPreview()">
+    </div>
+    
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="btn-half secondary" onclick="applyFFT()">FFT 분석</button>
+      <button class="btn-half secondary" onclick="applyIFFT()">IFFT 복원</button>
+    </div>
+    
+    <div class="control-group">
+      <label>FFT 윈도우</label>
+      <select id="windowType">
+        <option value="hann">Hann</option>
+        <option value="hamming" selected>Hamming</option>
+        <option value="blackman">Blackman</option>
+        <option value="rectangular">Rectangular</option>
+      </select>
+    </div>
+    
+    <div id="fileInfo">파일을 로드하거나 톤을 생성하세요.</div>
+  </div>
+  
+  <div class="panel" id="waveform">
+    <div class="fft-display">
+      <div class="display-label">시간 영역 파형 (Time Domain)</div>
+      <canvas id="timeCanvas"></canvas>
+    </div>
+    <div class="fft-display">
+      <div class="display-label">주파수 스펙트럼 (Frequency Domain - FFT)</div>
+      <canvas id="fftCanvas"></canvas>
+    </div>
+    <div class="fft-display">
+      <div class="display-label">스펙트로그램 (Spectrogram)</div>
+      <canvas id="spectrogram"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+const audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+const fileInput=document.getElementById('audioFile');
+const timeCanvas=document.getElementById('timeCanvas');
+const fftCanvas=document.getElementById('fftCanvas');
+const specCanvas=document.getElementById('spectrogram');
+
+let audioBuffer=null, filteredBuffer=null, currentFilter='lowpass';
+let waveformArray=[], spectrumArray=[], spectrogramData=[];
+
+// FFT 구현 (Danielson-Lanczos)
+function fft(real, imag) {
+  const N = real.length;
+  if (N <= 1) return { real, imag };
+  
+  const evenR = [], evenI = [], oddR = [], oddI = [];
+  for (let i = 0; i < N; i++) {
+    if (i % 2 === 0) { evenR[i/2] = real[i]; evenI[i/2] = imag[i]; }
+    else { oddR[(i-1)/2] = real[i]; oddI[(i-1)/2] = imag[i]; }
+  }
+  
+  const even = fft(evenR, evenI);
+  const odd = fft(oddR, oddI);
+  
+  const resultR = new Float32Array(N), resultI = new Float32Array(N);
+  for (let k = 0; k < N/2; k++) {
+    const t = -2 * Math.PI * k / N;
+    const tr = Math.cos(t), ti = Math.sin(t);
+    const u = odd.real[k] * tr - odd.imag[k] * ti;
+    const ui = odd.real[k] * ti + odd.imag[k] * tr;
+    resultR[k] = even.real[k] + u;
+    resultI[k] = even.imag[k] + ui;
+    resultR[k + N/2] = even.real[k] - u;
+    resultI[k + N/2] = even.imag[k] - ui;
+  }
+  return { real: resultR, imag: resultI };
+}
+
+function ifft(real, imag) {
+  const N = real.length;
+  const conjugatedImag = new Float32Array(N);
+  for (let i = 0; i < N; i++) conjugatedImag[i] = -imag[i];
+  
+  const result = fft(real, conjugatedImag);
+  const outputReal = new Float32Array(N);
+  const outputImag = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    outputReal[i] = result.real[i] / N;
+    outputImag[i] = -result.imag[i] / N;
+  }
+  return { real: outputReal, imag: outputImag };
+}
+
+// 윈도우 함수
+function applyWindow(data, type) {
+  const N = data.length;
+  const windowed = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    let w;
+    switch (type) {
+      case 'hann': w = 0.5 * (1 - Math.cos(2 * Math.PI * i / (N - 1))); break;
+      case 'hamming': w = 0.54 - 0.46 * Math.cos(2 * Math.PI * i / (N - 1)); break;
+      case 'blackman': w = 0.42 - 0.5 * Math.cos(2 * Math.PI * i / (N - 1)) + 0.08 * Math.cos(4 * Math.PI * i / (N - 1)); break;
+      case 'rectangular': w = 1; break;
+    }
+    windowed[i] = data[i] * w;
+  }
+  return windowed;
+}
+
+// 필터 설계 (Biquad)
+function designBiquad(type, freq, Q, gain, sampleRate) {
+  const K = Math.tan(Math.PI * freq / sampleRate);
+  const V = Math.pow(10, gain / 20);
+  const b = [], a = [];
+  
+  switch (type) {
+    case 'lowpass':
+      const b0 = (1 - Math.cos(K * Math.PI)) / 2;
+      const b1 = 1 - Math.cos(K * Math.PI);
+      const b2 = (1 - Math.cos(K * Math.PI)) / 2;
+      const a0 = 1 + Math.sqrt(2) * K + K * K;
+      const a1 = (-2 * Math.cos(K * Math.PI)) / a0;
+      const a2 = (1 - Math.sqrt(2) * K + K * K) / a0;
+      return { b: [b0/a0, b1/a0, b2/a0], a: [1, a1, a2] };
+    case 'highpass':
+      // ... 고속 통과 필터
+      return { b: [0.5, -1, 0.5], a: [1, -1, 0.5] };
+    case 'bandpass':
+      return { b: [Q*K, 0, -Q*K], a: [1 + K*K + K/Q, 2*(K*K-1), 1 + K*K - K/Q] };
+  }
+  return { b: [1], a: [1] };
+}
+
+// 필터 적용
+function applyBiquad(input, b, a) {
+  const output = new Float32Array(input.length);
+  for (let n = 2; n < input.length; n++) {
+    output[n] = (b[0]*input[n] + b[1]*input[n-1] + b[2]*input[n-2] - a[1]*output[n-1] - a[2]*output[n-2]) / a[0];
+  }
+  return output;
+}
+
+function applyFilter(type) {
+  if (!audioBuffer) return;
+  currentFilter = type;
+  
+  const input = audioBuffer.getChannelData(0);
+  const sampleRate = audioBuffer.sampleRate;
+  const freq = parseFloat(document.getElementById('cutoffFreq').value);
+  const Q = parseFloat(document.getElementById('qFactor').value);
+  const gain = parseFloat(document.getElementById('gainDb').value);
+  
+  const coeffs = designBiquad(type, freq, Q, gain, sampleRate);
+  const filtered = applyBiquad(input, coeffs.b, coeffs.a);
+  
+  filteredBuffer = audioCtx.createBuffer(1, filtered.length, sampleRate);
+  filteredBuffer.copyToChannel(filtered, 0);
+  
+  // 스펙트럼 업데이트
+  computeSpectrum(filteredBuffer.getChannelData(0), sampleRate);
+  drawTimeDomain();
+  drawSpectrum();
+}
+
+function computeSpectrum(data, sampleRate) {
+  const N = Math.min(data.length, 4096);
+  const windowed = applyWindow(data.slice(0, N), document.getElementById('windowType').value);
+  const real = new Float32Array(N);
+  const imag = new Float32Array(N);
+  for (let i = 0; i < N; i++) real[i] = windowed[i];
+  
+  const result = fft(real, imag);
+  spectrumArray = [];
+  for (let i = 0; i < N/2; i++) {
+    const mag = Math.sqrt(result.real[i]**2 + result.imag[i]**2);
+    spectrumArray.push({ freq: i * sampleRate / N, mag: 20 * Math.log10(mag + 1) });
+  }
+}
+
+function drawTimeDomain() {
+  const canvas = timeCanvas;
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+  
+  const data = filteredBuffer ? filteredBuffer.getChannelData(0) : (audioBuffer ? audioBuffer.getChannelData(0) : null);
+  if (!data) return;
+  
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = '#60a5fa';
+  ctx.lineWidth = 1;
+  
+  const step = Math.ceil(data.length / canvas.width);
+  ctx.beginPath();
+  for (let i = 0; i < data.length; i += step) {
+    const x = (i / data.length) * canvas.width;
+    const y = (1 - data[i]) * canvas.height / 2;
+    if (i === 0 || i === step) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  
+  ctx.strokeStyle = '#1e2840';
+  ctx.beginPath(); ctx.moveTo(0, canvas.height/2); ctx.lineTo(canvas.width, canvas.height/2); ctx.stroke();
+}
+
+function drawSpectrum() {
+  const canvas = fftCanvas;
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+  
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#4ade80';
+  
+  for (let i = 0; i < spectrumArray.length; i++) {
+    const barWidth = canvas.width / spectrumArray.length;
+    const barHeight = (spectrumArray[i].mag / 100) * canvas.height;
+    ctx.fillRect(i * barWidth, canvas.height - barHeight, barWidth - 1, barHeight);
+  }
+}
+
+function drawSpectrogram() {
+  const canvas = specCanvas;
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+  
+  const imageData = ctx.createImageData(canvas.width, canvas.height);
+  for (let y = 0; y < canvas.height; y++) {
+    const dataIdx = Math.floor(y / canvas.height * (spectrogramData.length || 1));
+    const freqIdx = dataIdx < spectrogramData.length ? dataIdx : spectrogramData.length - 1;
+    for (let x = 0; x < canvas.width; x++) {
+      const pixelIdx = (y * canvas.width + x) * 4;
+      const intensity = spectrogramData[freqIdx] ? spectrogramData[freqIdx][x] || 0 : 0;
+      const c = Math.floor(intensity * 255);
+      imageData.data[pixelIdx] = c;
+      imageData.data[pixelIdx+1] = c;
+      imageData.data[pixelIdx+2] = c;
+      imageData.data[pixelIdx+3] = 255;
+    }
+  }
+  ctx.putImageData(imageData, 0, 0);
+}
+
+async function loadAudio(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+  filteredBuffer = audioBuffer;
+  
+  document.getElementById('fileInfo').innerHTML = `파일: ${file.name}<br>샘플레이트: ${audioBuffer.sampleRate}Hz<br>길이: ${audioBuffer.duration.toFixed(2)}s<br>채널: ${audioBuffer.numberOfChannels}`;
+  
+  computeSpectrum(audioBuffer.getChannelData(0), audioBuffer.sampleRate);
+  drawTimeDomain();
+  drawSpectrum();
+  drawSpectrogram();
+  
+  // 스펙트로그램 데이터 생성
+  const data = audioBuffer.getChannelData(0);
+  const segLen = 256;
+  spectrogramData = [];
+  for (let seg = 0; seg < 50; seg++) {
+    const start = Math.floor(seg / 50 * data.length);
+    const segment = data.slice(start, start + segLen);
+    const windowed = applyWindow(segment, 'hann');
+    const real = new Float32Array(segment.length);
+    for (let i = 0; i < segment.length; i++) real[i] = windowed[i];
+    const result = fft(real, new Float32Array(segment.length));
+    const row = [];
+    for (let i = 0; i < 128; i++) row.push(Math.sqrt(result.real[i]**2 + result.imag[i]**2));
+    spectrogramData.push(row);
+  }
+}
+
+function generateTone() {
+  const sampleRate = 44100;
+  const duration = 2;
+  const freq = 440;
+  const numSamples = sampleRate * duration;
+  const data = new Float32Array(numSamples);
+  for (let i = 0; i < numSamples; i++) data[i] = Math.sin(2 * Math.PI * freq * i / sampleRate) * 0.5;
+  
+  audioBuffer = audioCtx.createBuffer(1, numSamples, sampleRate);
+  audioBuffer.copyToChannel(data, 0);
+  filteredBuffer = audioBuffer;
+  
+  document.getElementById('fileInfo').textContent = `생성됨: 440Hz 톤, ${duration}s, ${sampleRate}Hz`;
+  
+  computeSpectrum(data, sampleRate);
+  drawTimeDomain();
+  drawSpectrum();
+}
+
+fileInput.addEventListener('change', e => loadAudio(e.target.files[0]));
+
+// 활성화
+document.querySelectorAll('#editor-ui button[id^="lowpass"], #editor-ui button[id^="highpass"], #editor-ui button[id^="bandpass"], #editor-ui button[id^="notch"]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+document.getElementById('lowpass').classList.add('active');
+</script>
+</body>
+</html>

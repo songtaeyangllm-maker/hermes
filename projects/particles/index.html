@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Particle System</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px}h1{font-size:28px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}.sub{color:var(--muted);font-size:14px;margin-bottom:24px}#gameCanvas{border:2px solid var(--border);border-radius:8px}#ui{margin-top:16px;display:flex;justify-content:center;gap:16px;flex-wrap:wrap}.control{background:var(--card);border:1px solid var(--border);padding:10px 16px;border-radius:8px;display:flex;gap:8px;align-items:center}.control label{color:var(--muted);font-size:13px}.control select,.control input[type="range"]{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:4px}.footer{margin-top:32px;color:var(--muted);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<h1>PARTICLE <span>SYSTEM</span></h1>
+<div class="sub">다양한 파티클 효과 — 마우스로 파티클 생성</div>
+<canvas id="gameCanvas" width="800" height="500"></canvas>
+<div id="ui">
+  <div class="control">
+    <label>효과:</label>
+    <select id="effect">
+      <option value="fire">🔥 불꽃</option>
+      <option value="water">💧 물</option>
+      <option value="snow">❄️ 눈</option>
+      <option value="magic">✨ 마법</option>
+      <option value="explosion">💥 폭발</option>
+      <option value="trail">🌈 궤적</option>
+    </select>
+  </div>
+  <div class="control">
+    <label>개수:</label>
+    <input type="range" id="count" min="10" max="500" value="100">
+    <span id="countVal">100</span>
+  </div>
+  <div class="control">
+    <label>중력:</label>
+    <input type="range" id="gravity" min="-2" max="2" step="0.1" value="0.3">
+    <span id="gravVal">0.3</span>
+  </div>
+</div>
+<div class="footer">Hermes Particle System | GPU 가속 파티클 | 계속 업데이트됨</div>
+
+<script>
+const canvas=document.getElementById('gameCanvas');const ctx=canvas.getContext('2d');
+const W=800,H=500;
+let particles=[];let mouse={x:W/2,y:H/2,down:false};
+
+const effects={
+  fire:()=>({x:mouse.x,y:mouse.y,vx:(Math.random()-0.5)*3,vy:-Math.random()*3-1,life:1,decay:0.015+Math.random()*0.01,color:`hsl(${15+Math.random()*30},100%,${50+Math.random()*30}%)`,size:4+Math.random()*4,type:'fire'}),
+  water:()=>({x:mouse.x+Math.random()*20-10,y:mouse.y,vx:(Math.random()-0.5)*2,vy:Math.random()*3+1,life:1,decay:0.008+Math.random()*0.005,color:`hsl(${190+Math.random()*40},80%,${40+Math.random()*30}%)`,size:3+Math.random()*3,type:'water'}),
+  snow:()=>({x:Math.random()*W,y:-10,vx:(Math.random()-0.5)*0.5,vy:Math.random()*1+0.5,life:1,decay:0.003,color:`hsl(220,${20+Math.random()*30}%,${80+Math.random()*15}%)`,size:2+Math.random()*3,type:'snow'}),
+  magic:()=>({x:mouse.x,y:mouse.y,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,life:1,decay:0.02,color:`hsl(${Math.random()*360},80%,60%)`,size:3+Math.random()*4,type:'magic'}),
+  explosion:()=>({x:mouse.x,y:mouse.y,vx:(Math.random()-0.5)*10,vy:(Math.random()-0.5)*10,life:1,decay:0.02,color:`hsl(${Math.random()*60},100%,${50+Math.random()*30}%)`,size:4+Math.random()*6,type:'explosion'}),
+  trail:()=>({x:mouse.x,y:mouse.y,vx:(Math.random()-0.5)*1,vy:(Math.random()-0.5)*1,life:1,decay:0.015,color:`hsl(${Math.random()*360},80%,60%)`,size:2+Math.random()*3,type:'trail'})
+};
+
+function spawn(){const c=parseInt(document.getElementById('count').value);const eff=document.getElementById('effect').value;for(let i=0;i<c;i++)particles.push(effects[eff]())}
+function update(){
+  const g=parseFloat(document.getElementById('gravity').value);
+  particles.forEach(p=>{
+    p.x+=p.vx;p.y+=p.vy;p.vy+=g*0.1;p.life-=p.decay;
+    if(p.type==='fire')p.vx*=.99,p.vy*=.99;
+    if(p.type==='water')p.vx*=.98;
+    if(p.type==='magic'){p.vx*=1.01;p.vy*=1.01;p.size*=1.005}
+  });
+  particles=particles.filter(p=>p.life>0&&p.x>-50&&p.x<W+50&&p.y>-50&&p.y<H+50);
+  if(particles.length>2000)particles=particles.slice(-2000);
+}
+function draw(){ctx.fillStyle='rgba(11,14,22,0.15)';ctx.fillRect(0,0,W,H);
+  particles.forEach(p=>{ctx.globalAlpha=p.life;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,Math.max(0.5,p.size*p.life),0,Math.PI*2);ctx.fill();ctx.globalAlpha=1});
+}
+function loop(){if(mouse.down)spawn();update();draw();requestAnimationFrame(loop)}
+
+document.getElementById('count').oninput=e=>document.getElementById('countVal').textContent=e.target.value;
+document.getElementById('gravity').oninput=e=>document.getElementById('gravVal').textContent=parseFloat(e.target.value).toFixed(1);
+
+canvas.addEventListener('mousedown',e=>{mouse.down=true;mouse.x=e.offsetX;mouse.y=e.offsetY});
+canvas.addEventListener('mousemove',e=>{mouse.x=e.offsetX;mouse.y=e.offsetY});
+canvas.addEventListener('mouseup',()=>mouse.down=false);
+canvas.addEventListener('mouseleave',()=>mouse.down=false);
+canvas.addEventListener('touchstart',e=>{const t=e.touches[0];mouse.down=true;mouse.x=t.clientX-canvas.offsetLeft;mouse.y=t.clientY-canvas.offsetTop;e.preventDefault()},{passive:false});
+canvas.addEventListener('touchmove',e=>{const t=e.touches[0];mouse.x=t.clientX-canvas.offsetLeft;mouse.y=t.clientY-canvas.offsetTop;e.preventDefault()},{passive:false});
+canvas.addEventListener('touchend',()=>mouse.down=false);
+
+setInterval(()=>{if(document.getElementById('effect').value==='snow')spawn()},100);
+loop();
+</script>
+</body>
+</html>

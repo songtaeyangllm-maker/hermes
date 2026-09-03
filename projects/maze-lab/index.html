@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Maze Lab</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--accent:#a855f7;--muted:#9ca3af;--card2:#1f2434;--border:#2a3042}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px;min-height:100vh}
+h1{font-size:24px;letter-spacing:2px}h1 span{color:var(--accent)}
+.sub{color:var(--muted);font-size:13px;margin-bottom:16px}
+.controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:16px}
+button{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:8px 16px;font-size:13px;border-radius:8px;cursor:pointer;transition:all .2s}
+button:hover{border-color:var(--accent);transform:translateY(-1px)}
+button.primary{background:var(--accent);color:#0b0e16;border:none;font-weight:600}
+canvas{background:#0d0f16;border:1px solid var(--border);border-radius:12px;image-rendering:pixelated}
+.stats{color:var(--muted);font-size:13px;margin-top:12px;min-height:18px}
+.legend{display:flex;gap:14px;margin-top:10px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:middle;margin-right:4px}
+</style>
+</head>
+<body>
+<h1>HERMES <span>MAZE LAB</span></h1>
+<div class="sub">미로 생성 + A* 경로 탐색</div>
+<div class="controls">
+  <button class="primary" onclick="gen('dfs')">깊이우선(DFS)</button>
+  <button onclick="gen('recursive')">재귀분할</button>
+  <button onclick="gen('growing')">Growing Tree</button>
+  <button onclick="gen('kruskal')">크루스칼</button>
+  <span style="width:10px"></span>
+  <button onclick="solveAStar()">A* 탐색</button>
+  <button onclick="reveal()">정답 표시</button>
+</div>
+<canvas id="cv"></canvas>
+<div class="stats" id="stats"></div>
+<div class="legend">
+  <div><i style="background:#1f2434;border:1px solid #2a3042"></i>벽</div>
+  <div><i style="background:#0d0f16"></i>통로</div>
+  <div><i style="background:#22c55e"></i>시작</div>
+  <div><i style="background:#ef4444"></i>도착</div>
+  <div><i style="background:#fbbf24"></i>경로</div>
+  <div><i style="background:#60a5fa33"></i>방문</div>
+</div>
+<script>
+'use strict';
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const COLS=41,ROWS=31; // 홀수 → 1칸 벽 두께
+const CELL=14;
+cv.width=COLS*CELL;cv.height=ROWS*CELL;
+let grid=[]; // 0=통로 1=벽
+const start={c:1,r:1},end={c:COLS-2,r:ROWS-2};
+
+function initGrid(){
+  grid=Array.from({length:ROWS},()=>new Array(COLS).fill(1));
+  draw();
+}
+function draw(path,visited){
+  ctx.fillStyle='#0d0f16';ctx.fillRect(0,0,cv.width,cv.height);
+  // 방문 영역
+  if(visited){ctx.fillStyle='rgba(96,165,250,0.18)';visited.forEach(p=>ctx.fillRect(p.c*CELL,p.r*CELL,CELL,CELL));}
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    if(grid[r][c]===1){ctx.fillStyle='#1f2434';ctx.fillRect(c*CELL,r*CELL,CELL,CELL);}
+  }
+  // 경로
+  if(path){ctx.fillStyle='#fbbf24';path.forEach(p=>{ctx.fillRect(p.c*CELL+2,p.r*CELL+2,CELL-4,CELL-4);});}
+  // 시작/도착
+  ctx.fillStyle='#22c55e';ctx.fillRect(start.c*CELL+3,start.r*CELL+3,CELL-6,CELL-6);
+  ctx.fillStyle='#ef4444';ctx.fillRect(end.c*CELL+3,end.r*CELL+3,CELL-6,CELL-6);
+}
+
+// 마주보는 이웃 (2칸 떨어진) 유효 체크
+function inBounds(r,c){return r>0&&c>0&&r<ROWS-1&&c<COLS-1;}
+function neighborsOf(r,c){
+  const n=[];
+  const dirs=[[-2,0],[2,0],[0,-2],[0,2]];
+  for(const[dri,dc]of dirs){const nr=r+dri,nc=c+dc;if(inBounds(nr,nc)&&grid[nr][nc]===1)n.push({r:nr,c:nc});}
+  return n;
+}
+// 방문한 통로의 인접 통로 (DFS 추적)
+function passagesOf(r,c){
+  const n=[];
+  const dirs=[[-2,0],[2,0],[0,-2],[0,2]];
+  for(const[dri,dc]of dirs){const nr=r+dri,nc=c+dc;if(inBounds(nr,nc)&&grid[nr][nc]===0)n.push({r:nr,c:nc});}
+  return n;
+}
+
+// 1) 깊이우선(재귀) 미로
+function genDFS(){
+  initGrid();
+  grid[start.r][start.c]=0;
+  carveDFS(start.r,start.c);
+}
+function carveDFS(r,c){
+  const dirs=shuffle([[0,-2],[0,2],[-2,0],[2,0]]);
+  for(const[dr,dc]of dirs){
+    const nr=r+dr,nc=c+dc;
+    if(inBounds(nr,nc)&&grid[nr][nc]===1){
+      grid[r+dr/2][c+dc/2]=0;grid[nr][nc]=0;
+      carveDFS(nr,nc);
+    }
+  }
+}
+// 2) 재귀분할 — 격자를 모두 통로로 시작해 벽을 추가
+function genRecursive(){
+  initGrid();
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)grid[r][c]=0; // 전부 통로
+  divide(1,1,ROWS-2,COLS-2);
+}
+function divide(r0,c0,r1,c1){
+  if(r1-r0<2||c1-c0<2)return;
+  if(r1-r0>c1-c0){ // 수평 벽 (행 wall, 가로로 추가)
+    const wall=randEven(r0+1,r1-1);
+    const gap=randOdd(c0,c1);
+    for(let c=c0;c<=c1;c++)if(c!==gap)grid[wall][c]=1;
+    divide(r0,c0,wall-1,c1);divide(wall+1,c0,r1,c1);
+  }else{ // 수직 벽 (열 wall, 세로로 추가)
+    const wall=randEven(c0+1,c1-1);
+    const gap=randOdd(r0,r1);
+    for(let r=r0;r<=r1;r++)if(r!==gap)grid[r][wall]=1;
+    divide(r0,c0,r1,wall-1);divide(r0,wall+1,r1,c1);
+  }
+}
+// 3) Growing Tree
+function genGrowing(){
+  initGrid();
+  grid[start.r][start.c]=0;
+  const cells=[{r:start.r,c:start.c}];
+  while(cells.length){
+    const idx=Math.floor(Math.random()*Math.min(5,cells.length)); // 최근 셀 우선
+    const cell=cells[idx];
+    const nb=neighborsOf(cell.r,cell.c);
+    if(nb.length){
+      const pick=nb[Math.floor(Math.random()*nb.length)];
+      grid[(cell.r+pick.r)/2][(cell.c+pick.c)/2]=0;grid[pick.r][pick.c]=0;
+      cells.push(pick);
+    }else cells.splice(idx,1);
+  }
+}
+// 4) 크루스칼
+function genKruskal(){
+  initGrid();
+  // 모든 홀수좌표 셀을 먼저 통로로 연다
+  for(let r=1;r<ROWS;r+=2)for(let c=1;c<COLS;c+=2)grid[r][c]=0;
+  const cells=[];
+  for(let r=1;r<ROWS;r+=2)for(let c=1;c<COLS;c+=2)cells.push({r,c});
+  const parent={};
+  const key=(r,c)=>r+','+c;
+  cells.forEach(ce=>parent[key(ce.r,ce.c)]=key(ce.r,ce.c));
+  const find=(k)=>{while(parent[k]!==k){parent[k]=parent[parent[k]];k=parent[k];}return k;};
+  const union=(a,b)=>{parent[find(b)]=find(a);};
+  // 모든 인접 셀 쌍 사이의 벽 (홀수셀 사이의 짝수 좌표)
+  const edges=[];
+  for(let r=1;r<ROWS;r+=2)for(let c=1;c<COLS;c+=2){
+    for(const[dr,dc]of[[2,0],[0,2]]){
+      const nr=r+dr,nc=c+dc;
+      if(nr<ROWS&&nc<COLS){
+        edges.push({a:key(r,c),b:key(nr,nc),r:(r+nr)/2,c:(c+nc)/2});
+      }
+    }
+  }
+  shuffle(edges);
+  for(const e of edges){
+    if(find(e.a)!==find(e.b)){
+      grid[e.r][e.c]=0; // 두 셀 사이 벽 제거 (통로 열기)
+      union(e.a,e.b);
+    }
+  }
+  grid[start.r][start.c]=0;grid[end.r][end.c]=0;
+}
+
+// A* 경로 탐색
+function solveAStar(){
+  // A*: h = 맨해튼 거리, g = 실제비용, 4방향 이동
+  const open=[],closed=new Set(),gScore={},fScore={},came={};
+  const key=(r,c)=>r+','+c;
+  const h=(r,c)=>Math.abs(r-end.r)+Math.abs(c-end.c);
+  const stKey=key(start.r,start.c);
+  gScore[stKey]=0;fScore[stKey]=h(start.r,start.c);
+  open.push({r:start.r,c:start.c,f:fScore[stKey],g:0});
+  const visited=[];
+  const dirs=[[-1,0],[1,0],[0,-1],[0,1]];
+  let found=false,target=null;
+  while(open.length){
+    open.sort((a,b)=>a.f-b.f);
+    const cur=open.shift();
+    const k=key(cur.r,cur.c);
+    if(closed.has(k))continue;
+    closed.add(k);
+    visited.push({r:cur.r,c:cur.c});
+    if(cur.r===end.r&&cur.c===end.c){found=true;target=k;break;}
+    for(const[dr,dc]of dirs){
+      const nr=cur.r+dr,nc=cur.c+dc;
+      if(nr<0||nc<0||nr>=ROWS||nc>=COLS||grid[nr][nc]===1)continue;
+      const nk=key(nr,nc);
+      if(closed.has(nk))continue;
+      const ng=cur.g+1;
+      if(ng<(gScore[nk]===undefined?Infinity:gScore[nk])){
+        gScore[nk]=ng;fScore[nk]=ng+h(nr,nc);came[nk]=k;
+        open.push({r:nr,c:nc,f:fScore[nk],g:ng});
+      }
+    }
+  }
+  // 경로 재구성
+  let path=[];
+  if(found){
+    let curK=target;
+    while(curK){const[r,c]=curK.split(',').map(Number);path.unshift({r,c});curK=came[curK];}
+  }
+  const st=document.getElementById('stats');
+  if(found){
+    st.textContent='✅ A* 완료 — 경로 길이: '+path.length+' 칸 · 방문: '+visited.length+' 셀';
+    draw(path,visited);
+  }
+  else st.textContent='❌ 경로를 찾지 못함';
+  return path.length;
+}
+
+function reveal(){const p=AStarPath();const st=document.getElementById('stats');if(p.length)st.textContent='경로 길이: '+p.length+' 칸';draw(p);}
+function AStarPath(){const p=[];const open=[],closed=new Set(),gScore={},fScore={},came={};
+  const key=(r,c)=>r+','+c,h=(r,c)=>Math.abs(r-end.r)+Math.abs(c-end.c);const stKey=key(start.r,start.c);
+  gScore[stKey]=0;fScore[stKey]=h(start.r,start.c);open.push({r:start.r,c:start.c,f:fScore[stKey],g:0});
+  const dirs=[[-1,0],[1,0],[0,-1],[0,1]];let target=null,found=false;
+  while(open.length){open.sort((a,b)=>a.f-b.f);const cur=open.shift();const k=key(cur.r,cur.c);if(closed.has(k))continue;closed.add(k);
+    if(cur.r===end.r&&cur.c===end.c){found=true;target=k;break;}
+    for(const[dr,dc]of dirs){const nr=cur.r+dr,nc=cur.c+dc;if(nr<0||nc<0||nr>=ROWS||nc>=COLS||grid[nr][nc]===1)continue;const nk=key(nr,nc);if(closed.has(nk))continue;const ng=cur.g+1;if(ng<(gScore[nk]===undefined?Infinity:gScore[nk])){gScore[nk]=ng;fScore[nk]=ng+h(nr,nc);came[nk]=k;open.push({r:nr,c:nc,f:fScore[nk],g:ng});}}}
+  if(found){let curK=target;while(curK){const[r,c]=curK.split(',').map(Number);p.unshift({r,c});curK=came[curK];}}
+  return p;
+}
+
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function randEven(lo,hi){let v=lo+Math.floor(Math.random()*(hi-lo+1));return v%2===0?v:v+1;}
+function randOdd(lo,hi){const span=Math.floor((hi-lo)/2);return lo+(Math.floor(Math.random()*(span+1))*2);}
+
+function gen(method){
+  if(method==='dfs')genDFS();
+  else if(method==='recursive')genRecursive();
+  else if(method==='growing')genGrowing();
+  else if(method==='kruskal')genKruskal();
+  draw();
+  document.getElementById('stats').textContent='';
+}
+
+// 초기
+genDFS();draw();
+</script>
+</body>
+</html>

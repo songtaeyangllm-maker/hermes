@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes SVG Editor</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;height:100vh}
+header{background:var(--card);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;justify-content:space-between;align-items:center}
+header h1{font-size:16px;letter-spacing:1px}header h1 span{color:var(--accent)}
+.toolbar{display:flex;gap:8px;align-items:center}.btn{background:var(--accent);color:#0b0e16;border:none;padding:6px 12px;font-size:12px;border-radius:4px;cursor:pointer}.btn:hover{opacity:.9}.btn.secondary{background:var(--border);color:var(--text)}
+#main{flex:1;display:flex}
+#tools{width:200px;background:var(--card);border-right:1px solid var(--border);padding:16px;overflow-y:auto}
+#tools h3{font-size:11px;color:var(--muted);margin-bottom:12px;text-transform:uppercase}
+.tool-btn{width:100%;text-align:left;padding:10px 12px;margin-bottom:6px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;cursor:pointer;font-size:13px}
+.tool-btn:hover{background:var(--border)}.tool-btn.active{background:var(--accent);color:#0b0e16;border-color:var(--accent)}
+#canvas-area{flex:1;position:relative;background:#0d1117;overflow:hidden}
+#svgCanvas{position:absolute;top:0;left:0;background:repeating-conic-gradient(#1a1f2e 0 25%,#141824 0 50%)}
+#properties{width:280px;background:var(--card);border-left:1px solid var(--border);padding:16px;overflow-y:auto}
+#properties h3{font-size:11px;color:var(--muted);margin-bottom:12px;text-transform:uppercase}
+.prop{margin-bottom:12px}.prop label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px}.prop input,.prop select{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:4px;font-size:12px}
+#layers{margin-top:24px}#layers h3{font-size:11px;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.layer-item{display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;margin-bottom:4px;font-size:12px;cursor:pointer}
+.layer-item.active{background:var(--accent);color:#0b0e16;border-color:var(--accent)}
+.layer-item input[type="checkbox"]{width:16px;height:16px;accent-color:var(--accent)}
+.footer{padding:8px;color:var(--muted);font-size:11px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>SVG <span>EDITOR</span></h1>
+  <div class="toolbar">
+    <button class="btn secondary" onclick="newDoc()">새 문서</button>
+    <button class="btn secondary" onclick="loadSVG()">열기</button>
+    <button class="btn" onclick="saveSVG()">SVG 저장</button>
+    <button class="btn secondary" onclick="exportPNG()">PNG 내보내기</button>
+    <input type="file" id="svgFile" accept=".svg" style="display:none" onchange="importSVG(event)">
+  </div>
+</header>
+<div id="main">
+  <div id="tools">
+    <h3>도구</h3>
+    <button class="tool-btn active" data-tool="select" onclick="setTool('select')">선택 (V)</button>
+    <button class="tool-btn" data-tool="rect" onclick="setTool('rect')">사각형 (R)</button>
+    <button class="tool-btn" data-tool="circle" onclick="setTool('circle')">원/타원 (C)</button>
+    <button class="tool-btn" data-tool="line" onclick="setTool('line')">선 (L)</button>
+    <button class="tool-btn" data-tool="polygon" onclick="setTool('polygon')">다각형 (P)</button>
+    <button class="tool-btn" data-tool="text" onclick="setTool('text')">텍스트 (T)</button>
+    <button class="tool-btn" data-tool="path" onclick="setTool('path')">패스 (B)</button>
+  </div>
+  <div id="canvas-area">
+    <svg id="svgCanvas" width="800" height="600" viewBox="0 0 800 600"></svg>
+  </div>
+  <div id="properties">
+    <h3>속성</h3>
+    <div id="propPanel">
+      <div style="color:var(--muted);text-align:center;padding:20px">객체를 선택하세요</div>
+    </div>
+    <div id="layers">
+      <h3>레이어</h3>
+      <div id="layerList"></div>
+      <button class="btn secondary" style="width:100%" onclick="addLayer()">레이어 추가</button>
+    </div>
+  </div>
+</div>
+<div class="footer">Hermes SVG Editor | 벡터 그래픽 에디터 | 계속 업데이트됨</div>
+
+<script>
+const svg=document.getElementById('svgCanvas');
+const propPanel=document.getElementById('propPanel');
+const layerList=document.getElementById('layerList');
+let currentTool='select';
+let elements=[],selected=null,layers=[{id:'layer1',name:'레이어 1',elements:[],visible:true}];
+let currentLayer=0,elementId=0;
+let isDrawing=false,startX=0,startY=0,tempEl=null;
+
+function setTool(t){
+  currentTool=t;
+  document.querySelectorAll('.tool-btn').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));
+  svg.style.cursor=t==='select'?'default':'crosshair';
+}
+
+function screenToSvg(x,y){
+  const rect=svg.getBoundingClientRect();
+  const scaleX=800/rect.width,scaleY=600/rect.height;
+  return {x:(x-rect.left)*scaleX,y:(y-rect.top)*scaleY};
+}
+
+function createElement(type,attrs){
+  const el=document.createElementNS('http://www.w3.org/2000/svg',type);
+  Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,v));
+  el.dataset.id=++elementId;
+  return el;
+}
+
+function addElement(el){
+  layers[currentLayer].elements.push(el);
+  svg.appendChild(el);
+  selectElement(el);
+  updateLayers();
+}
+
+function selectElement(el){
+  selected=el;
+  if(el){
+    document.querySelectorAll('#svgCanvas *').forEach(e=>e.classList.remove('selected'));
+    el.classList.add('selected');
+    showProperties(el);
+  }else propPanel.innerHTML='<div style="color:var(--muted);text-align:center;padding:20px">객체를 선택하세요</div>';
+}
+
+function showProperties(el){
+  const tag=el.tagName;
+  let html='';
+  const attrs=[...el.attributes].filter(a=>!a.name.startsWith('data-')).map(a=>a.name);
+  
+  const common=['fill','stroke','stroke-width','opacity','fill-opacity','stroke-opacity'];
+  const typeProps={
+    rect:['x','y','width','height','rx','ry'],
+    circle:['cx','cy','r'],
+    ellipse:['cx','cy','rx','ry'],
+    line:['x1','y1','x2','y2'],
+    polygon:['points'],
+    polyline:['points'],
+    path:['d'],
+    text:['x','y','font-size','font-family','text-anchor']
+  };
+  
+  const props=[...new Set([...common,...(typeProps[tag]||[])])];
+  
+  props.forEach(p=>{
+    const val=el.getAttribute(p)||'';
+    const type=p.includes('color')||p==='fill'||p==='stroke'?'color':p.includes('width')||p.includes('height')||p.includes('x')||p.includes('y')||p.includes('r')||p==='stroke-width'?'number':'text';
+    html+=`<div class="prop"><label>${p}</label><input type="${type}" value="${val}" onchange="updateAttr('${p}',this.value)" ${type==='color'?'style="width:60px"':''}></div>`;
+  });
+  
+  propPanel.innerHTML=html;
+}
+
+function updateAttr(name,val){
+  if(selected){
+    if(val==='')selected.removeAttribute(name);
+    else selected.setAttribute(name,val);
+  }
+}
+
+function updateLayers(){
+  layerList.innerHTML=layers.map((l,i)=>`<div class="layer-item ${i===currentLayer?'active':''}" onclick="selectLayer(${i})"><input type="checkbox" ${l.visible?'checked':''} onchange="event.stopPropagation();layers[${i}].visible=this.checked;renderLayers()">${l.name}</div>`).join('');
+}
+
+function selectLayer(i){
+  currentLayer=i;
+  updateLayers();
+}
+
+function renderLayers(){
+  svg.innerHTML='';
+  layers.forEach(l=>{if(l.visible)l.elements.forEach(el=>svg.appendChild(el))});
+}
+
+function addLayer(){
+  layers.push({id:'layer'+(layers.length+1),name:`레이어 ${layers.length+1}`,elements:[],visible:true});
+  updateLayers();
+}
+
+svg.addEventListener('mousedown',e=>{
+  if(currentTool==='select'){
+    const pt=screenToSvg(e.clientX,e.clientY);
+    const target=e.target;
+    if(target!==svg)selectElement(target);
+    else selectElement(null);
+  }else{
+    const pt=screenToSvg(e.clientX,e.clientY);
+    isDrawing=true;startX=pt.x;startY=pt.y;
+  }
+});
+
+svg.addEventListener('mousemove',e=>{
+  if(!isDrawing)return;
+  const pt=screenToSvg(e.clientX,e.clientY);
+  if(tempEl)tempEl.remove();
+  
+  const w=pt.x-startX,h=pt.y-startY;
+  let attrs={fill:'none',stroke:'#60a5fa','stroke-width':2,'stroke-dasharray':'5,5'};
+  
+  if(currentTool==='rect')tempEl=createElement('rect',{...attrs,x:Math.min(startX,pt.x),y:Math.min(startY,pt.y),width:Math.abs(w),height:Math.abs(h)});
+  else if(currentTool==='circle'){const r=Math.sqrt(w*w+h*h)/2;tempEl=createElement('circle',{...attrs,cx:(startX+pt.x)/2,cy:(startY+pt.y)/2,r})}
+  else if(currentTool==='line')tempEl=createElement('line',{...attrs,x1:startX,y1:startY,x2:pt.x,y2:pt.y});
+  else if(currentTool==='polygon'){tempEl=createElement('polygon',{...attrs,points:`${startX},${startY} ${pt.x},${startY} ${(startX+pt.x)/2},${pt.y}`})}
+  
+  if(tempEl)svg.appendChild(tempEl);
+});
+
+svg.addEventListener('mouseup',e=>{
+  if(!isDrawing)return;
+  isDrawing=false;
+  const pt=screenToSvg(e.clientX,e.clientY);
+  if(tempEl){tempEl.remove();tempEl=null}
+  
+  const w=pt.x-startX,h=pt.y-startY;
+  if(Math.abs(w)<5&&Math.abs(h)<5)return;
+  
+  let el;
+  const attrs={fill:'#60a5fa44',stroke:'#60a5fa','stroke-width':2};
+  
+  if(currentTool==='rect')el=createElement('rect',{...attrs,x:Math.min(startX,pt.x),y:Math.min(startY,pt.y),width:Math.abs(w),height:Math.abs(h),rx:4,ry:4});
+  else if(currentTool==='circle'){const r=Math.sqrt(w*w+h*h)/2;el=createElement('circle',{...attrs,cx:(startX+pt.x)/2,cy:(startY+pt.y)/2,r})}
+  else if(currentTool==='line')el=createElement('line',{...attrs,x1:startX,y1:startY,x2:pt.x,y2:pt.y});
+  else if(currentTool==='polygon')el=createElement('polygon',{...attrs,points:`${startX},${startY} ${pt.x},${startY} ${(startX+pt.x)/2},${pt.y}`});
+  else if(currentTool==='text'){el=createElement('text',{...attrs,x:startX,y:startY,'font-size':16,'font-family':'sans-serif'});el.textContent='텍스트';}
+  else if(currentTool==='path'){el=createElement('path',{...attrs,fill:'none',d:`M${startX},${startY} L${pt.x},${pt.y}`});}
+  
+  if(el)addElement(el);
+});
+
+function newDoc(){
+  if(confirm('새 문서를 만드시겠습니까?')){elements=[];layers=[{id:'layer1',name:'레이어 1',elements:[],visible:true}];currentLayer=0;elementId=0;svg.innerHTML='';updateLayers();selectElement(null)}
+}
+
+function saveSVG(){
+  const serializer=new XMLSerializer();
+  const str=serializer.serializeToString(svg);
+  const blob=new Blob([str],{type:'image/svg+xml'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='drawing.svg';
+  a.click();
+}
+
+function exportPNG(){
+  const serializer=new XMLSerializer();
+  const str=serializer.serializeToString(svg);
+  const img=new Image();
+  const blob=new Blob([str],{type:'image/svg+xml'});
+  img.src=URL.createObjectURL(blob);
+  img.onload=()=>{
+    const canvas=document.createElement('canvas');
+    canvas.width=800;canvas.height=600;
+    const ctx=canvas.getContext('2d');
+    ctx.fillStyle='#0d1117';ctx.fillRect(0,0,800,600);
+    ctx.drawImage(img,0,0);
+    canvas.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='drawing.png';a.click()});
+  };
+}
+
+function loadSVG(){document.getElementById('svgFile').click()}
+
+function importSVG(e){
+  const f=e.target.files[0];if(!f)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const parser=new DOMParser();
+    const doc=parser.parseFromString(e.target.result,'image/svg+xml');
+    const imported=doc.documentElement;
+    svg.innerHTML='';
+    layers[currentLayer].elements=[];
+    [...imported.children].forEach(el=>{const cloned=el.cloneNode(true);cloned.dataset.id=++elementId;layers[currentLayer].elements.push(cloned);svg.appendChild(cloned)});
+    updateLayers();
+  };
+  reader.readAsText(f);
+}
+
+setTool('select');
+</script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Text Converter</title>
+<style>
+:root { --bg:#0b0e16; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; --accent:#60a5fa; --good:#4ade80; --bad:#ef4444; }
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:32px}h1{font-size:28px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}.sub{color:var(--muted);font-size:14px;margin-bottom:32px}.convert-container{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;width:100%;max-width=600px}.algo-select{width:100%;padding:12px;border:1px solid var(--border);border-radius:8x;background:var(--card2);color:var(--text);font-size:14px;margin-bottom:16px}.text-area{width:100%;min-height:150px;margin-bottom:16px;padding:12px;border:1px solid var(--border);border-radius:8x;background:var(--card2);color:var(--text);font-family:inherit;font-size:14px;resize:vertical}.output-area{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:20px;margin-top:24px;min-height:100px}.output-label{color:var(--muted);font-size:12px;margin-bottom:8px}.output-value{font-family:Consolas,Monaco,monospace;font-size:16px;color:var(--accent);word-break:break-all;min-height:3em}.copy-row{display:flex;gap:8px;margin-top:12px}.copy-btn{background:var(--good);color:#0b0e16;border:none;padding:8px 16px;font-size:13px;border-radius:6x;cursor}.copy-btn:hover{opacity:.9}.toggle{width:60px;height:30px;background:#1a2540;border:1px solid var(--border);border-radius:15px;position:relative}.toggle-on{background:var(--good);position:absolute;left:0;top:0;width:30;height:30;border-radius:15px;transition:.3s}.empty{color:var(--muted);text-align:center;padding:20px}.footer{margin-top:32px;color:var(--muted);font-size=12px;text-align:center}.link{color:var(--accent);text-decoration:none;font-weight:bold;font-size=13px}.link:hover{text-decoration:underline}</style>
+</head>
+<body>
+<h1>TEXT <span>CONVERTER</span></h1>
+<div class="sub">다양한 인코딩 및 변환 도구</div>
+<div class="convert-container">
+  <select class="algo-select" id="algoSelect">
+    <option value="base64">Base64 인코딩</option>
+    <option value="hex">HEX 인코딩</option>
+    <option value="url">URL 인코딩</option>
+    <option value="dec-url">URL 디코딩</option>
+    <option value="rot13">ROT13 암호</option>
+    <option value="reverse">역순</option>
+    <option value="upper">대문자 변환</option>
+    <option value="lower">소문자 변환</option>
+  </select>
+  <textarea class="text-area" id="inputText" placeholder="변환할 텍스트를 입력하세요..."></textarea>
+  <div class="output-area" id="outputArea">
+    <div class="output-label">변환 결과</div>
+    <div class="output-value" id="outputValue">입력된 텍스트를 선택한 변환 방식으로 변환됩니다</div>
+    <div class="copy-row">
+      <button class="copy-btn" onclick="copyOutput()">복사</button>
+      <button class="toggle" id="toggleCase" onclick="toggleCaseMode()">대소문자 토글</button>
+    </div>
+  </div>
+  <div class="empty" id="emptyState">변환할 텍스트를 입력하세요</div>
+</div>
+<div class="footer">Hermes Text Converter | Base64/HEX/URL 변환 | 계속 업데이트됨</div>
+
+<script>
+// 알고리즘 매핑
+const converters={
+  base64:function(t){return btoa(t)},
+  hex:function(t){return btoa(t).replace(/./g,c=>c.charCodeAt(0).toString(16).padStart(2,'0'))},
+  url:function(t){return encodeURIComponent(t)},
+  'dec-url':function(t){return decodeURIComponent(t)},
+  'rot13':function(t){return t.replace(/[a-zA-Z]/g,c=>String.fromCharCode((c.charCodeAt(0)-((c>='a'?97:65))+13)%26+((c>='a'?97:65))))},
+  reverse:function(t){return t.split('').reverse().join('')},
+  upper:function(t){return t.toUpperCase()},
+  lower:function(t){return t.toLowerCase()}
+}
+
+const algoSelect=document.getElementById('algoSelect');
+const inputText=document.getElementById('inputText');
+const outputValue=document.getElementById('outputValue');
+const emptyState=document.getElementById('emptyState');
+
+function convert(){const text=inputText.value;const algo=algoSelect.value;if(!text){emptyState.style.display='block';outputArea.style.display='none';return}const result=converters[algo](text);outputValue.textContent=result;emptyState.style.display='none';outputArea.style.display='block'}// 초기 표시emptyState.style.display='block';outputArea.style.display='none'// 토글 함수
+function toggleCaseMode(){const current=outputValue.textContent;if(current){const newText=current===current.toUpperCase()?current.toLowerCase():current.toUpperCase();outputValue.textContent=newText}}// 초기 변환트리거convert()
+// 복사 기능
+function copyOutput(){const output=document.getElementById('outputValue');if(output.textContent&&output.textContent!=='입력된 텍스트를 선택한 변환 방식으로 변환됩니다'){navigator.clipboard.writeText(output.textContent).then(()=>alert('복사 완료')).catch(()=>{output.select();document.execCommand('copy')})}}
+</script>
+</body>
+</html>

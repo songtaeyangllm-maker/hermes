@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Sudoku</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--accent:#22c55e;--muted:#9ca3af;--card:#161b27;--card2:#1f2434;--border:#2a3042}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px;min-height:100vh}
+h1{font-size:24px;letter-spacing:2px;margin-bottom:4px}h1 span{color:var(--accent)}
+.sub{color:var(--muted);font-size:13px;margin-bottom:20px}
+.controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:20px}
+button{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:8px 16px;font-size:13px;border-radius:8px;cursor:pointer;transition:all .2s}
+button:hover{border-color:var(--accent);transform:translateY(-1px)}
+button.primary{background:var(--accent);color:#0b0e16;border:none;font-weight:600}
+.board{margin:auto}
+.row{display:flex}
+.cell{width:44px;height:44px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:500}
+.cell.given{color:var(--accent);font-weight:700}
+.cell.editing{color:#60a5fa}
+.cell.highlight{background:var(--card)}
+.b3b{border-bottom:3px solid var(--accent)}
+.b3r{border-right:3px solid var(--accent)}
+.status{color:var(--muted);font-size:14px;margin-top:16px;min-height:20px}
+.status.win{color:var(--accent);font-weight:600}
+.numpad{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;justify-content:center}
+.numpad button{width:40px;height:40px;font-size:16px;border-radius:8px}
+.info{color:var(--muted);font-size:12px;margin-top:14px;max-width:520px;text-align:center;line-height:1.6}
+@media(max-width:520px){.cell{width:34px;height:34px;font-size:16px}}
+</style>
+</head>
+<body>
+<h1>HERMES <span>SUDOKU</span></h1>
+<div class="sub">백트래킹 풀이 + 퍼즐 생성</div>
+<div class="controls">
+  <button class="primary" onclick="newPuzzle()">새 퍼즐</button>
+  <button onclick="solvePuzzle()">풀기</button>
+  <button onclick="checkPuzzle()">정답 확인</button>
+  <button onclick="clearPuzzle()">초기화</button>
+</div>
+<div class="board" id="board"></div>
+<div class="numpad" id="numpad"></div>
+<div class="status" id="status">퍼즐을 선택하세요</div>
+<div class="info">🧠 영역: 카운트백트래킹 · 최소 후보(candidate) 셀 우선 · MRV 휴리스틱 적용</div>
+<script>
+// 한 칸의 후보 수가 가장 적은 셀부터 채우는 최적화 백트래킹
+'use strict';
+let board=[],given=new Array(9).fill(0).map(()=>new Array(9).fill(false));
+let current=null, selected=0; // 선택 cell index
+
+function genPuzzle(){
+  // 1) 백트래킹으로 완전한 해 생성 (무작위)
+  const g=Array.from({length:9},()=>new Array(9).fill(0));
+  fillSudoku(g);
+  // 2) 대칭으로 셀 제거하고 유일해인지 확인
+  const puzzle=JSON.parse(JSON.stringify(g));
+  const holes=new Array(81).fill(0).map((_,i)=>i);
+  for(let i=holes.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[holes[i],holes[j]]=[holes[j],holes[i]];}
+  let removed=0;
+  for(let k=0;k<81&&removed<52;k++){
+    const idx=holes[k],r=Math.floor(idx/9),c=idx%9;
+    const backup=puzzle[r][c];
+    puzzle[r][c]=0;
+    if(countSolutions(puzzle.map(a=>a.slice()),0)>1){puzzle[r][c]=backup;}
+    else removed++;
+  }
+  return puzzle;
+}
+// 완전한 해 하나 생성
+function fillSudoku(g){
+  const empty=findEmpty(g);if(!empty)return true;
+  const nums=shuffle([1,2,3,4,5,6,7,8,9]);
+  for(const n of nums){if(isValid(g,empty.r,empty.c,n)){g[empty.r][empty.c]=n;if(fillSudoku(g))return true;g[empty.r][empty.c]=0;}}
+  return false;
+}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function findEmpty(g){for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(g[r][c]===0)return{r,c};return null;}
+function isValid(g,r,c,n){
+  for(let i=0;i<9;i++){if(g[i][c]===n||g[r][i]===n)return false;}
+  const br=Math.floor(r/3)*3,bc=Math.floor(c/3)*3;
+  for(let i=0;i<3;i++)for(let j=0;j<3;j++)if(g[br+i][bc+j]===n)return false;
+  return true;
+}
+// 해의 개수 세기 (2개 이상이면 즉시 중단) — 유일해 판정
+function countSolutions(g,count){
+  const e=findEmpty(g);if(!e)return count+1;
+  for(let n=1;n<=9;n++){
+    if(count>=2)return count;
+    if(isValid(g,e.r,e.c,n)){g[e.r][e.c]=n;count=countSolutions(g,count);g[e.r][e.c]=0;}
+  }
+  return count;
+}
+// MRV 백트래킹 풀이 (후보 수가 적은 셀 우선)
+function solveWithMRV(){
+  const g=board.map(a=>a.slice());
+  if(!solveMRV(g))return null;
+  return g;
+}
+function solveMRV(g){
+  // 후보 수가 가장 적은 빈 셀 찾기
+  let best=null,bestCnt=10,row=null;
+  for(let r=0;r<9;r++)for(let c=0;c<9;c++){
+    if(g[r][c]!==0)continue;
+    let cnt=0;
+    const used=new Set();
+    for(let i=0;i<9;i++){used.add(g[i][c]);used.add(g[r][i]);}
+    const br=Math.floor(r/3)*3,bc=Math.floor(c/3)*3;
+    for(let i=0;i<3;i++)for(let j=0;j<3;j++)used.add(g[br+i][bc+j]);
+    for(let n=1;n<=9;n++)if(!used.has(n))cnt++;
+    if(cnt<bestCnt){bestCnt=cnt;best={r,c};}
+    if(cnt===1)break;
+  }
+  if(!best)return true; // 다 채워짐
+  // 후보 순서대로 시도
+  const cands=[];
+  for(let n=1;n<=9;n++){if(isValid(g,best.r,best.c,n))cands.push(n);}
+  for(const n of cands){g[best.r][best.c]=n;if(solveMRV(g))return true;g[best.r][best.c]=0;}
+  return false;
+}
+
+function render(){
+  const b=document.getElementById('board');b.innerHTML='';
+  for(let r=0;r<9;r++){
+    const row=document.createElement('div');row.className='row';
+    for(let c=0;c<9;c++){
+      const cell=document.createElement('div');
+      cell.className='cell'+(given[r][c]?' given':'')+(selected===r*9+c?' highlight':'');
+      if(c===2||c===5)cell.className+=' b3r';
+      if(r===2||r===5)cell.className+=' b3b';
+      cell.textContent=board[r][c]===0?'':board[r][c];
+      cell.onclick=()=>{selected=r*9+c;current=cell;render();document.getElementById('status').textContent='';};
+      row.appendChild(cell);
+    }
+    b.appendChild(row);
+  }
+}
+function newPuzzle(){
+  board=genPuzzle();
+  for(let r=0;r<9;r++)for(let c=0;c<9;c++)given[r][c]=board[r][c]!==0;
+  selected=-1;render();
+  // 검증: 생성된 퍼즐이 유일해인지
+  const sol=countSolutions(board.map(a=>a.slice()),0);
+  document.getElementById('status').textContent='새 퍼즐 (유일해 '+(sol===1?'확인 ✓':'N/A')+')';
+}
+function solvePuzzle(){
+  const sol=solveWithMRV();
+  if(!sol){document.getElementById('status').textContent='❌ 현재 배치에 해가 없습니다';return;}
+  board=sol;
+  render();
+  document.getElementById('status').textContent='✅ 풀이 완료';
+}
+function checkPuzzle(){
+  let completed=true;
+  for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(board[r][c]===0)completed=false;
+  const valid=isBoardValid(board);
+  const st=document.getElementById('status');
+  if(completed&&valid){st.className='status win';st.textContent='🎉 정답입니다!';}
+  else if(valid&&!completed)st.textContent='규칙상 오류 없음 — 아직 빈 칸이 있습니다';
+  else st.textContent='❌ 충돌이 있습니다 (같은 숫자가 중복)';
+}
+function isBoardValid(g){
+  for(let r=0;r<9;r++){const s=new Set();for(let c=0;c<9;c++){if(g[r][c]&&s.has(g[r][c]))return false;s.add(g[r][c]);}}
+  for(let c=0;c<9;c++){const s=new Set();for(let r=0;r<9;r++){if(g[r][c]&&s.has(g[r][c]))return false;s.add(g[r][c]);}}
+  for(let br=0;br<3;br++)for(let bc=0;bc<3;bc++){const s=new Set();for(let i=0;i<3;i++)for(let j=0;j<3;j++){const v=g[br*3+i][bc*3+j];if(v&&s.has(v))return false;s.add(v);}}
+  return true;
+}
+function clearPuzzle(){for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(!given[r][c])board[r][c]=0;render();document.getElementById('status').textContent='입력값 초기화';}
+
+// 숫자 패드
+const np=document.getElementById('numpad');
+for(let n=1;n<=9;n++){const b=document.createElement('button');b.textContent=n;b.onclick=()=>{if(selected<0||selected>=81)return;const r=Math.floor(selected/9),c=selected%9;if(given[r][c])return;board[r][c]=n;render();};np.appendChild(b);}
+const clear=document.createElement('button');clear.textContent='✕';clear.onclick=()=>{if(selected<0)return;const r=Math.floor(selected/9),c=selected%9;if(given[r][c])return;board[r][c]=0;render();};np.appendChild(clear);
+
+// 숫자 키보드 입력
+document.addEventListener('keydown',e=>{
+  if(selected<0)return;
+  if(e.key>='1'&&e.key<='9'){const r=Math.floor(selected/9),c=selected%9;if(!given[r][c]){board[r][c]=+e.key;render();}}
+  if(e.key==='Backspace'||e.key==='Delete'){const r=Math.floor(selected/9),c=selected%9;if(!given[r][c]){board[r][c]=0;render();}}
+  const arrows={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};
+  if(arrows[e.key]){const cr=Math.floor(selected/9),cc=selected%9;const nr=cr+arrows[e.key][1],nc=cc+arrows[e.key][0];if(nr>=0&&nr<9&&nc>=0&&nc<9){selected=nr*9+nc;render();}e.preventDefault();}
+});
+
+// 시작
+board=genPuzzle();
+for(let r=0;r<9;r++)for(let c=0;c<9;c++)given[r][c]=board[r][c]!==0;
+render();
+document.getElementById('status').textContent='퍼즐 로드 완료 — 클릭해서 숫자 입력';
+</script>
+</body>
+</html>

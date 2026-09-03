@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Terminal</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;height:100vh}
+header{background:var(--card);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;justify-content:space-between;align-items:center}
+header h1{font-size:16px;letter-spacing:1px}header h1 span{color:var(--accent)}
+.toolbar{display:flex;gap:8px}.btn{background:var(--accent);color:#0b0e16;border:none;padding:6px 12px;font-size:12px;border-radius:4px;cursor:pointer}.btn:hover{opacity:.9}.btn.secondary{background:var(--border);color:var(--text)}
+#terminal{flex:1;background:#0d1117;font-family:'Consolas','Monaco',monospace;font-size:14px;line-height:1.5;padding:16px;overflow-y:auto;white-space:pre-wrap;word-break:break-word}
+#input-line{display:flex;border-top:1px solid var(--border);padding:8px 16px;background:var(--card)}
+#prompt{color:var(--accent);margin-right:8px;white-space:nowrap}
+#cmdInput{flex:1;background:transparent;border:none;color:var(--text);font-family:inherit;font-size:14px;outline:none}
+#output{margin-top:8px;color:var(--text)}
+.error{color:var(--bad)}.success{color:var(--good)}.info{color:var(--accent)}
+.footer{padding:8px;color:var(--muted);font-size:11px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>TERMINAL <span>EMULATOR</span></h1>
+  <div class="toolbar">
+    <button class="btn secondary" onclick="clearTerminal()">지우기</button>
+    <button class="btn secondary" onclick="showHelp()">도움말</button>
+    <button class="btn secondary" onclick="showHistory()">히스토리</button>
+  </div>
+</header>
+<div id="terminal"></div>
+<div id="input-line">
+  <span id="prompt">hermes@workspace:~$</span>
+  <input type="text" id="cmdInput" autocomplete="off" spellcheck="false" placeholder="명령어를 입력하세요...">
+</div>
+<div class="footer">Hermes Terminal Emulator | 시뮬레이션된 쉘 환경 | 계속 업데이트됨</div>
+
+<script>
+const terminal=document.getElementById('terminal');
+const input=document.getElementById('cmdInput');
+let history=[],historyIndex=-1;
+const cwd='/home/user';
+
+const commands={
+  help:()=>`사용 가능한 명령어:
+  help          - 도움말 표시
+  ls [path]     - 디렉토리 내용 나열
+  pwd           - 현재 디렉토리 출력
+  cd <path>     - 디렉토리 변경
+  mkdir <dir>   - 디렉토리 생성
+  rm <file>     - 파일 삭제
+  cat <file>    - 파일 내용 출력
+  echo <text>   - 텍스트 출력
+  clear         - 터미널 지우기
+  history       - 명령어 히스토리
+  date          - 현재 날짜/시간
+  whoami        - 현재 사용자
+  ps            - 프로세스 목록
+  top           - 시스템 리소스
+  neofetch      - 시스템 정보
+  matrix        - 매트릭스 효과
+  snake         - 스네이크 게임
+  calc <expr>   - 계산기
+  uuid          - UUID 생성
+  base64 <text> - Base64 인코딩
+  hash <text>   - 해시 생성`,
+  pwd:()=>cwd,
+  whoami:()=>'user',
+  date:()=>new Date().toLocaleString('ko-KR'),
+  clear:()=>{terminal.innerHTML='';return''},
+  ls:(args)=>{
+    const path=args[0]||cwd;
+    const items=['Documents','Downloads','Projects','Music','Pictures','Videos','Desktop','hermes-workspace'];
+    return items.join('  ');
+  },
+  cd:(args)=>{
+    if(!args[0])return '사용법: cd <경로>';
+    return `디렉토리 변경: ${args[0]} (시뮬레이션)`;
+  },
+  mkdir:(args)=>{
+    if(!args[0])return '사용법: mkdir <디렉토리>';
+    return `디렉토리 생성: ${args[0]} (시뮬레이션)`;
+  },
+  rm:(args)=>{
+    if(!args[0])return '사용법: rm <파일>';
+    return `삭제: ${args[0]} (시뮬레이션)`;
+  },
+  cat:(args)=>{
+    if(!args[0])return '사용법: cat <파일>';
+    return `파일 내용: ${args[0]} (시뮬레이션)`;
+  },
+  echo:(args)=>args.join(' '),
+  history:()=>history.map((h,i)=>`${i+1}  ${h}`).join('\n')||'히스토리 없음',
+  ps:()=>`PID  TTY  TIME  CMD
+1    pts/0  0:00  bash
+42   pts/0  0:01  node server.js
+128  pts/0  0:00  python3 app.py
+256  pts/0  0:00  vim config.json`,
+  top:()=>`상위 프로세스:
+  PID  USER  %CPU  %MEM  COMMAND
+  1    user  0.1   0.5   systemd
+  42   user  2.3   1.2   node
+  128  user  1.8   0.8   python3
+  256  user  0.5   0.3   vim`,
+  neofetch:()=>`OS: Hermes OS 1.0
+Host: workspace
+Kernel: 6.x.x-hermes
+Uptime: ${Math.floor(Math.random()*100)}h ${Math.floor(Math.random()*60)}m
+Shell: bash 5.x
+Terminal: Hermes Terminal
+CPU: Virtual CPU @ 2.4GHz
+Memory: ${Math.floor(Math.random()*8)+4}GB / 16GB
+Disk: ${Math.floor(Math.random()*200)+100}GB / 500GB
+GPU: WebGL Renderer`,
+  uuid:()=>crypto.randomUUID(),
+  base64:(args)=>args.length?btoa(args.join(' ')):'사용법: base64 <텍스트>',
+  hash:(args)=>args.length?(async()=>{const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(args.join(' ')));return 'SHA-256: '+Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');})():'사용법: hash <텍스트>',
+  calc:(args)=>{
+    try{return eval(args.join(' '))}catch(e){return '계산 오류'}
+  },
+  matrix:()=>{runMatrix();return''},
+  snake:()=>{runSnake();return''}
+};
+
+function print(text,cls=''){
+  const div=document.createElement('div');
+  div.textContent=text;
+  if(cls)div.className=cls;
+  terminal.appendChild(div);
+  terminal.scrollTop=terminal.scrollHeight;
+}
+function printError(text){print(text,'error')}
+function printSuccess(text){print(text,'success')}
+function printInfo(text){print(text,'info')}
+
+async function execute(cmd){
+  print(`hermes@workspace:${cwd}$ ${cmd}`);
+  history.push(cmd);historyIndex=history.length;
+  
+  const parts=cmd.trim().split(/\s+/);
+  const cmdName=parts[0].toLowerCase();
+  const args=parts.slice(1);
+  
+  if(commands[cmdName]){
+    try{
+      const result=await commands[cmdName](args);
+      if(result!==undefined&&result!=='')print(result);
+    }catch(e){printError('오류: '+e.message)}
+  }else if(cmdName){
+    printError(`알 수 없는 명령어: ${cmdName}. 'help' 입력으로 도움말 확인`);
+  }
+}
+
+input.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){
+    const cmd=input.value.trim();
+    input.value='';
+    if(cmd)execute(cmd);
+  }else if(e.key==='ArrowUp'){
+    e.preventDefault();
+    if(historyIndex>0){historyIndex--;input.value=history[historyIndex]}
+  }else if(e.key==='ArrowDown'){
+    e.preventDefault();
+    if(historyIndex<history.length-1){historyIndex++;input.value=history[historyIndex]}
+    else{historyIndex=history.length;input.value=''}
+  }
+});
+
+function clearTerminal(){terminal.innerHTML=''}
+function showHelp(){execute('help')}
+function showHistory(){execute('history')}
+
+function runMatrix(){
+  const cols=Math.floor(terminal.clientWidth/8);
+  const drops=new Array(cols).fill(0);
+  const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()';
+  let matrixInterval=setInterval(()=>{
+    let line='';
+    for(let i=0;i<cols;i++){
+      line+=chars[Math.floor(Math.random()*chars.length)]+' ';
+      if(Math.random()>0.975)drops[i]=0;
+      drops[i]++;
+    }
+    print(line,'success');
+    if(terminal.scrollHeight>5000){clearInterval(matrixInterval);printInfo('매트릭스 종료 (clear로 지우기)')}
+  },50);
+}
+
+function runSnake(){
+  printInfo('스네이크 게임은 별도 프로젝트에서 실행하세요: projects/snake/index.html');
+}
+
+printSuccess('Hermes Terminal v1.0 시작됨');
+printInfo("'help' 입력으로 명령어 목록 확인");
+</script>
+</body>
+</html>

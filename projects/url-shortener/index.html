@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes URL Shortener</title>
+<style>
+:root { --bg:#0b0e16; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; --accent:#60a5fa; --good:#4ade80; --bad:#ef4444; }
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:32px 16px}
+h1{font-size:30px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}
+.sub{color:var(--muted);font-size:14px;margin-bottom:32px;text-align:center}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;width:100%;max-width:560px;box-shadow:0 8px 30px rgba(0,0,0,.3)}
+.url-row{display:flex;gap:8px;margin-bottom:14px}
+.url-row input{flex:1;padding:13px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px;outline:none}
+.url-row input:focus{border-color:var(--accent)}
+.btn{background:var(--accent);color:#0b0e16;border:none;padding:13px 22px;font-size:14px;font-weight:700;border-radius:8px;cursor:pointer;white-space:nowrap}
+.btn:hover{opacity:.9;transform:translateY(-1px)}
+.result{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;margin-top:14px;display:none}
+.result.show{display:block}
+.result .row{display:flex;align-items:center;gap:10px}
+.result a.short{color:var(--good);font-size:18px;font-weight:700;text-decoration:none;word-break:break-all;flex:1}
+.result a.short:hover{text-decoration:underline}
+.result .orig{color:var(--muted);font-size:12px;margin-top:6px;word-break:break-all}
+.copy-btn{background:var(--border);color:var(--text);border:none;padding:8px 14px;font-size:12px;border-radius:6px;cursor:pointer;white-space:nowrap}
+.copy-btn:hover{background:var(--accent);color:#0b0e16}
+.hint{color:var(--muted);font-size:12px;margin-top:14px;line-height:1.7}
+.hint b{color:var(--accent)}
+.stats{display:flex;gap:16px;margin-top:18px;padding-top:14px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+.stats b{color:var(--accent);font-size:16px;display:block}
+.empty{color:var(--muted);text-align:center;padding:20px 0;font-size:13px}
+.list{margin-top:18px;max-height:220px;overflow-y:auto}
+.list-item{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:9px 12px;margin-bottom:6px;font-size:12px}
+.list-item .scode{color:var(--good);font-weight:700;min-width:90px}
+.list-item .surl{color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list-item .cnt{color:var(--muted);min-width:40px;text-align:right}
+.footer{margin-top:32px;color:var(--muted);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<h1>URL <span>SHORTENER</span></h1>
+<div class="sub">긴 URL을 짧은 코드로 변환하고 클릭 시 이동 · localStorage에 저장</div>
+<div class="card">
+  <div class="url-row">
+    <input type="text" id="longUrl" placeholder="단축할 URL 또는 텍스트 입력" onkeydown="if(event.key==='Enter')shorten()">
+    <button class="btn" onclick="shorten()">단축화</button>
+  </div>
+  <div class="result" id="result">
+    <div class="row">
+      <a class="short" id="shortLink" href="#" target="_blank" rel="noopener"></a>
+      <button class="copy-btn" onclick="copyShort()">복사</button>
+    </div>
+    <div class="orig" id="originalUrl"></div>
+  </div>
+  <div class="stats">
+    <div>단축된 URL<b id="totalCount">0</b></div>
+    <div>총 클릭<b id="totalClick">0</b></div>
+  </div>
+  <div class="list" id="list"></div>
+  <div class="hint">원리를 확인하려면: <b>#/코드</b> 형태로 브라우저 주소창에 입력하면 원본 URL로 이동합니다.<br>데모 한정 — 실제 배포 시 서버 리다이렉트 필요 (hash 는 진짜 단축 도메인이 아님).</div>
+</div>
+<div class="footer">Hermes URL Shortener | 순수 클라이언트 · localStorage 저장 | 계속 업데이트됨</div>
+
+<script>
+'use strict';
+// localStorage에 저장: { code: {url, clicks} }
+const STORE_KEY='hermes_urls';
+const CHARS='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+let store=load();
+
+function load(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY))||{}; }catch(e){ return {}; } }
+function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(store)); }
+function genCode(len=6){
+  let c='';
+  for(let i=0;i<len;i++) c+=CHARS[Math.floor(Math.random()*CHARS.length)];
+  if(store[c]) return genCode(len+1); // 충돌 시 길이 증가
+  return c;
+}
+
+function shorten(){
+  const input=document.getElementById('longUrl');
+  const url=input.value.trim();
+  const result=document.getElementById('result');
+  const shortLink=document.getElementById('shortLink');
+  const originalUrl=document.getElementById('originalUrl');
+  if(!url){ result.classList.remove('show'); alert('URL을 입력하세요'); return; }
+  // 같은 URL이 이미 있으면 재사용
+  for(const code in store){ if(store[code].url===url){ showResult(code,url); return; } }
+  const code=genCode();
+  store[code]={url, clicks:0, created:Date.now()};
+  save();
+  showResult(code,url);
+  renderList();
+}
+
+function showResult(code,url){
+  const result=document.getElementById('result');
+  const shortLink=document.getElementById('shortLink');
+  const originalUrl=document.getElementById('originalUrl');
+  const display=location.origin+location.pathname+'#'+code;
+  shortLink.href=display;
+  shortLink.textContent='#/'+code+' (또는 '+code+')';
+  originalUrl.textContent='원본: '+url;
+  result.classList.add('show');
+  updateStats();
+}
+
+function copyShort(){
+  const code=document.getElementById('shortLink').textContent.match(/#\/(\w+)/);
+  if(!code) return;
+  copyText(location.origin+location.pathname+'#'+code[1]);
+}
+function copyText(t){
+  if(navigator.clipboard){ navigator.clipboard.writeText(t).then(()=>toast('복사 완료')).catch(()=>fallback(t)); }
+  else fallback(t);
+}
+function fallback(t){ const tmp=document.createElement('input');tmp.value=t;document.body.appendChild(tmp);tmp.select();document.execCommand('copy');document.body.removeChild(tmp);toast('복사 완료'); }
+function toast(m){ const t=document.createElement('div');t.textContent=m;t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent);color:#0b0e16;padding:10px 20px;border-radius:8px;font-weight:700;z-index:999;font-size:14px';document.body.appendChild(t);setTimeout(()=>t.remove(),1600); }
+
+function renderList(){
+  const list=document.getElementById('list');
+  const entries=Object.entries(store).sort((a,b)=>b[1].created-a[1].created).slice(0,10);
+  list.innerHTML=entries.map(([code,v])=>`<div class="list-item"><span class="scode">${code}</span><span class="surl">${v.url}</span><span class="cnt">${v.clicks}회</span><button class="copy-btn" onclick="copyCode('${code}')">복사</button></div>`).join('')||'';
+}
+function copyCode(code){ copyText(location.origin+location.pathname+'#'+code); }
+
+function updateStats(){
+  const codes=Object.keys(store);
+  const clicks=codes.reduce((s,c)=>s+(store[c].clicks||0),0);
+  document.getElementById('totalCount').textContent=codes.length;
+  document.getElementById('totalClick').textContent=clicks;
+}
+
+// hash 라우팅: #/code → 원본 이동
+function handleHash(){
+  const h=location.hash.replace(/^#\/?/,'');
+  if(h && store[h]){
+    store[h].clicks=(store[h].clicks||0)+1;
+    save();
+    updateStats();
+    renderList();
+    window.location.replace(store[h].url);
+  }
+}
+window.addEventListener('hashchange', handleHash);
+
+renderList();
+updateStats();
+handleHash();
+</script>
+</body>
+</html>

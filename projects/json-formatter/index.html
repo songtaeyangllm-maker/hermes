@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes JSON Formatter</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:32px}h1{font-size:28px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}.sub{color:var(--muted);font-size:14px;margin-bottom:32px}.formatter{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;width:100%;max-width=1000px}.panes{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:900px){.panes{grid-template-columns:1fr}}.pane{background:var(--bg);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column}.pane-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}.pane-header h3{font-size:13px;color:var(--muted);text-transform:uppercase}.pane-header select{background:var(--card);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:12px}textarea{flex:1;background:transparent;border:none;color:var(--text);font-family:'Consolas',monospace;font-size:13px;line-height:1.6;padding:16px;outline:none;tab-size:2;resize:none}.output{white-space:pre-wrap;word-break:break-word}.btn-row{display:flex;gap:8px;margin-top:16px;justify-content:center}.btn{background:var(--accent);color:#0b0e16;border:none;padding:10px 20px;font-size:13px;border-radius:6px;cursor:pointer}.btn:hover{opacity:.9}.btn.secondary{background:var(--border);color:var(--text)}.stats{display:flex;justify-content:center;gap:24px;margin-top:16px;font-size:12px;color:var(--muted)}.footer{margin-top:32px;color:var(--muted);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<h1>JSON <span>FORMATTER</span></h1>
+<div class="sub">JSON 포맷팅/압축/검증/변환 도구</div>
+<div class="formatter">
+  <div class="panes">
+    <div class="pane">
+      <div class="pane-header">
+        <h3>입력</h3>
+        <select id="inputMode" onchange="process()">
+          <option value="json">JSON</option>
+          <option value="yaml">YAML</option>
+        </select>
+      </div>
+      <textarea id="input" placeholder='{"name": "Hermes", "version": "1.0", "features": ["AI", "Tools", "Widgets"]}' spellcheck="false"></textarea>
+    </div>
+    <div class="pane">
+      <div class="pane-header">
+        <h3>출력</h3>
+        <select id="outputMode" onchange="process()">
+          <option value="pretty">예쁘게 (Pretty)</option>
+          <option value="compact">압축 (Minify)</option>
+          <option value="yaml">YAML</option>
+          <option value="tree">트리 뷰</option>
+        </select>
+      </div>
+      <div class="output" id="output" contenteditable="true" spellcheck="false"></div>
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn" onclick="formatJson()">포맷</button>
+    <button class="btn secondary" onclick="minifyJson()">압축</button>
+    <button class="btn secondary" onclick="toYaml()">YAML 변환</button>
+    <button class="btn secondary" onclick="copyOutput()">복사</button>
+    <button class="btn secondary" onclick="clearAll()">지우기</button>
+    <button class="btn secondary" onclick="loadSample()">샘플 로드</button>
+  </div>
+  <div class="stats">
+    <span>입력: <span id="inSize">0</span> 문자</span>
+    <span>출력: <span id="outSize">0</span> 문자</span>
+    <span>줄: <span id="outLines">0</span></span>
+  </div>
+  <div id="validation" style="margin-top:12px;min-height:20px"></div>
+</div>
+<div class="footer">Hermes JSON Formatter | YAML 지원 (js-yaml) | 계속 업데이트됨</div>
+
+<script>
+// js-yaml 로드
+const loadYaml=()=>new Promise(r=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js';s.onload=r;document.head.appendChild(s)});
+
+const input=document.getElementById('input');
+const output=document.getElementById('output');
+const validation=document.getElementById('validation');
+let yamlLib=null;
+
+async function init(){
+  await loadYaml();
+  yamlLib=window.jsyaml;
+  input.value='{\n  "name": "Hermes",\n  "version": "1.0.0",\n  "description": "AI Agent Workspace",\n  "features": [\n    "AI Systems",\n    "Visualization",\n    "Games",\n    "Tools"\n  ],\n  "config": {\n    "theme": "dark",\n    "language": "ko"\n  }\n}';
+  process();
+}
+
+function process(){
+  const inMode=document.getElementById('inputMode').value;
+  const outMode=document.getElementById('outputMode').value;
+  const text=input.value.trim();
+  
+  if(!text){output.textContent='';updateStats(0,0);validation.textContent='';return}
+  
+  let obj;
+  try{
+    if(inMode==='yaml')obj=yamlLib.load(text);
+    else obj=JSON.parse(text);
+    validation.innerHTML='<span style="color:var(--good)">✓ 유효한 JSON/YAML</span>';
+  }catch(e){
+    validation.innerHTML=`<span style="color:var(--bad)">✗ 파싱 오류: ${e.message}</span>`;
+    output.textContent='';
+    updateStats(text.length,0);
+    return;
+  }
+  
+  let result;
+  try{
+    if(outMode==='pretty')result=JSON.stringify(obj,null,2);
+    else if(outMode==='compact')result=JSON.stringify(obj);
+    else if(outMode==='yaml')result=yamlLib.dump(obj);
+    else if(outMode==='tree')result=renderTree(obj);
+    output.textContent=result;
+  }catch(e){
+    output.textContent='출력 오류: '+e.message;
+  }
+  updateStats(text.length,result?.length||0);
+}
+
+function renderTree(obj,indent=0){
+  const spaces='  '.repeat(indent);
+  if(obj===null)return spaces+'null';
+  if(Array.isArray(obj)){
+    if(obj.length===0)return spaces+'[]';
+    return spaces+'[\n'+obj.map((v,i)=>renderTree(v,indent+1)+(i<obj.length-1?',':'')).join('\n')+'\n'+spaces+']';
+  }
+  if(typeof obj==='object'){
+    const keys=Object.keys(obj);
+    if(keys.length===0)return spaces+'{}';
+    return spaces+'{\n'+keys.map((k,i)=>spaces+'  '+JSON.stringify(k)+': '+renderTree(obj[k],indent+1).trimStart()+(i<keys.length-1?',':'')).join('\n')+'\n'+spaces+'}';
+  }
+  return spaces+JSON.stringify(obj);
+}
+
+function formatJson(){document.getElementById('outputMode').value='pretty';process()}
+function minifyJson(){document.getElementById('outputMode').value='compact';process()}
+function toYaml(){document.getElementById('outputMode').value='yaml';process()}
+
+function copyOutput(){
+  navigator.clipboard.writeText(output.textContent).then(()=>alert('복사 완료'));
+}
+
+function clearAll(){
+  input.value='';output.textContent='';validation.textContent='';updateStats(0,0);
+}
+
+function loadSample(){
+  input.value='{\n  "projects": [\n    {"id": 1, "name": "Neural Network", "category": "AI", "stars": 42},\n    {"id": 2, "name": "3D Engine", "category": "Graphics", "stars": 38},\n    {"id": 3, "name": "Tetris", "category": "Game", "stars": 56}\n  ],\n  "stats": {"total": 91, "categories": 6, "lines": 15059}\n}';
+  process();
+}
+
+function updateStats(inLen,outLen){
+  document.getElementById('inSize').textContent=inLen;
+  document.getElementById('outSize').textContent=outLen;
+  document.getElementById('outLines').textContent=outLen?output.textContent.split('\n').length:0;
+}
+
+input.addEventListener('input',process);
+init();
+</script>
+</body>
+</html>

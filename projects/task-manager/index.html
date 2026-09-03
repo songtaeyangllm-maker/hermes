@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Task Manager</title>
+<style>
+:root { --bg:#0b0e16; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; --accent:#60a5fa; --good:#4ade80; --bad:#ef4444; }
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:32px}h1{font-size:28px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}.sub{color:var(--muted);font-size:14px;margin-bottom:32px}.task-grid{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;width:100%;max-width:1000px}.task-card{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:20px;margin:12px 0;transition:transform .2s}.task-card:hover{transform:translateX(4px)}.task-card.priority-high{border-left:4px solid var(--bad)}.task-card.priority-medium{border-left:4px solid var(--accent)}.task-card.priority-low{border-left:4px solid var(--good)}.task-header{display:flex;justify-content:space-between;align-items:flex-start}.task-title{font-size:14px;font-weight:bold;color:var(--text);margin-bottom:4px}.task-meta{color:var(--muted);font-size:11px;margin-bottom:8px}.task-priority{font-size:10px;padding:2px 6px;border-radius:4px;color:#0b0e16}.priority-high{background:var(--bad);color:#fff}.priority-medium{background:var(--accent);color:#0b0e16}.priority-low{background:var(--good);color:#0b0e16}.task-actions{margin-top:8px;display:flex;gap:4px}.btn{background:var(--accent);color:#0b0e16;border:none;padding:6px 10px;font-size:11px;font-weight:bold;cursor;border-radius:4px;transition:opacity .2s}.btn:hover{opacity:.9}.btn-danger{background:var(--bad);color:#fff}.filter-row{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:16px}.filter-row select{background:var(--card2);border:1px solid var(--border);padding:6px 10px;font-size:13px;color:var(--text);border-radius:6px;width:150px}.empty{color:var(--muted);text-align:center;padding:20px}.footer{margin-top:32px;color:var(--muted);font-size:12px;text-align:center}.link{color:var(--accent);text-decoration:none;font-weight:bold;font-size:13px}.link:hover{text-decoration:underline}</style>
+</head>
+<body>
+<h1>TASK <span>MANAGER</span></h1>
+<div class="sub">모든 프로젝트의 진행 상황 및 우선순위 관리</div>
+<div class="filter-row">
+  <select id="priorityFilter">
+    <option value="all">전체</option>
+    <option value="high">높음</option>
+    <option value="medium">중간</option>
+    <option value="low">낮음</option>
+  </select>
+</div>
+<div class="task-grid" id="taskGrid">
+  <div class="empty">작업이 없습니다. 아래에서 새 작업을 추가해 보세요.</div>
+</div>
+<div class="action-row" style="margin-top:32px;width:100%;justify-content:center">
+  <input class="note-input" id="taskInput" placeholder="새 작업 제목을 입력하세요">
+  <select id="prioritySelect" style="margin-left:16px;width:120px">
+    <option value="medium">중간</option>
+    <option value="high">높음</option>
+    <option value="low">낮음</option>
+  </select>
+  <button class="btn" onclick="addTask()">추가</button>
+</div>
+<script>
+// 데이터 저장소 (localStorage)
+let tasks = JSON.parse(localStorage.getItem('hermesTasks')||'[]');
+const taskGrid=document.getElementById('taskGrid');
+function getPriorityClass(priority){if(priority==='high')return'priority-high';if(priority==='medium')return'priority-medium';return'priority-low'}
+function renderTasks(){const filter=document.getElementById('priorityFilter').value;const filtered=tasks.filter(t=>filter==='all'||t.priority===filter);if(filtered.length===0){taskGrid.innerHTML='<div class="empty">작업이 없습니다. 아래에서 새 작업을 추가해 보세요.</div>';return;}taskGrid.innerHTML=filtered.map((task,i)=>`<div class="task-card ${getPriorityClass(task.priority)}" data-index="${i}">
+  <div class="task-header">
+    <div>
+      <div class="task-title">${task.title}</div>
+      <div class="task-meta">생성: ${new Date(task.created).toLocaleDateString()}</div>
+    </div>
+    <span class="task-priority ${getPriorityClass(task.priority)}">${task.priority===undefined?'미지정':task.priority}</span>
+  </div>
+  <div class="task-actions">
+    <button class="btn" onclick="completeTask(${i})">완료</button>
+    <button class="btn btn-danger" onclick="removeTask(${i})">삭제</button>
+  </div>
+</div>`).join('')}
+taskGrid.innerHTML=document.querySelector('.empty')?document.querySelector('.empty').outerHTML:taskGrid.innerHTML
+function addTask(){const title=document.getElementById('taskInput').value.trim();const prioritySelect=document.getElementById('prioritySelect');if(!title)return;tasks.unshift({title,priority:prioritySelect.value,created:Date.now()});localStorage.setItem('hermesTasks',JSON.stringify(tasks));renderTasks();document.getElementById('taskInput').value=''}
+function completeTask(i){tasks[i].completed=true;localStorage.setItem('hermesTasks',JSON.stringify(tasks));renderTasks()}
+function removeTask(i){if(confirm('정말 삭제하시겠습니까?')){tasks.splice(i,1);localStorage.setItem('hermesTasks',JSON.stringify(tasks));renderTasks()}}
+renderTasks()
+document.getElementById('priorityFilter').onchange=renderTasks
+</script>
+</body>
+</html>

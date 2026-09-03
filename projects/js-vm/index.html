@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes JS VM</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;height:100vh;display:flex;flex-direction:column}
+header{background:var(--card);border-bottom:1px solid var(--border);padding:6px 16px;display:flex;justify-content:space-between;align-items:center}
+header h1{font-size:14px}header h1 span{color:var(--accent)}
+header .sub{color:var(--muted);font-size:11px}
+.main{flex:1;display:flex;gap:2px;min-height:0}
+.panel{background:var(--card);border:1px solid var(--border);display:flex;flex-direction:column;min-height:0}
+.source-panel{width:40%;min-width:280px}
+.output-panel{width:24%;min-width:200px}
+.vm-panel{flex:1}
+.panel h3{margin:0;padding:6px 12px;border-bottom:1px solid var(--border);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.btn-bar{padding:6px;background:var(--bg);border-bottom:1px solid var(--border);display:flex;gap:4px}
+.btn{flex:1;background:var(--accent);color:#0b0e16;border:none;padding:7px;font-size:12px;border-radius:4px;cursor:pointer;font-weight:600}
+.btn:hover{opacity:.9}.btn.secondary{background:var(--border);color:var(--text);font-weight:400}
+#editor{flex:1;width:100%;min-height:0;background:#0d1117;color:#e5e7eb;border:none;outline:none;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;resize:none;padding:12px;tab-size:2;line-height:1.5}
+#bytecode{flex:1;overflow-y:auto;font-family:ui-monospace,monospace;font-size:11px;padding:6px 10px;line-height:1.6;color:var(--muted);white-space:pre;max-height:45%}
+.bc-line{cursor:pointer;padding:0 2px;border-radius:2px}
+.bc-line:hover{background:var(--border)}
+.bc-line.active{background:var(--accent);color:#0b0e16;font-weight:700}
+#registers{font-family:ui-monospace,monospace;font-size:11px;padding:8px;display:grid;grid-template-columns:repeat(2,1fr);gap:4px;background:var(--bg);max-height:90px;overflow-y:auto}
+#registers .reg{background:var(--card);border:1px solid var(--border);border-radius:3px;padding:4px 6px;font-size:10px}
+#registers .reg b{color:var(--accent);font-weight:600;display:block;font-size:9px;text-transform:uppercase;letter-spacing:.5px}
+#stack{flex:1;overflow-y:auto;font-family:ui-monospace,monospace;font-size:11px;padding:8px;color:var(--good);line-height:1.7;background:var(--bg)}
+#stack .sitem{border-bottom:1px dashed var(--border);padding:1px 0;display:flex;justify-content:space-between}
+#stack .sidx{color:var(--muted);width:40px}
+#output{flex:1;overflow-y:auto;font-family:ui-monospace,monospace;font-size:11px;padding:8px;line-height:1.4;background:var(--bg)}
+.output-line{margin-bottom:2px;padding:2px 6px;border-left:2px solid var(--border)}
+.output-line.error{color:var(--bad);border-left-color:var(--bad)}
+.output-line.success{color:var(--good);border-left-color:var(--good)}
+.output-line.info{color:var(--muted)}
+.status-bar{background:var(--card);border-top:1px solid var(--border);padding:4px 12px;font-size:11px;color:var(--muted);display:flex;gap:18px;align-items:center}
+.status-bar span b{color:var(--accent);font-family:monospace}
+.badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:600}
+.badge.ok{background:rgba(74,222,128,.15);color:var(--good)}
+.badge.run{background:rgba(96,165,250,.15);color:var(--accent)}
+.badge.err{background:rgba(239,68,68,.15);color:var(--bad)}
+</style>
+</head>
+<body>
+<header><h1>JS <span>VM</span> <span class="sub">스택기반 바이트코드 인터프리터 · 렉서/파서/컴파일러/VM/스테퍼</span></h1></header>
+<div class="main">
+  <div class="panel source-panel">
+    <h3>소스 (변수·산술·if/else·while·함수·재귀·print)</h3>
+    <div class="btn-bar">
+      <button class="btn" onclick="compile()">컴파일</button>
+      <button class="btn" onclick="vmRun()">▶ 실행</button>
+      <button class="btn secondary" onclick="step()">스텝</button>
+      <button class="btn secondary" onclick="reset()">리셋</button>
+    </div>
+    <textarea id="editor" spellcheck="false">// Hermes Mini JS VM — 팩토리얼 + 피보나치
+function factorial(n) {
+  if (n <= 1) return 1;
+  return n * factorial(n - 1);
+}
+function fib(n) {
+  if (n <= 1) return n;
+  return fib(n - 1) + fib(n - 2);
+}
+let total = 0;
+let i = 1;
+while (i <= 6) {
+  total = total + factorial(i) + fib(i);
+  i = i + 1;
+}
+print(total);</textarea>
+  </div>
+  <div class="panel output-panel">
+    <h3>출력</h3>
+    <div id="output"></div>
+  </div>
+  <div class="panel vm-panel">
+    <h3>바이트코드 (클릭=점프)</h3>
+    <div id="bytecode"></div>
+    <h3>스택 (최상단 순)</h3>
+    <div id="stack"></div>
+  </div>
+</div>
+<div class="status-bar">
+  <span>PC <b id="stPC">0</b></span>
+  <span>스택 <b id="stStack">0</b></span>
+  <span>호출 <b id="stCall">0</b></span>
+  <span>함수 <b id="stFn">main</b></span>
+  <span id="stStatus" class="badge ok">준비됨</span>
+  <span style="margin-left:auto">시간 <b id="stTime">-</b></span>
+</div>
+
+<script>
+'use strict';
+// ============ 1. 렉서 ============
+const T={NUM:'NUM',ID:'ID',KW:'KW',OP:'OP',EOF:'EOF'};
+const KWS=new Set(['function','if','else','while','return','let','var','print','true','false']);
+function lex(src){
+  const a=[];let i=0;
+  while(i<src.length){
+    const c=src[i];
+    if(/\s/.test(c)){i++;continue;}
+    if(c==='/'&&src[i+1]==='/'){while(i<src.length&&src[i]!=='\n')i++;continue;}
+    if(c==='/'&&src[i+1]==='*'){i+=2;while(i<src.length&&!(src[i]==='*'&&src[i+1]==='/'))i++;i+=2;continue;}
+    if(/[0-9]/.test(c)){let j=i;while(j<src.length&&/[0-9.]/.test(src[j]))j++;a.push({t:T.NUM,v:parseFloat(src.slice(i,j))});i=j;continue;}
+    if(/[A-Za-z_]/.test(c)){let j=i;while(j<src.length&&/[A-Za-z0-9_]/.test(src[j]))j++;const w=src.slice(i,j);a.push({t:KWS.has(w)?T.KW:T.ID,v:w});i=j;continue;}
+    const two=src.substr(i,2);
+    if(two==='=='||two==='!='||two==='<='||two==='>='){a.push({t:T.OP,v:two});i+=2;continue;}
+    if('+-*/%<>=!(){};,'.includes(c)){a.push({t:T.OP,v:c});i++;continue;}
+    throw new Error('알 수 없는 문자: '+c);
+  }
+  a.push({t:T.EOF,v:null});return a;
+}
+
+// ============ 2. 파서 → AST ============
+class P{
+  constructor(t){this.t=t;this.p=0;}
+  peek(o=0){return this.t[Math.min(this.p+o,this.t.length-1)];}
+  n(){return this.t[this.p++];}
+  ex(v){const k=this.n();if(k.v!==v&&k.t!==v)throw new Error('예상 "'+v+'" 실제 "'+k.v+'"');return k;}
+  is(v){return this.peek().v===v;}
+  prog(){const b=[];while(this.peek().t!==T.EOF)b.push(this.st());return{type:'P',body:b};}
+  st(){
+    if(this.is('function'))return this.fnDecl();
+    if(this.is('let')||this.is('var'))return this.varDecl();
+    if(this.is('if'))return this.ifSt();
+    if(this.is('while'))return this.whileSt();
+    if(this.is('return')){this.n();const a=this.expr();this.ex(';');return{type:'Ret',arg:a};}
+    // print(...) 문
+    if(this.is('print')){this.n();this.ex('(');const a=this.expr();this.ex(')');this.ex(';');return{type:'Print',arg:a};}
+    // 할당문: name = expr ;  (식별자 뒤 '=' 감지)
+    if(this.peek().t===T.ID && this.peek(1).v==='='){
+      const nm=this.n().v;this.n();const e=this.expr();this.ex(';');return{type:'Assign',name:nm,value:e};
+    }
+    const e=this.expr();this.ex(';');return{type:'Expr',expr:e};
+  }
+  fnDecl(){this.ex('function');const nm=this.ex(T.ID).v;this.ex('(');const ps=[];if(!this.is(')')){do{ps.push(this.ex(T.ID).v);}while(this.n().v===',');this.p--;}this.ex(')');this.ex('{');const b=[];while(!this.is('}'))b.push(this.st());this.ex('}');return{type:'Func',name:nm,params:ps,body:b};}
+  varDecl(){this.n();const nm=this.ex(T.ID).v;let init=null;if(this.is('=')){this.n();init=this.expr();}this.ex(';');return{type:'VD',name:nm,init};}
+  ifSt(){this.ex('if');this.ex('(');const c=this.expr();this.ex(')');const cons=this.blockOrStmt();let alt=null;if(this.is('else')){this.n();if(this.is('if')){alt=[this.ifSt()];}else alt=this.blockOrStmt();}return{type:'If',c,cons,alt};}
+  blockOrStmt(){ if(this.is('{')){this.n();const b=[];while(!this.is('}'))b.push(this.st());this.ex('}');return b;} return [this.st()]; }
+  whileSt(){this.ex('while');this.ex('(');const c=this.expr();this.ex(')');const b=this.blockOrStmt();return{type:'While',c,body:b};}
+  or(){let e=this.and();while(this.is('||')){const op=this.n().v;e={type:'B',op,l:e,r:this.and()};}return e;}
+  and(){let e=this.eq();while(this.is('&&')){const op=this.n().v;e={type:'B',op,l:e,r:this.eq()};}return e;}
+  eq(){let e=this.rel();while(this.is('==')||this.is('!=')){const op=this.n().v;e={type:'B',op,l:e,r:this.rel()};}return e;}
+  rel(){let e=this.add();while(this.is('<')||this.is('<=')||this.is('>')||this.is('>=')){const op=this.n().v;e={type:'B',op,l:e,r:this.add()};}return e;}
+  add(){let e=this.mul();while(this.is('+')||this.is('-')){const op=this.n().v;e={type:'B',op,l:e,r:this.mul()};}return e;}
+  mul(){let e=this.un();while(this.is('*')||this.is('/')||this.is('%')){const op=this.n().v;e={type:'B',op,l:e,r:this.un()};}return e;}
+  un(){if(this.is('-')||this.is('!')){const op=this.n().v;return{type:'U',op,arg:this.un()};}return this.prim();}
+  prim(){
+    const k=this.peek();
+    if(k.t===T.NUM){this.n();return{type:'N',v:k.v};}
+    if(k.t===T.ID){this.n();if(this.is('(')){this.n();const as=[];if(!this.is(')')){do{as.push(this.expr());}while(this.n().v===',');this.p--;}this.ex(')');return{type:'Call',name:k.v,args:as};}return{type:'V',name:k.v};}
+    if(k.v==='true'){this.n();return{type:'BL',v:true};}
+    if(k.v==='false'){this.n();return{type:'BL',v:false};}
+    if(this.is('(')){this.n();const e=this.expr();this.ex(')');return e;}
+    throw new Error('표현식 오류: '+k.v);
+  }
+  expr(){return this.or();}
+}
+
+// ============ 3. 바이트코드 ============
+const O={PUSH:0,LOAD:1,STORE:2,NEG:3,ADD:4,SUB:5,MUL:6,DIV:7,MOD:8,LT:9,LTE:10,GT:11,GTE:12,EQ:13,NEQ:14,JUMP:15,JZ:16,CALL:17,RET:18,PRINT:19,POP:20,HALT:21};
+const ON=['PUSH','LOAD','STORE','NEG','ADD','SUB','MUL','DIV','MOD','LT','LTE','GT','GTE','EQ','NEQ','JUMP','JZ','CALL','RET','PRINT','POP','HALT'];
+
+// ============ 4. 컴파일러 ============
+// 설계: 코드를 두 세그먼트로 — [함수 본문들...] [main 본문...]. funcs[name].start 를 코드 인덱스로 저장.
+class Cmp{
+  constructor(){this.code=[];this.funcs={};this.fnDefs=[];}
+  emit(op,arg=null){const i=this.code.length;this.code.push({op,arg});return i;}
+  compile(ast){
+    // 1) 모든 함수 본문 먼저 컴파일 (프로토타입), main 은 나중
+    const fns=ast.body.filter(n=>n.type==='Func');
+    const mainAst={type:'P',body:ast.body.filter(n=>n.type!=='Func')};
+    // 함수들 컴파일 (각 함수 시작 주소 기록)
+    this.fnDefs=[];
+    const collectFns=(nodes,top)=>{
+      for(const n of nodes){
+        if(n.type==='Func'){this.fnDefs.push(n);collectFns(n.body);}
+      }
+    };
+    collectFns(ast.body);
+    // 함수 본문 코드 생성 (실행 시 CALL 로 점프)
+    for(const fn of this.fnDefs){
+      const start=this.code.length;
+      this.funcs[fn.name]={params:fn.params,start};
+      this.genBlock(fn.body);
+      this.emit(O.RET); // 암시적 return
+    }
+    // main 시작
+    this.funcs.__main__={params:[],start:this.code.length};
+    this.mainStart=this.code.length;
+    if(mainAst.body.length===0){this.emit(O.HALT);}
+    else { this.genBlock(mainAst.body); this.emit(O.HALT); }
+    return {code:this.code,funcs:this.funcs,mainStart:this.mainStart};
+  }
+  genBlock(ss){for(const s of ss)this.genSt(s);}
+  genSt(s){
+    switch(s.type){
+      case 'VD': if(s.init)this.genE(s.init);else this.emit(O.PUSH,0);this.emit(O.STORE,s.name);break;
+      case 'Assign': this.genE(s.value);this.emit(O.STORE,s.name);break;
+      case 'If':{this.genE(s.c);const jz=this.emit(O.JZ,null);this.genBlock(s.cons);if(s.alt){const j=this.emit(O.JUMP,null);this.code[jz].arg=this.code.length;this.genBlock(s.alt);this.code[j].arg=this.code.length;}else this.code[jz].arg=this.code.length;break;}
+      case 'While':{const st=this.code.length;this.genE(s.c);const jz=this.emit(O.JZ,null);this.genBlock(s.body);this.emit(O.JUMP,st);this.code[jz].arg=this.code.length;break;}
+      case 'Expr':this.genE(s.expr);this.emit(O.POP);break;
+      case 'Ret':this.genE(s.arg);this.emit(O.RET);break;
+      case 'Print':this.genE(s.arg);this.emit(O.PRINT);this.emit(O.POP);break;
+      case 'Func':break; // 정의는 이미 컴파일됨
+    }
+  }
+  genE(e){
+    if(!e)return;
+    switch(e.type){
+      case 'N':this.emit(O.PUSH,e.v);break;
+      case 'BL':this.emit(O.PUSH,e.v?1:0);break;
+      case 'V':this.emit(O.LOAD,e.name);break;
+      case 'U':this.genE(e.arg);if(e.op==='-')this.emit(O.NEG);else this.emit(O.PUSH,e.op==='!'?0:0);/* not 구현 생략 */break;
+      case 'B':{ // binary
+        const m={'+':O.ADD,'-':O.SUB,'*':O.MUL,'/':O.DIV,'%':O.MOD,'<':O.LT,'<=':O.LTE,'>':O.GT,'>=':O.GTE,'==':O.EQ,'===':O.EQ,'!=':O.NEQ,'!==':O.NEQ};
+        if(e.op==='&&'){this.genE(e.l);const jz=this.emit(O.JZ,null);this.genE(e.r);this.code[jz].arg=this.code.length;break;}
+        if(e.op==='||'){this.genE(e.l);const jnz=this.emit(O.JZ,null);/* falsy -> jump */this.genE(e.r);this.code[jnz].arg=this.code.length;break;}
+        this.genE(e.l);this.genE(e.r);this.emit(m[e.op]);break;}
+      case 'Call':{for(const a of e.args)this.genE(a);this.emit(O.CALL,e.name);break;}
+      case 'P':break;
+    }
+  }
+}
+
+// ============ 5. VM ============
+class Vm{
+  constructor(prog){this.p=prog;this.code=prog.code;this.ip=prog.mainStart;this.stack=[];this.env={scope:new Map(),parent:null};this.frames=[];this.nCalls=0;this.out=[];this.done=false;this.fnName='main';}
+  getv(nm){let e=this.env;while(e){if(e.scope.has(nm))return e.scope.get(nm);e=e.parent;}return 0;}
+  setv(nm,v){let e=this.env;while(e){if(e.scope.has(nm)){e.scope.set(nm,v);return;}e=e.parent;}this.env.scope.set(nm,v);}
+  step(){
+    if(this.done)return;
+    const c=this.code[this.ip];if(!c){this.done=true;return;}
+    const op=c.op,ar=c.arg;
+    switch(op){
+      case O.PUSH:this.stack.push(ar);break;
+      case O.LOAD:this.stack.push(this.getv(ar));break;
+      case O.STORE:this.setv(ar,this.stack.pop());break;
+      case O.NEG:this.stack.push(-this.stack.pop());break;
+      case O.ADD:{const b=this.stack.pop(),a=this.stack.pop();this.stack.push(a+b);}break;
+      case O.SUB:{const b=this.stack.pop(),a=this.stack.pop();this.stack.push(a-b);}break;
+      case O.MUL:{const b=this.stack.pop(),a=this.stack.pop();this.stack.push(a*b);}break;
+      case O.DIV:{const b=this.stack.pop(),a=this.stack.pop();this.stack.push(a/b);}break;
+      case O.MOD:{const b=this.stack.pop(),a=this.stack.pop();this.stack.push(a%b);}break;
+      case O.LT:{const b=this.stack.pop(),a=this.stack.pop();this.stack.push(a<b?1:0);}break;
+      case O.LTE:{const b=this.stack.pop(),a=this.stack.pop();this.stack.push(a<=b?1:0);}break;
+      case O.GT:{const b=this.stack.pop(),a=this.stack.pop();this.stack.push(a>b?1:0);}break;
+      case O.GTE:{const b=this.stack.pop(),a=this.stack.pop();this.stack.push(a>=b?1:0);}break;
+      case O.EQ:{const b=this.stack.pop(),a=this.stack.pop();this.stack.push(a==b?1:0);}break;
+      case O.NEQ:{const b=this.stack.pop(),a=this.stack.pop();this.stack.push(a!=b?1:0);}break;
+      case O.JUMP:this.ip=ar;return;
+      case O.JZ:if(!this.stack.pop()){this.ip=ar;return;}break;
+      case O.CALL:{
+        const fn=this.p.funcs[ar];
+        const np=fn?fn.params.length:0;
+        const args=[];for(let i=0;i<np;i++)args.unshift(this.stack.pop());
+        if(ar==='print'){this.out.push(args[0]);
+          // print 는 리턴값 없음 -> 0 스택
+          this.stack.push(0);
+        }else if(fn){
+          this.frames.push({ip:this.ip+1,env:this.env,fn:this.fnName});
+          this.nCalls++;
+          const sc=new Map();fn.params.forEach((p,i)=>sc.set(p,args[i]));
+          this.env={scope:sc,parent:this.env};
+          this.fnName=ar;
+          this.ip=fn.start;return;
+        }else{throw new Error('정의 안 된 함수: '+ar);}
+        break;}
+      case O.RET:{
+        const ret=this.stack.pop();
+        const f=this.frames.pop();
+        if(f){this.env=f.env;this.fnName=f.fn;this.ip=f.ip;this.stack.push(ret);return;}
+        // main 이면 종료
+        this.done=true;this.stack.push(ret);return;}
+      case O.PRINT:this.out.push(this.stack[this.stack.length-1]);break;
+      case O.POP:this.stack.pop();break;
+      case O.HALT:this.done=true;return;
+    }
+    this.ip++;
+  }
+  run(max=200000){
+    let n=0;
+    while(!this.done&&n++<max){this.step();if(n>=max){this.out.push('(스텝 한도 초과)');break;}}
+  }
+}
+
+// ============ 6. UI ============
+const $=id=>document.getElementById(id);
+let prog=null,vm=null;
+
+function compile(){
+  try{
+    const ast=new P(lex($('editor').value)).prog();
+    prog=new Cmp().compile(ast);
+    vm=new Vm(prog);
+    renderBC();
+    st('컴파일 완료 — '+prog.code.length+' 바이트, '+Object.keys(prog.funcs).length+' 함수','ok');
+  }catch(e){st('컴파일 오류: '+e.message,'err');out('컴파일 오류: '+e.message,'error');}
+}
+
+function renderBC(){
+  const el=$('bytecode');
+  el.innerHTML=prog.code.map((c,i)=>{
+    const nm=ON[c.op]||'?';
+    let hot='';if(prog.mainStart===i)hot=' <span style="color:var(--good)">←main</span>';
+    const arg=c.arg!==null?' '+JSON.stringify(c.arg):'';
+    return `<div class="bc-line" id="bc-${i}" data-i="${i}" onclick="vm?vm.ip=i:null;renderBC();"><span style="color:var(--border)">${String(i).padStart(3)}</span> <span style="color:${c.op===O.CALL||c.op===O.JUMP||c.op===O.JZ?'var(--warn)':'var(--accent)'}">${nm}</span>${arg}${hot}</div>`;
+  }).join('');
+}
+
+function st(t,k){const el=$('stStatus');el.className='badge '+k;el.textContent=t;}
+function out(t,c='info'){$('output').insertAdjacentHTML('beforeend',`<div class="output-line ${c}">› ${t}</div>`);$('output').scrollTop=$('output').scrollHeight;}
+function updStats(){
+  $('stPC').textContent=vm?vm.ip:0;
+  $('stStack').textContent=vm?vm.stack.length:0;
+  $('stCall').textContent=vm?vm.nCalls:0;
+  $('stFn').textContent=vm?vm.fnName:'main';
+  renderRegs();
+}
+function renderRegs(){
+  const stk=$('stack');
+  if(!vm){stk.innerHTML='<div style="color:var(--muted)">컴파일 후 스텝/실행</div>';return;}
+  const topN=vm.stack.slice(-25).reverse();
+  stk.innerHTML=topN.length?topN.map((v,i)=>{
+    const idx=vm.stack.length-i-1;
+    return `<div class="sitem"><span class="sidx">#${idx}</span><span>${typeof v==='number'?v.toFixed(6):JSON.stringify(v)}</span></div>`;
+  }).join(''):'<div style="color:var(--muted)">스택 비어있음</div>';
+  document.querySelectorAll('.bc-line.active').forEach(x=>x.classList.remove('active'));
+  const cur=document.getElementById('bc-'+vm.ip);
+  if(cur){cur.classList.add('active');cur.scrollIntoView({block:'nearest'});}
+}
+
+function vmRun(){
+  if(!prog){compile();}
+  $('output').innerHTML='';
+  if(!vm||vm.done){vm=new Vm(prog.meta||prog);}
+  // 재생성
+  const ast=new P(lex($('editor').value)).prog();prog=new Cmp().compile(ast);
+  vm=new Vm(prog);
+  const t0=performance.now();
+  vm.run();
+  const t1=performance.now();
+  vm.out.forEach(v=>out(v,'success'));
+  st(vm.done?'완료 ('+vm.nCalls+' 호출)':'중단','ok');
+  $('stTime').textContent=(t1-t0).toFixed(2)+'ms';
+  updStats();
+}
+function step(){
+  if(!prog)compile();
+  if(!vm||vm.done){$('output').innerHTML='';const ast=new P(lex($('editor').value)).prog();prog=new Cmp().compile(ast);vm=new Vm(prog);renderBC();}
+  vm.step();
+  if(vm.done){vm.out.forEach(v=>out(v,'success'));st('완료','ok');}
+  updStats();
+}
+function reset(){
+  prog=null;vm=null;
+  $('bytecode').innerHTML='';$('stack').innerHTML='';$('output').innerHTML='';
+  $('stPC').textContent='0';$('stStack').textContent='0';$('stCall').textContent='0';$('stFn').textContent='main';
+  st('준비됨','ok');$('stTime').textContent='-';
+}
+</script>
+</body>
+</html>

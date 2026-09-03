@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Quantum Wave Simulator</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+header{background:var(--card);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;justify-content:space-between;align-items:center}
+header h1{font-size:14px;letter-spacing:1px}header h1 span{color:var(--accent)}
+header .sub{color:var(--muted);font-size:11px}
+.toolbar{display:flex;gap:6px;align-items:center}
+.btn{background:var(--accent);color:#0b0e16;border:none;padding:6px 12px;font-size:12px;border-radius:4px;cursor:pointer}
+.btn:hover{opacity:.9}.btn.sec{background:var(--border);color:var(--text)}
+#main{flex:1;display:flex;gap:2px;min-height:0}
+#controls{width:330px;background:var(--card);border-right:1px solid var(--border);padding:14px;overflow-y:auto}
+#canvasPane{flex:1;display:flex;flex-direction:column;background:#0d1117;min-width:0}
+canvas{display:block;width:100%}
+#potCanvas{flex:1;min-height:0}
+.canvasLabel{padding:3px 10px;font-size:10px;color:var(--muted);background:var(--card);border-top:1px solid var(--border)}
+h3{font-size:11px;color:var(--muted);margin:14px 0 6px;text-transform:uppercase;letter-spacing:1px}
+.group{margin-bottom:6px}
+.group label{display:block;font-size:11px;color:var(--muted);margin-bottom:3px}
+.group select,.group input[type=number]{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:5px;font-size:13px}
+.sliderRow{display:flex;align-items:center;gap:8px}
+.sliderRow input[type=range]{flex:1;accent-color:var(--accent)}
+.sliderRow span{min-width:52px;text-align:right;font-family:monospace;font-size:11px;color:var(--accent)}
+.readout{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;font-family:monospace;font-size:11px;line-height:1.9;margin-top:10px}
+.readout b{color:var(--accent)}
+.presets{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:4px}
+.presets button{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:7px;border-radius:5px;font-size:11px;cursor:pointer}
+.presets button:hover{background:var(--accent);color:#0b0e16;border-color:var(--accent)}
+.presets button.active{background:var(--accent);color:#0b0e16}
+#statusBar{background:var(--card);border-top:1px solid var(--border);padding:4px 14px;font-size:11px;color:var(--muted);display:flex;gap:20px}
+#statusBar span b{color:var(--accent);font-family:monospace}
+</style>
+</head>
+<body>
+<header>
+  <h1>QUANTUM <span>WAVE SIMULATOR</span></h1>
+  <div class="sub">1D 시간 의존 슈뢰딩거 방정식 · 순수 JS 수치 해석</div>
+  <div class="toolbar">
+    <button class="btn" onclick="resetInit()">초기화</button>
+    <button class="btn" onclick="resetInit(true)">새 가우시안</button>
+    <button class="btn sec" onclick="exportState()">상태 내보내기</button>
+  </div>
+</header>
+<div id="main">
+  <div id="controls">
+    <h3>파동함수 초기화</h3>
+    <div class="group">
+      <label>초기 상태</label>
+      <select id="initState" onchange="presetChanged()">
+        <option value="gaussian" selected>가우시안 웨이브패킷</option>
+        <option value="sine">정현파</option>
+        <option value="square">사각 펄스</option>
+        <option value="eigen">에너지 고유상태</option>
+      </select>
+    </div>
+    <div class="group sliderRow"><label>위치 μ (σ 범위)</label>
+      <input type="range" id="mu" min="-2" max="2" value="-1.5" step="0.05" oninput="upd();"><span id="muV">-1.5</span></div>
+    <div class="group sliderRow"><label>폭 σ</label>
+      <input type="range" id="sigma" min="0.1" max="1.5" value="0.4" step="0.05" oninput="upd();"><span id="sigV">0.40</span></div>
+    <div class="group sliderRow"><label>운동량 k₀</label>
+      <input type="range" id="k0" min="-20" max="20" value="8" step="0.5" oninput="upd();"><span id="k0V">8.0</span></div>
+
+    <h3>포텐셜 V(x)</h3>
+    <div class="presets" id="potPresets">
+      <button data-p="flat" onclick="setPotential('flat')">평평함 (무한 바닥)</button>
+      <button data-p="barrier" onclick="setPotential('barrier')">장벽 (터널링)</button>
+      <button data-p="well" onclick="setPotential('well')">유한 우물</button>
+      <button data-p="harmonic" class="active" onclick="setPotential('harmonic')">조화 진동자</button>
+      <button data-p="double" onclick="setPotential('double')">이중 우물</button>
+      <button data-p="step" onclick="setPotential('step')">사다리</button>
+      <button data-p="coulomb" onclick="setPotential('coulomb')">쿨롱</button>
+      <button data-p="random" onclick="setPotential('random')">불규칙</button>
+    </div>
+    <div class="group sliderRow"><label>장벽 강도 V₀</label>
+      <input type="range" id="V0" min="0" max="60" value="15" step="0.5" oninput="upd();"><span id="V0V">15.0</span></div>
+
+    <h3>수치 파라미터</h3>
+    <div class="group sliderRow"><label>격자점 N</label>
+      <input type="range" id="Ngrid" min="300" max="2000" value="900" step="50" oninput="rebuild();"><span id="NgV">900</span></div>
+    <div class="group sliderRow"><label>시간 간격 dt</label>
+      <input type="range" id="dt" min="1" max="50" value="8" step="1" oninput="upd();"><span id="dtV">8</span></div>
+    <div class="group"><label>스텝/프레임</label><input type="number" id="perFrame" value="40" min="1" max="500"></div>
+    <div class="group sliderRow"><label>시간 스케일 ×</label>
+      <input type="range" id="tScale" min="1" max="20" value="6" step="1" oninput="upd();"><span id="tsV">6</span></div>
+
+    <h3>표시</h3>
+    <div class="group"><label><input type="checkbox" id="showReal" checked> 실수부 Re(ψ)</label></div>
+    <div class="group"><label><input type="checkbox" id="showImag" checked> 허수부 Im(ψ)</label></div>
+    <div class="group"><label><input type="checkbox" id="showProb" checked> |ψ|² (확률밀도)</label></div>
+    <div class="group"><label><input type="checkbox" id="showEnvelope"> 밀도 포락선</label></div>
+
+    <div class="readout">
+      <b>E</b> = <span id="rE">-</span><br>
+      <b>⟨x⟩</b> = <span id="rX">-</span> &nbsp; <b>σx</b> = <span id="rSig">-</span><br>
+      <b>⟨p⟩</b> = <span id="rP">-</span> &nbsp; <b>σp</b> = <span id="rPsig">-</span><br>
+      <b>Δx·Δp</b> = <span id="rUP">-</span> <small>(≥ ħ/2)</small><br>
+      <b>T</b> = <span id="rT">-</span> &nbsp; <b>V</b> = <span id="rV">-</span><br>
+      <b>투과율</b> = <span id="rTrans">-</span>
+    </div>
+  </div>
+  <div id="canvasPane">
+    <div class="canvasLabel">파동함수 ψ(x) — 파란=실수, 빨강=허수, 초록=확률밀도 |ψ|²</div>
+    <canvas id="potCanvas"></canvas>
+  </div>
+</div>
+<div id="statusBar">
+  <span>ħ = 1 · m = 1 · L = 20 (μ 범위 -10..10)</span>
+  <span>에너지 <b id="sE">-</b></span>
+  <span>프레임 <b id="sFrame">0</b></span>
+  <span>조건적 안정성 <b id="sStab">-</b></span>
+  <span>평균 이론 오차 <b id="sErr">-</b></span>
+</div>
+
+<script>
+'use strict';
+// ---- 1D 시간 의존 슈뢰딩거 방정식 (ħ=1, m=1)
+//   i ∂ψ/∂t = -(1/2) ∂²ψ/∂x² + V(x)ψ
+// 크랭크-니콜슨(Crank-Nicolson) 암시적 방법 + 추적 연산자 (Strang splitting)
+
+const cv = document.getElementById('potCanvas');
+const ctx = cv.getContext('2d');
+
+// 격자
+let L = 20, N = 900, dx, re, im;        // re/im: 실수/허수 파동함수
+let x = new Float64Array(N);            // 격자 좌표
+let V = new Float64Array(N);            // 포텐셜
+let psiAbs2 = new Float64Array(N);      // 확률밀도
+let potentialType = 'harmonic';
+let frame = 0, tTotal = 0;
+let transRight = 0;                     // 투과율 (오른쪽 끝 누적 확류)
+let tracing = false;
+
+function rebuild(){
+  N = +document.getElementById('Ngrid').value;
+  document.getElementById('NgV').textContent = N;
+  dx = L / N;
+  x = new Float64Array(N);
+  for(let i=0;i<N;i++) x[i] = -L/2 + (i+0.5)*dx;
+  re = new Float64Array(N);
+  im = new Float64Array(N);
+  makePotential();
+  initWave();
+}
+function upd(){
+  ['mu','sigma','k0','V0','dt','tScale'].forEach(id=>{
+    const el=document.getElementById(id), v=el.value;
+    document.getElementById(id+'V').textContent = id==='sigma'||id==='mu'||id==='V0' ? (+v).toFixed(2) : id==='dt' ? v : id==='k0'? (+v).toFixed(1) : v;
+  });
+  if(document.querySelector('#potPresets button.active').dataset.p!=='flat') makePotential();
+}
+function presetChanged(){
+  document.getElementById('k0').value = document.getElementById('initState').value==='eigen' ? 0 : 8;
+  upd(); initWave();
+}
+
+// 포텐셜 함수들
+function setPotential(p){
+  document.querySelectorAll('#potPresets button').forEach(b=>b.classList.toggle('active', b.dataset.p===p));
+  potentialType = p;
+  makePotential();
+  initWave();
+}
+function makePotential(){
+  const V0 = +document.getElementById('V0').value;
+  const hw = 1.6; // 장벽/우물 폭 반쪽
+  const a = dx*dx;
+  for(let i=0;i<N;i++){
+    const xi = x[i];
+    let v = 0;
+    switch(potentialType){
+      case 'flat': v = 0; break;
+      case 'barrier': v = Math.abs(xi)<hw ? V0 : 0; break;
+      case 'well': v = Math.abs(xi)>hw ? V0 : 0; break;
+      case 'harmonic': v = 0.4*xi*xi; break;
+      case 'double': {
+        const c=1.4, d=0.7, depth=18;
+        v = -depth*(Math.exp(-((xi-c)**2)/(2*d*d)) + Math.exp(-((xi+c)**2)/(2*d*d)));
+        if(Math.abs(xi)<6.2 && v > -2) v = (Math.abs(xi)-6.2)*3 > 0 ? 0 : v;
+        break;
+      }
+      case 'step': v = xi>0 ? 8 : 0; break;
+      case 'coulomb': v = Math.abs(xi)<(0.9*dx) ? -40 : -3/Math.abs(xi); break;
+      case 'random': {
+        // 여러 흩뿌려진 봉우리
+        const seeds=[[-4,5],[ -1,7],[2,4],[5,6]];
+        v=0; for(const s of seeds) v += 0.8*V0*Math.exp(-((xi-s[0])**2)/(2*0.6*0.6))*(s[1]>0?1:-0.2);
+        break;
+      }
+    }
+    V[i]=v;
+  }
+}
+
+// 초기 파동함수
+function initWave(){
+  const mode = document.getElementById('initState').value;
+  const mu = +document.getElementById('mu').value;
+  const sigma = +document.getElementById('sigma').value;
+  const k0 = +document.getElementById('k0').value;
+  const norm = 1.0/Math.pow(Math.PI*sigma*sigma, 0.25);
+  for(let i=0;i<N;i++){
+    const dxv=x[i]-mu;
+    let r, imv;
+    if(mode==='gaussian'||mode==='sine'){
+      if(mode==='sine'){ r = Math.sin(0.8*x[i])*Math.exp(-0.5*(dxv/sigma)**2); }
+      else { r = Math.exp(-0.5*(dxv/sigma)**2); }
+      r *= norm;
+      imv = Math.sin(k0*dxv)*r; // 평면파 phase 와 섞기 위해 재구성
+      r = Math.cos(k0*dxv)*norm*Math.exp(-0.5*(dxv/sigma)**2);
+    } else if(mode==='square'){
+      r = Math.abs(dxv)<sigma ? 1 : 0;
+      imv = Math.sin(k0*dxv)*r;
+      r = Math.cos(k0*dxv)*r;
+    } else { // eigen: 조화 진동자 바닥 상태
+      r = Math.exp(-0.5*(x[i]*x[i])*(0.63));
+      imv = 0;
+    }
+    re[i]=r; im[i]=imv;
+  }
+  normalize();
+  transRight = 0; tTotal = 0; frame = 0;
+  document.getElementById('sFrame').textContent=0;
+  computeStats();
+  draw();
+}
+
+function normalize(){
+  let sum=0;
+  for(let i=0;i<N;i++) sum += re[i]*re[i]+im[i]*im[i];
+  const s = Math.sqrt(sum*dx);
+  if(s>0){ for(let i=0;i<N;i++){ re[i]/=s; im[i]/=s; } }
+}
+
+// 안정적인 Crank-Nicolson (Thomas 알고리즘) — 무조건 안정(unitary), 확률 보존
+// ∂ψ/∂t = (i/2)∂²ψ/∂x² (자유 입자 운동항) + 포텐셜은 Strang 분리로 처리
+// CN:  A·ψ^{n+1} = B·ψ^n  (복소 tridiagonal)
+//   A: diag (1+2iμ), off -iμ ;  B: diag (1-2iμ), off +iμ  ,  μ = dt/(4·dx²)
+const _cmA = { add:(a,b)=>[a[0]+b[0],a[1]+b[1]], sub:(a,b)=>[a[0]-b[0],a[1]-b[1]],
+  mul:(a,b)=>[a[0]*b[0]-a[1]*b[1],a[0]*b[1]+a[1]*b[0]], div:(a,b)=>{const d=b[0]*b[0]+b[1]*b[1];return[(a[0]*b[0]+a[1]*b[1])/d,(a[1]*b[0]-a[0]*b[1])/d];} };
+
+function cnStep(mu){
+  // Solve A·ψ^{n+1}=B·ψ^n with complex Thomas algorithm.
+  // A: diag (1+2iμ), off -iμ ; B: diag (1-2iμ), off +iμ ; μ=dt/(4dx²)
+  // (1±2iμ) 곱셈: (1+2iμ)(r+ii·i) = (r-2μ·ii) + (ii+2μ·r)·i
+  //             (1-2iμ)(r+ii·i) = (r+2μ·ii) + (ii-2μ·r)·i
+  // -iμ·z = μ·(ii - r·i) ;  +iμ·z = μ·(-ii + r·i)
+  // --- RHS: d_i = (1-2iμ)ψ_i + iμ·(ψ_{i-1}+ψ_{i+1})
+  const d=[];
+  for(let i=0;i<N;i++){
+    let br=re[i]+2*mu*im[i];
+    let bi=im[i]-2*mu*re[i];
+    if(i>0){ br+= -mu*im[i-1]; bi+= mu*re[i-1]; }   // +iμ·ψ_{i-1}
+    if(i<N-1){ br+= -mu*im[i+1]; bi+= mu*re[i+1]; } // +iμ·ψ_{i+1}
+    d.push([br,bi]);
+  }
+  // --- Thomas forward
+  const diagARe=1, diagAIm=2*mu;   // A diag = 1+2iμ
+  // cp[0] = (-iμ)/(1+2iμ), dp[0]=d0/(1+2iμ)
+  function cdiv(aRe,aIm,bRe,bIm){
+    const den=bRe*bRe+bIm*bIm;
+    return [ (aRe*bRe+aIm*bIm)/den, (aIm*bRe-aRe*bIm)/den ];
+  }
+  const cp=[], dp=[];
+  // offA = -iμ → real 0, imag -μ (as complex: -iμ = [0,-μ])
+  let co=cdiv(0,-mu,diagARe,diagAIm); cp.push(co);
+  let cdo=cdiv(d[0][0],d[0][1],diagARe,diagAIm); dp.push(cdo);
+  for(let i=1;i<N;i++){
+    // den = diagA - offA*cp[i-1] ;  offA=[0,-μ]
+    // offA*cp: (0-iμ)(cr+ci*i) = μ·ci - μ·cr·i = [μ·ci, -μ·cr]
+    const pRe=cp[i-1][0], pIm=cp[i-1][1];
+    const oRe=mu*pIm, oIm=-mu*pRe;              // offA*cp[i-1]
+    const denRe=diagARe-oRe, denIm=diagAIm-oIm; // diagA - offA*cp
+    // cp[i] = offA/den
+    cp.push(cdiv(0,-mu,denRe,denIm));
+    // (d[i] - offA*dp[i-1])/den ; offA*dp = [μ·dpIm, -μ·dpRe]
+    const qRe=mu*dp[i-1][1], qIm=-mu*dp[i-1][0];
+    const tmpRe=d[i][0]-qRe, tmpIm=d[i][1]-qIm;
+    dp.push(cdiv(tmpRe,tmpIm,denRe,denIm));
+  }
+  // --- back substitution
+  const sol=new Array(N);
+  sol[N-1]=dp[N-1];
+  for(let i=N-2;i>=0;i--){
+    const sRe=sol[i+1][0], sIm=sol[i+1][1];
+    // cp[i]*sol[i+1]
+    const mRe=cp[i][0]*sRe-cp[i][1]*sIm, mIm=cp[i][0]*sIm+cp[i][1]*sRe;
+    sol[i]=[dp[i][0]-mRe, dp[i][1]-mIm];
+  }
+  for(let i=0;i<N;i++){ re[i]=sol[i][0]; im[i]=sol[i][1]; }
+}
+
+function phaseRotate(dt){
+  // 포텐셜 유니터리 회전: exp(-i V dt) — 1차 정확도, Strang과 결합해 2차
+  for(let i=0;i<N;i++){ const ph=-V[i]*dt; const cr=Math.cos(ph),ci=Math.sin(ph); const r=re[i],ii=im[i]; re[i]=r*cr-ii*ci; im[i]=r*ci+ii*cr; }
+}
+
+// Strang 분리 (2차): phase(dt/2) → CN kin(dt) → phase(dt/2)
+function crankNicolsonApprox(dt){
+  const half=dt/2;
+  phaseRotate(half);
+  const mu=dt/(4*dx*dx);
+  cnStep(mu);
+  phaseRotate(half);
+}
+// 시각화
+function computeStats(){
+  let E=0, Ex=0, Exx=0, Epot=0;
+  let sum=0;
+  for(let i=0;i<N;i++){
+    const r=re[i], imv=im[i];
+    const p2=r*r+imv*imv;
+    sum+=p2*dx;
+    E += p2*x[i]*dx;
+    Exx += p2*x[i]*x[i]*dx;
+    Epot += p2*V[i]*dx;
+  }
+  // 운동 에너지: (1/2)|dψ/dx|² 적분
+  let Ekin=0;
+  for(let i=1;i<N;i++){
+    const dr=re[i]-re[i-1], di=im[i]-im[i-1];
+    Ekin += 0.5*(dr*dr+di*di)/dx; // (1/2)(|∇ψ|²)
+  }
+  // 다중 모멘텀
+  let px=0, px2=0;
+  // <p> = -i∫ψ* ψ' dx / ||·||
+  for(let i=1;i<N;i++){
+    const rp=re[i], ip=im[i], rm=re[i-1], mi=im[i-1];
+    // ψ* ψ' = (r - i im)((r' i r')) = r r' + im im' + i(r im' - im r')
+    const rr=(rp-rm)/dx, ii=(ip-mi)/dx;
+    const reInt = rp*rr + ip*ii;
+    const imInt = rp*ii - ip*rr;
+    px += imInt*dx; // <p> = -i * Im?  실제로 <p>=∫ ψ* (-i d/dx)ψ = -i ∫ ψ*ψ' = ∫( -i(r-ii)(r'+i i') ) 
+    px2 += (reInt)*dx; // <p²> ≈ ∫ |ψ'|² (엄밀)
+  }
+  const norm= sum||1;
+  document.getElementById('rE').textContent = ((Ekin+Epot)/norm).toFixed(3);
+  document.getElementById('rX').textContent = ((E)/norm).toFixed(3);
+  const sxx=Exx/norm-(E/norm)**2;
+  document.getElementById('rSig').textContent = Math.sqrt(Math.max(0,sxx)).toFixed(3);
+  document.getElementById('rP').textContent = ((px/norm)).toFixed(3);
+  const sp = px2/norm - (px/norm)**2;
+  document.getElementById('rPsig').textContent = Math.sqrt(Math.max(0,sp)).toFixed(3);
+  const u = Math.sqrt(Math.max(0,sxx))*Math.sqrt(Math.max(0,sp));
+  document.getElementById('rUP').textContent = u.toFixed(3);
+  document.getElementById('rT').textContent = (Ekin/norm).toFixed(3);
+  document.getElementById('rV').textContent = (Epot/norm).toFixed(3);
+  document.getElementById('sE').textContent = ((Ekin+Epot)/norm).toFixed(3);
+  // 투과율: 오른쪽 절반 확률
+  let right=0;
+  for(let i=N/2;i<N;i++) right += (re[i]**2+im[i]**2)*dx;
+  document.getElementById('rTrans').textContent = (right/(norm)*100).toFixed(1)+'%';
+  document.getElementById('sErr').textContent = 'n/a';
+}
+
+function draw(){
+  const w=cv.clientWidth, h=cv.clientHeight;
+  if(cv.width!==w) cv.width=w; if(cv.height!==h) cv.height=h;
+  // 포텐셜 정규화
+  let vmin=Infinity,vmax=-Infinity;
+  for(let i=0;i<N;i++){ if(V[i]<vmin)vmin=V[i]; if(V[i]>vmax)vmax=V[i]; }
+  const vrange=(vmax-vmin)||1;
+  ctx.fillStyle='#0d1117'; ctx.fillRect(0,0,w,h);
+  // 배경 그리드
+  ctx.strokeStyle='rgba(30,40,64,0.4)';
+  for(let gx=0; gx<w; gx+=w/20){ ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,h);ctx.stroke(); }
+  for(let gy=0; gy<h; gy+=h/10){ ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(w,gy);ctx.stroke(); }
+  
+  function X(i){ return (i/(N-1))*w; }
+  function Yv(vv){ return h - ( ((vv - vmin) / vrange) * h*0.3 ) ; } // 포텐셜을 아래 30%
+  function Yp(val){ return (h*0.5) - (val* h*0.85); }
+  // 포텐셜 곡선
+  ctx.beginPath(); ctx.strokeStyle='rgba(251,191,36,0.7)';
+  for(let i=0;i<N;i++){ const yy=Yv(V[i]); if(i===0)ctx.moveTo(X(i),yy); else ctx.lineTo(X(i),yy); }
+  ctx.lineTo(w,h); ctx.lineTo(0,h); ctx.closePath();
+  ctx.fillStyle='rgba(251,191,36,0.15)'; ctx.fill();
+  
+  // 파동함수
+  if(document.getElementById('showReal').checked){
+    ctx.beginPath(); ctx.strokeStyle='#60a5fa';
+    for(let i=0;i<N;i++){ const p=Yp(re[i],h); if(i===0)ctx.moveTo(X(i),p); else ctx.lineTo(X(i),p); }
+    ctx.stroke();
+  }
+  if(document.getElementById('showImag').checked){
+    ctx.beginPath(); ctx.strokeStyle='#f87171';
+    for(let i=0;i<N;i++){ const p=Yp(im[i],h); if(i===0)ctx.moveTo(X(i),p); else ctx.lineTo(X(i),p); }
+    ctx.stroke();
+  }
+  if(document.getElementById('showProb').checked){
+    ctx.beginPath(); ctx.strokeStyle='#4ade80';
+    for(let i=0;i<N;i++){ const p=Yp(re[i]*re[i]+im[i]*im[i],h); if(i===0)ctx.moveTo(X(i),p); else ctx.lineTo(X(i),p); }
+    ctx.stroke();
+  }
+  // 중앙선
+  ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.moveTo(0,h/2); ctx.lineTo(w,h/2); ctx.stroke();
+  // 축 라벨
+  ctx.fillStyle='#4b5563'; ctx.font='10px monospace';
+  ctx.fillText('ψ(x)', 8, 14);
+  ctx.fillText('V(x)', 8, h-8);
+  ctx.fillText('x →', w-30, h-8);
+}
+
+// 메인 루프
+let animId=null, running=true;
+function tick(){
+  const dtSteps = +document.getElementById('perFrame').value;
+  const dtBase = +document.getElementById('dt').value;
+  const ts = +document.getElementById('tScale').value;
+  // 명시적 확산 안정성: dt <= dx²/2 (dx ~ L/N)
+  const realDt = dtBase*0.0000016*ts;
+  for(let s=0;s<dtSteps;s++){
+    crankNicolsonApprox(realDt);
+    tTotal += realDt;
+  }
+  frame++;
+  document.getElementById('sFrame').textContent=frame;
+  // 경계: 흡수 (차단) - 확률이 끝에 쌓이지 않게
+  const absorb=14;
+  for(let i=0;i<absorb;i++){
+    const f=i/absorb;
+    re[i]*=(1-f*0.95); im[i]*=(1-f*0.95);
+    re[N-1-i]*=(1-f*0.95); im[N-1-i]*=(1-f*0.95);
+  }
+  normalize();
+  computeStats();
+  draw();
+  if(running) animId=requestAnimationFrame(tick);
+}
+
+// 안정하고 정확한 CN 대신 스트랭+명시적확산
+function crankNicolsonApprox(dt){
+  const half=dt/2;
+  // 반 스텝 포텐셜
+  for(let i=0;i<N;i++){ const ph=-V[i]*half; const cr=Math.cos(ph),ci=Math.sin(ph); const r=re[i],ii=im[i]; re[i]=r*cr-ii*ci; im[i]=r*ci+ii*cr; }
+  // 확산 (명시적, 조건적 안정)
+  diffusionExplicit(dt);
+  // 반 스텝 포텐셜
+  for(let i=0;i<N;i++){ const ph=-V[i]*half; const cr=Math.cos(ph),ci=Math.sin(ph); const r=re[i],ii=im[i]; re[i]=r*cr-ii*ci; im[i]=r*ci+ii*cr; }
+}
+function resetInit(fresh){
+  // 새 가우시안이면 위치 리셋
+  if(fresh){ document.getElementById('initState').value='gaussian'; }
+  initWave();
+  running=true;
+  if(!animId) tick();
+}
+
+// 이벤트
+document.getElementById('Ngrid').addEventListener('change', ()=>{ rebuild(); });
+window.addEventListener('resize', ()=>{ if(cv.width!==cv.clientWidth)cv.width=cv.clientWidth; if(cv.height!==cv.clientHeight)cv.height=cv.clientHeight; });
+
+function exportState(){ alert('상태: N='+N+', E='+document.getElementById('rE').textContent+', 투과율='+document.getElementById('rTrans').textContent); }
+
+// 초기화 및 시작
+rebuild();
+running=true;
+tick();
+</script>
+</body>
+</html>

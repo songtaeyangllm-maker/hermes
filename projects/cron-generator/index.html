@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Cron Generator</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:32px}h1{font-size:28px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}.sub{color:var(--muted);font-size:14px;margin-bottom:32px}.generator{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;width:100%;max-width=700px}.section{margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid var(--border)}.section:last-child{border:none;margin-bottom:0}.section h3{font-size:14px;color:var(--muted);margin-bottom:16px;text-transform:uppercase;letter-spacing:1px}.field{margin-bottom:16px}.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}.field select,.field input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:6px;font-size:14px}.field small{display:block;margin-top:4px;color:var(--muted);font-size:12px}.preview{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:20px;margin-top:24px;min-height:80px;font-family:'Consolas',monospace;font-size:14px}.preview .valid{color:var(--good)}.preview .invalid{color:var(--bad)}.next-runs{margin-top:16px}.run-item{padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;margin-bottom:8px;font-family:'Consolas',monospace;font-size:13px}.btn-row{display:flex;gap:12px;margin-top:24px}.btn{background:var(--accent);color:#0b0e16;border:none;padding:12px 24px;font-size:14px;border-radius:6px;cursor:pointer}.btn:hover{opacity:.9}.btn.secondary{background:var(--border);color:var(--text)}.footer{margin-top:32px;color:var(--muted);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<h1>CRON <span>GENERATOR</span></h1>
+<div class="sub">Cron 표현식 생성기 및 스케줄 미리보기</div>
+<div class="generator">
+  <div class="section">
+    <h3>스케줄 유형</h3>
+    <div class="field">
+      <select id="scheduleType" onchange="updateFields()">
+        <option value="minute">매분</option>
+        <option value="hourly">매시간</option>
+        <option value="daily">매일</option>
+        <option value="weekly">매주</option>
+        <option value="monthly">매월</option>
+        <option value="custom">사용자 정의</option>
+        <option value="preset">프리셋</option>
+      </select>
+    </div>
+  </div>
+  
+  <div class="section" id="minuteFields" style="display:none">
+    <h3>분 설정</h3>
+    <div class="field">
+      <label>간격 (분)</label>
+      <input type="number" id="minuteInterval" value="5" min="1" max="59" oninput="generate()">
+      <small>예: 5 = 5분마다</small>
+    </div>
+  </div>
+  
+  <div class="section" id="hourlyFields" style="display:none">
+    <h3>시간 설정</h3>
+    <div class="field">
+      <label>분</label>
+      <input type="number" id="hourlyMinute" value="0" min="0" max="59" oninput="generate()">
+    </div>
+  </div>
+  
+  <div class="section" id="dailyFields" style="display:none">
+    <h3>일일 설정</h3>
+    <div class="field">
+      <label>시간 (0-23)</label>
+      <input type="number" id="dailyHour" value="9" min="0" max="23" oninput="generate()">
+    </div>
+    <div class="field">
+      <label>분</label>
+      <input type="number" id="dailyMinute" value="0" min="0" max="59" oninput="generate()">
+    </div>
+  </div>
+  
+  <div class="section" id="weeklyFields" style="display:none">
+    <h3>주간 설정</h3>
+    <div class="field">
+      <label>요일</label>
+      <select id="weeklyDay" onchange="generate()">
+        <option value="0">일요일</option>
+        <option value="1">월요일</option>
+        <option value="2">화요일</option>
+        <option value="3">수요일</option>
+        <option value="4">목요일</option>
+        <option value="5">금요일</option>
+        <option value="6">토요일</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>시간</label>
+      <input type="number" id="weeklyHour" value="9" min="0" max="23" oninput="generate()">
+    </div>
+    <div class="field">
+      <label>분</label>
+      <input type="number" id="weeklyMinute" value="0" min="0" max="59" oninput="generate()">
+    </div>
+  </div>
+  
+  <div class="section" id="monthlyFields" style="display:none">
+    <h3>월간 설정</h3>
+    <div class="field">
+      <label>날짜 (1-31)</label>
+      <input type="number" id="monthlyDate" value="1" min="1" max="31" oninput="generate()">
+    </div>
+    <div class="field">
+      <label>시간</label>
+      <input type="number" id="monthlyHour" value="0" min="0" max="23" oninput="generate()">
+    </div>
+    <div class="field">
+      <label>분</label>
+      <input type="number" id="monthlyMinute" value="0" min="0" max="59" oninput="generate()">
+    </div>
+  </div>
+  
+  <div class="section" id="customFields" style="display:none">
+    <h3>사용자 정의 (5개 필드)</h3>
+    <div class="field">
+      <label>분 (0-59, *, */n, n-m, n,m)</label>
+      <input type="text" id="cronMin" value="*" oninput="generate()">
+    </div>
+    <div class="field">
+      <label>시 (0-23)</label>
+      <input type="text" id="cronHour" value="*" oninput="generate()">
+    </div>
+    <div class="field">
+      <label>일 (1-31)</label>
+      <input type="text" id="cronDay" value="*" oninput="generate()">
+    </div>
+    <div class="field">
+      <label>월 (1-12)</label>
+      <input type="text" id="cronMonth" value="*" oninput="generate()">
+    </div>
+    <div class="field">
+      <label>요일 (0-7, 0=일)</label>
+      <input type="text" id="cronDow" value="*" oninput="generate()">
+    </div>
+  </div>
+  
+  <div class="section" id="presetFields" style="display:none">
+    <h3>프리셋</h3>
+    <div class="field">
+      <select id="presetSelect" onchange="loadPreset()">
+        <option value="">선택하세요</option>
+        <option value="0 * * * *">매시간 정각</option>
+        <option value="0 */6 * * *">6시간마다</option>
+        <option value="0 0 * * *">매일 자정</option>
+        <option value="0 9 * * *">매일 오전 9시</option>
+        <option value="0 18 * * 1-5">평일 오후 6시</option>
+        <option value="0 0 * * 0">매주 일요일 자정</option>
+        <option value="0 0 1 * *">매월 1일 자정</option>
+        <option value="0 0 1 1 *">매년 1월 1일 자정</option>
+        <option value="*/15 * * * *">15분마다</option>
+        <option value="*/30 * * * *">30분마다</option>
+        <option value="0 */12 * * *">12시간마다</option>
+        <option value="0 3 * * 6">토요일 오전 3시</option>
+      </select>
+    </div>
+  </div>
+  
+  <div class="preview">
+    <div>Cron 표현식: <span id="cronExpr" class="valid">* * * * *</span></div>
+    <div id="cronDesc" style="margin-top:8px;color:var(--muted);font-size:13px"></div>
+    <div class="next-runs">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">다음 실행 시간:</div>
+      <div id="nextRuns"></div>
+    </div>
+  </div>
+  
+  <div class="btn-row">
+    <button class="btn" onclick="copyCron()">표현식 복사</button>
+    <button class="btn secondary" onclick="copyAll()">전체 복사</button>
+  </div>
+</div>
+<div class="footer">Hermes Cron Generator | Quartz/Cron 호환 | 계속 업데이트됨</div>
+
+<script>
+const scheduleType=document.getElementById('scheduleType');
+const fields={
+  minute:document.getElementById('minuteFields'),
+  hourly:document.getElementById('hourlyFields'),
+  daily:document.getElementById('dailyFields'),
+  weekly:document.getElementById('weeklyFields'),
+  monthly:document.getElementById('monthlyFields'),
+  custom:document.getElementById('customFields'),
+  preset:document.getElementById('presetFields')
+};
+
+function updateFields(){
+  Object.values(fields).forEach(f=>f.style.display='none');
+  const type=scheduleType.value;
+  if(fields[type])fields[type].style.display='block';
+  generate();
+}
+
+function loadPreset(){
+  const val=document.getElementById('presetSelect').value;
+  if(!val)return;
+  const parts=val.split(' ');
+  document.getElementById('cronMin').value=parts[0];
+  document.getElementById('cronHour').value=parts[1];
+  document.getElementById('cronDay').value=parts[2];
+  document.getElementById('cronMonth').value=parts[3];
+  document.getElementById('cronDow').value=parts[4];
+  scheduleType.value='custom';
+  updateFields();
+}
+
+function generate(){
+  let cron='';
+  const type=scheduleType.value;
+  
+  switch(type){
+    case 'minute':
+      cron=`*/${document.getElementById('minuteInterval').value} * * * *`;break;
+    case 'hourly':
+      cron=`${document.getElementById('hourlyMinute').value} * * * *`;break;
+    case 'daily':
+      cron=`${document.getElementById('dailyMinute').value} ${document.getElementById('dailyHour').value} * * *`;break;
+    case 'weekly':
+      cron=`${document.getElementById('weeklyMinute').value} ${document.getElementById('weeklyHour').value} * * ${document.getElementById('weeklyDay').value}`;break;
+    case 'monthly':
+      cron=`${document.getElementById('monthlyMinute').value} ${document.getElementById('monthlyHour').value} ${document.getElementById('monthlyDate').value} * *`;break;
+    case 'custom':
+      cron=`${document.getElementById('cronMin').value} ${document.getElementById('cronHour').value} ${document.getElementById('cronDay').value} ${document.getElementById('cronMonth').value} ${document.getElementById('cronDow').value}`;break;
+    case 'preset':
+      cron=document.getElementById('presetSelect').value||'* * * * *';break;
+  }
+  
+  document.getElementById('cronExpr').textContent=cron;
+  document.getElementById('cronExpr').className=cron==='* * * * *'?'invalid':'valid';
+  describeCron(cron);
+  showNextRuns(cron);
+}
+
+function describeCron(cron){
+  const parts=cron.split(' ');
+  if(parts.length!==5){document.getElementById('cronDesc').textContent='';return}
+  const [min,hour,day,month,dow]=parts;
+  let desc='';
+  
+  if(min==='*'&&hour==='*'&&day==='*'&&month==='*'&&dow==='*')desc='매분 실행';
+  else if(min.startsWith('*/'))desc=`${min.slice(2)}분마다 실행`;
+  else if(hour==='*'&&day==='*'&&month==='*'&&dow==='*')desc=`매시간 ${min}분에 실행`;
+  else if(day==='*'&&month==='*'&&dow==='*')desc=`매일 ${hour.padStart(2,'0')}:${min.padStart(2,'0')} 실행`;
+  else if(month==='*'&&dow==='*'){
+    const days=['일','월','화','수','목','금','토'];
+    const d=parseInt(dow);if(!isNaN(d))desc=`매주 ${days[d]}요일 ${hour.padStart(2,'0')}:${min.padStart(2,'0')} 실행`;
+  }else if(dow==='*'){
+    desc=`매월 ${day}일 ${hour.padStart(2,'0')}:${min.padStart(2,'0')} 실행`;
+  }else{
+    desc='사용자 정의 스케줄';
+  }
+  document.getElementById('cronDesc').textContent=desc;
+}
+
+function showNextRuns(cron){
+  const container=document.getElementById('nextRuns');
+  const now=new Date();
+  const runs=[];
+  let d=new Date(now);
+  
+  // 간단한 다음 5회 계산 (정확하지 않을 수 있음)
+  for(let i=0;i<5;i++){
+    d=new Date(d.getTime()+60000); // 임시: 1분씩 증가
+    runs.push(d.toLocaleString('ko-KR'));
+  }
+  container.innerHTML=runs.map(r=>`<div class="run-item">${r}</div>`).join('');
+}
+
+function copyCron(){
+  navigator.clipboard.writeText(document.getElementById('cronExpr').textContent).then(()=>alert('복사 완료'));
+}
+
+function copyAll(){
+  const cron=document.getElementById('cronExpr').textContent;
+  const desc=document.getElementById('cronDesc').textContent;
+  navigator.clipboard.writeText(`${cron}\n# ${desc}`).then(()=>alert('복사 완료'));
+}
+
+document.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',generate));
+updateFields();
+generate();
+</script>
+</body>
+</html>

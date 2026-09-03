@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Pong</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px}h1{font-size:28px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}.sub{color:var(--muted);font-size:14px;margin-bottom:24px}#gameCanvas{border:2px solid var(--border);border-radius:8px;background:#000}#ui{margin-top:16px;display:flex;justify-content:center;gap:48px;font-size:24px;font-family:Consolas,monospace}.footer{margin-top:32px;color:var(--muted);font-size:12px;text-align:center}.link{color:var(--accent);text-decoration:none;font-weight:bold;font-size:13px}.link:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<h1>PONG <span>AI</span></h1>
+<div class="sub">AI 상대와 대전 — W/S 키로 패들 조작</div>
+<canvas id="gameCanvas" width="800" height="450"></canvas>
+<div id="ui">
+  <div>Player: <span id="p1Score">0</span></div>
+  <div>AI: <span id="p2Score">0</span></div>
+</div>
+<div class="footer">Hermes Pong AI | 계속 업데이트됨</div>
+
+<script>
+const canvas=document.getElementById('gameCanvas');const ctx=canvas.getContext('2d');
+const W=800,H=450;
+const paddleW=12,paddleH=90;
+let p1={x:20,y:H/2-paddleH/2,score:0},p2={x:W-20-paddleW,y:H/2-paddleH/2,score:0};
+let ball={x:W/2,y:H/2,vx:6,vy:3,r:10,speed:6};
+let keys={};
+const aiSpeed=4.5;
+
+function resetBall(){ball.x=W/2;ball.y=H/2;ball.vx=(Math.random()>0.5?1:-1)*ball.speed;ball.vy=(Math.random()-0.5)*4}
+function update(){
+  if(keys.w&&p1.y>0)p1.y-=8;
+  if(keys.s&&p1.y+H-paddleH<H)p1.y+=8;
+  
+  const target=p2.y+paddleH/2;
+  if(target<ball.y-10)p2.y+=aiSpeed;
+  else if(target>ball.y+10)p2.y-=aiSpeed;
+  p2.y=Math.max(0,Math.min(H-paddleH,p2.y));
+  
+  ball.x+=ball.vx;ball.y+=ball.vy;
+  
+  if(ball.y-ball.r<0||ball.y+ball.r>H){ball.vy*=-1;ball.y=Math.max(ball.r,Math.min(H-ball.r,ball.y))}
+  
+  if(ball.x-ball.r<p1.x+paddleW&&ball.x+ball.r>p1.x&&ball.y+ball.r>p1.y&&ball.y-ball.r<p1.y+paddleH){
+    ball.vx=Math.abs(ball.vx)*1.05;ball.vy+=((ball.y-(p1.y+paddleH/2))/(paddleH/2))*4;ball.x=p1.x+paddleW+ball.r
+  }
+  if(ball.x+ball.r>p2.x&&ball.x-ball.r<p2.x+paddleW&&ball.y+ball.r>p2.y&&ball.y-ball.r<p2.y+paddleH){
+    ball.vx=-Math.abs(ball.vx)*1.05;ball.vy+=((ball.y-(p2.y+paddleH/2))/(paddleH/2))*4;ball.x=p2.x-ball.r
+  }
+  
+  if(ball.x<0){p2.score++;document.getElementById('p2Score').textContent=p2.score;resetBall()}
+  if(ball.x>W){p1.score++;document.getElementById('p1Score').textContent=p1.score;resetBall()}
+  
+  if(ball.vx>15)ball.vx=15;if(ball.vx<-15)ball.vx=-15;
+}
+function draw(){ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);ctx.fillStyle='#60a5fa';ctx.fillRect(p1.x,p1.y,paddleW,paddleH);ctx.fillStyle='#ef4444';ctx.fillRect(p2.x,p2.y,paddleW,paddleH);ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2);ctx.fill();ctx.setLineDash([10,15]);ctx.strokeStyle='#334155';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(W/2,0);ctx.lineTo(W/2,H);ctx.stroke();ctx.setLineDash([])}
+function loop(){update();draw();requestAnimationFrame(loop)}
+window.addEventListener('keydown',e=>keys[e.key]=true);window.addEventListener('keyup',e=>keys[e.key]=false);loop();
+</script>
+</body>
+</html>

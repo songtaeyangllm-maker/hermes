@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Color Converter</title>
+<style>
+:root { --bg:#0b0e16; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; --accent:#60a5fa; --good:#4ade80; --bad:#ef4444; }
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:32px 16px}
+h1{font-size:30px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}
+.sub{color:var(--muted);font-size:14px;margin-bottom:28px;text-align:center}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;width:100%;max-width:640px;box-shadow:0 8px 30px rgba(0,0,0,.3)}
+.swatch{height:110px;border-radius:10px;margin-bottom:18px;border:3px solid var(--border);transition:background .2s;display:flex;align-items:flex-end;justify-content:flex-end;padding:10px}
+.swatch .hex{font-family:Consolas,monospace;font-size:16px;font-weight:700;background:rgba(0,0,0,.55);padding:4px 10px;border-radius:6px;color:#fff}
+.row{display:flex;gap:10px;margin-bottom:14px}
+.row label{min-width:70px;line-height:42px;color:var(--muted);font-size:13px;font-weight:600}
+.row input{flex:1;padding:11px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;outline:none}
+.row input:focus{border-color:var(--accent)}
+.row select{width:170px;padding:11px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px;outline:none}
+.mode-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.mode-btn{background:var(--bg);border:1px solid var(--border);padding:10px 16px;font-size:13px;color:var(--text);border-radius:8px;cursor:pointer;font-weight:600}
+.mode-btn:hover{border-color:var(--accent)}
+.mode-btn.active{background:var(--accent);color:#0b0e16;border-color:var(--accent)}
+.results{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px}
+.result-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px}
+.result-box label{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.result-box .val{font-family:Consolas,monospace;font-size:14px;color:var(--accent);word-break:break-all;cursor:pointer}
+.result-box .val:hover{text-decoration:underline;color:var(--good)}
+.footer{margin-top:32px;color:var(--muted);font-size:12px;text-align:center}
+.copy-msg{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent);color:#0b0e16;padding:10px 20px;border-radius:8px;font-weight:700;z-index:999;font-size:14px}
+</style>
+</head>
+<body>
+<h1>COLOR <span>CONVERTER</span></h1>
+<div class="sub">RGB · HEX · HSL · HSV 상호 변환 (클릭 시 복사)</div>
+<div class="card">
+  <div class="swatch" id="swatch"><span class="hex" id="swatchHex">#000000</span></div>
+  <div class="mode-row" id="modeRow">
+    <button class="mode-btn active" data-mode="rgb">RGB</button>
+    <button class="mode-btn" data-mode="hex">HEX</button>
+    <button class="mode-btn" data-mode="hsl">HSL</button>
+    <button class="mode-btn" data-mode="hsv">HSV</button>
+  </div>
+  <div class="row"><label>값</label><input id="valInput" placeholder="예: 255, 128, 0  또는  #1E90FF  또는  hsl(210,100%,50%)" spellcheck="false"></div>
+  <div class="results">
+    <div class="result-box"><label>RGB</label><div class="val" id="outRGB">rgb(0,0,0)</div></div>
+    <div class="result-box"><label>HEX</label><div class="val" id="outHEX">#000000</div></div>
+    <div class="result-box"><label>HSL</label><div class="val" id="outHSL">hsl(0,0%,0%)</div></div>
+    <div class="result-box"><label>HSV</label><div class="val" id="outHSV">hsv(0,0%,0%)</div></div>
+    <div class="result-box"><label>RGB (0-1)</label><div class="val" id="out01">0,0,0</div></div>
+    <div class="result-box"><label>CMYK</label><div class="val" id="outCMYK">0,0,0,100</div></div>
+  </div>
+</div>
+<div class="footer">Hermes Color Converter | 예: rgb(255,128,0) · #1E90FF · hsl(210,100%,50%) | 정확한 수학 변환 · 계속 업데이트됨</div>
+
+<script>
+'use strict';
+let mode='rgb';
+
+// ==== 정확한 변환 구현 ====
+
+function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v));}
+
+// RGB (0-255) → HEX
+function rgbToHex(r,g,b){
+  r=clamp(Math.round(r),0,255);g=clamp(Math.round(g),0,255);b=clamp(Math.round(b),0,255);
+  return '#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('').toUpperCase();
+}
+// HEX → RGB
+function hexToRgb(hex){
+  hex=hex.replace('#','');
+  if(hex.length===3) hex=hex.split('').map(c=>c+c).join('');
+  if(hex.length!==6) return null;
+  return {r:parseInt(hex.substring(0,2),16),g:parseInt(hex.substring(2,4),16),b:parseInt(hex.substring(4,6),16)};
+}
+// RGB → HSL (h:0-360, s/l:0-100)
+function rgbToHsl(r,g,b){
+  r/=255;g/=255;b/=255;
+  const max=Math.max(r,g,b),min=Math.min(r,g,b);
+  let h=0,s=0;const l=(max+min)/2;
+  if(max!==min){
+    const d=max-min;
+    s=l>0.5?d/(2-max-min):d/(max+min);
+    switch(max){
+      case r: h=(g-b)/d+(g<b?6:0);break;
+      case g: h=(b-r)/d+2;break;
+      case b: h=(r-g)/d+4;break;
+    }
+    h/=6;
+  }
+  return {h:Math.round(h*360),s:Math.round(s*100),l:Math.round(l*100)};
+}
+// HSL → RGB
+function hslToRgb(h,s,l){
+  h=((h%360)+360)%360;s/=100;l/=100;
+  const c=(1-Math.abs(2*l-1))*s;
+  const x=c*(1-Math.abs(((h/60)%2)-1));
+  const m=l-c/2;
+  let rr,gg,bb;
+  if(h<60){rr=c;gg=x;bb=0;}
+  else if(h<120){rr=x;gg=c;bb=0;}
+  else if(h<180){rr=0;gg=c;bb=x;}
+  else if(h<240){rr=0;gg=x;bb=c;}
+  else if(h<300){rr=x;gg=0;bb=c;}
+  else {rr=c;gg=0;bb=x;}
+  return {r:Math.round((rr+m)*255),g:Math.round((gg+m)*255),b:Math.round((bb+m)*255)};
+}
+// RGB → HSV (h:0-360, s/v:0-100)
+function rgbToHsv(r,g,b){
+  r/=255;g/=255;b/=255;
+  const max=Math.max(r,g,b),min=Math.min(r,g,b);
+  let h=0;const v=max;
+  const d=max-min;
+  const s=max===0?0:d/max;
+  if(max!==min){
+    switch(max){
+      case r: h=(g-b)/d+(g<b?6:0);break;
+      case g: h=(b-r)/d+2;break;
+      case b: h=(r-g)/d+4;break;
+    }
+    h/=6;
+  }
+  return {h:Math.round(h*360),s:Math.round(s*100),v:Math.round(v*100)};
+}
+// HSV → RGB
+function hsvToRgb(h,s,v){
+  h=((h%360)+360)%360;s/=100;v/=100;
+  const c=v*s;
+  const x=c*(1-Math.abs(((h/60)%2)-1));
+  const m=v-c;
+  let rr,gg,bb;
+  if(h<60){rr=c;gg=x;bb=0;}
+  else if(h<120){rr=x;gg=c;bb=0;}
+  else if(h<180){rr=0;gg=c;bb=x;}
+  else if(h<240){rr=0;gg=x;bb=c;}
+  else if(h<300){rr=x;gg=0;bb=c;}
+  else {rr=c;gg=0;bb=x;}
+  return {r:Math.round((rr+m)*255),g:Math.round((gg+m)*255),b:Math.round((bb+m)*255)};
+}
+// RGB → CMYK
+function rgbToCmyk(r,g,b){
+  r/=255;g/=255;b/=255;
+  const k=1-Math.max(r,g,b);
+  if(k===1) return {c:0,m:0,y:0,k:100};
+  const c=(1-r-k)/(1-k),m=(1-g-k)/(1-k),y=(1-b-k)/(1-k);
+  return {c:Math.round(c*100),m:Math.round(m*100),y:Math.round(y*100),k:Math.round(k*100)};
+}
+
+// ==== 파싱 ====
+function parseInput(s, mode){
+  s=s.trim();
+  if(mode==='rgb'){
+    const m=s.match(/\(?\s*(\d+)\s*[,\s]\s*(\d+)\s*[,\s]\s*(\d+)\s*\)?/);
+    if(!m) return null;
+    return {r:+m[1],g:+m[2],b:+m[3]};
+  }
+  if(mode==='hex'){
+    const m=s.match(/[0-9a-f]{6}|[0-9a-f]{3}/i);
+    if(!m) return null;
+    return hexToRgb(m[0]);
+  }
+  if(mode==='hsl'){
+    const m=s.match(/\(?\s*(\d+)\s*[,\s]\s*(\d+)%\s*[,\s]\s*(\d+)%\s*\)?/);
+    if(!m) return null;
+    return hslToRgb(+m[1],+m[2],+m[3]);
+  }
+  if(mode==='hsv'){
+    const m=s.match(/\(?\s*(\d+)\s*[,\s]\s*(\d+)%\s*[,\s]\s*(\d+)%\s*\)?/);
+    if(!m) return null;
+    return hsvToRgb(+m[1],+m[2],+m[3]);
+  }
+  return null;
+}
+
+function update(){
+  const input=document.getElementById('valInput').value;
+  const rgb=parseInput(input, mode);
+  const swatch=document.getElementById('swatch');
+  const swHex=document.getElementById('swatchHex');
+  if(!rgb){
+    swatch.style.background='#20283a';
+    swHex.textContent='(입력을 기다리는 중)';
+    document.getElementById('outRGB').textContent='-';
+    document.getElementById('outHEX').textContent='-';
+    document.getElementById('outHSL').textContent='-';
+    document.getElementById('outHSV').textContent='-';
+    document.getElementById('out01').textContent='-';
+    document.getElementById('outCMYK').textContent='-';
+    return;
+  }
+  const hex=rgbToHex(rgb.r,rgb.g,rgb.b);
+  const hsl=rgbToHsl(rgb.r,rgb.g,rgb.b);
+  const hsv=rgbToHsv(rgb.r,rgb.g,rgb.b);
+  const cmyk=rgbToCmyk(rgb.r,rgb.g,rgb.b);
+  swatch.style.background=hex;
+  swHex.textContent=hex;
+  document.getElementById('outRGB').textContent='rgb('+rgb.r+','+rgb.g+','+rgb.b+')';
+  document.getElementById('outHEX').textContent=hex;
+  document.getElementById('outHSL').textContent='hsl('+hsl.h+','+hsl.s+'%,'+hsl.l+'%)';
+  document.getElementById('outHSV').textContent='hsv('+hsv.h+','+hsv.s+'%,'+hsv.v+'%)';
+  document.getElementById('out01').textContent=(rgb.r/255).toFixed(3)+','+(rgb.g/255).toFixed(3)+','+(rgb.b/255).toFixed(3);
+  document.getElementById('outCMYK').textContent=cmyk.c+','+cmyk.m+','+cmyk.y+','+cmyk.k;
+}
+
+// 모드 토글
+document.getElementById('modeRow').addEventListener('click',e=>{
+  const btn=e.target.closest('.mode-btn');
+  if(!btn) return;
+  mode=btn.dataset.mode;
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b===btn));
+  document.getElementById('valInput').placeholder={
+    rgb:'예: 255, 128, 0',hex:'예: 1E90FF  또는 #1E90FF',hsl:'예: 210, 100, 50',hsv:'예: 210, 100, 50'
+  }[mode];
+  update();
+});
+
+// 입력 감지
+document.getElementById('valInput').addEventListener('input',update);
+
+// 결과 클릭 복사
+document.querySelectorAll('.val').forEach(el=>{
+  el.addEventListener('click',()=>{
+    const t=el.textContent;
+    if(t==='-'||!t) return;
+    navigator.clipboard.writeText(t).then(()=>toast('복사: '+t)).catch(()=>toast('복사 실패'));
+  });
+});
+function toast(m){const t=document.createElement('div');t.className='copy-msg';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),1400);}
+
+// 기본값
+document.getElementById('valInput').value='64, 156, 255';
+update();
+</script>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Unit Converter</title>
+<style>
+:root { --bg:#0b0e16; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; --accent:#60a5fa; --good:#4ade80; --bad:#ef4444; }
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:32px}h1{font-size:28px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}.sub{color:var(--muted);font-size:14px;margin-bottom:32px}.converter{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;width:100%;max-width=800px}.category-select{width:100%;padding:12px;border:1px solid var(--border);border-radius:8x;background:var(--card2);color:var(--text);font-size:14x;margin-bottom:24px}.conversion-area{display:flex;flex-direction:column;gap:16px}.input-row{display:flex;gap:8px;margin-bottom:8px}.input-row input{flex:1;padding:10px;border:1px solid var(--border);border-radius:6x;background:var(--card2);color:var(--text);font-size:14x}.output-row{background:var(--card2);border:1px solid var(--border);border-radius:8x;padding:16px;margin-top:16px}.output-label{color:var(--muted);font-size:12x;margin-bottom:4x}.output-value{font-family:Consolas,Monaco,monospace;font-size:18x;color:var(--accent);word-break:break-all;min-height:3em}.copy-btn{background:var(--good);color:#0b0e16;border:none;padding:8px 16px;font-size:13px;border-radius:6x;cursor}.copy-btn:hover{opacity:.9}.category-btns{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}.category-btn{background:var(--card2);border:1px solid var(--border);padding:8px 12px;font-size:13px;color:var(--text);border-radius:6x;cursor}.category-btn.active{background:var(--accent);color:#0b0e16}.empty{color:var(--muted);text-align:center;padding:20px}.footer{margin-top:32px;color:var(--muted);font-size=12px;text-align:center}.link{color:var(--accent);text-decoration:none;font-weight=bold;font-size=13px}.link:hover{text-decoration:underline}</style>
+</head>
+<body>
+<h1>UNIT <span>CONVERTER</span></h1>
+<div class="sub">다양한 단위 간의 변환 계산</div>
+<div class="converter">
+  <div class="category-btns">
+    <button class="category-btn active" data-category="length">길이</button>
+    <button class="category-btn" data-category="weight">무게</button>
+    <button class="category-btn" data-category="temperature">온도</button>
+    <button class="category-btn" data-category="speed">속도</button>
+    <button class="category-btn" data-category="volume">부피</button>
+  </div>
+  <div class="conversion-area" id="conversionArea">
+    <div class="input-row">
+      <input type="number" id="inputValue" placeholder="변환할 값" step="any">
+      <select id="fromUnit" class="algo-select" style="width:150px"></select>
+      <select id="toUnit" class="algo-select" style="width:150px"></select>
+    </div>
+    <div class="output-row" id="outputRow">
+      <div class="output-label">결과</div>
+      <div class="output-value" id="outputValue">변환될 값이 여기에 표시됩니다</div>
+      <button class="copy-btn" onclick="copyResult()">복사</button>
+    </div>
+  </div>
+  <div class="empty" id="emptyState">변환할 카테고리를 선택하세요</div>
+</div>
+<div class="footer">Hermes Unit Converter | 길이/무게/온도 변환 | 계속 업데이트됨</div>
+
+<script>
+'use strict';
+// 단위 변환: 환산 계수(기준 단위 대비 배수)로 통일
+const CATS={
+  length:{mm:0.001,cm:0.01,m:1,km:1000,in:0.0254,ft:0.3048,yd:0.9144,mi:1609.344},
+  weight:{mg:0.000001,g:0.001,kg:1,oz:0.0283495,lb:0.453592,ton:1000},
+  area:{mm2:0.000001,cm2:0.0001,m2:1,ha:10000,km2:1000000,in2:0.00064516,ft2:0.092903,mile2:2589988},
+  volume:{ml:0.000001,l:0.001,m3:1,gal:0.00378541,qt:0.000946353,pt:0.000473176,cup:0.000236588,tsp:0.00000492892,tbsp:0.0000147868},
+  speed:{mps:1,kmh:0.277778,mph:0.44704,knot:0.514444,fts:0.3048},
+  temperature:{__conv:'temp'},
+  data:{b:1,kb:1024,mb:1048576,gb:1073741824,tb:1099511627776}
+};
+function convTemp(v,from,to){
+  // 기준: 섭씨
+  let c;
+  if(from==='c')c=v; else if(from==='f')c=(v-32)*5/9; else if(from==='k')c=v-273.15;
+  if(to==='c')return c; if(to==='f')return c*9/5+32; return c+273.15;
+}
+const UNIT_NAMES={length:'길이',weight:'무게',area:'면적',volume:'부피',speed:'속도',temperature:'온도',data:'데이터'};
+
+let curCat='length';
+function setUnits(cat){
+  curCat=cat;
+  const table=CATS[cat];
+  const isTemp=!!table.__conv;
+  const units=isTemp?['c','f','k']:Object.keys(table);
+  const from=document.getElementById('fromUnit'),to=document.getElementById('toUnit');
+  from.innerHTML='';to.innerHTML='';
+  units.forEach(u=>{const f=document.createElement('option');f.value=u;f.textContent=u;from.appendChild(f);const t=document.createElement('option');t.value=u;t.textContent=u;to.appendChild(t);});
+  // 다른 두 단위 기본값
+  if(units.length>1){from.value=units[0];to.value=units[1];}
+  convert();
+}
+function convert(){
+  const input=document.getElementById('inputValue').value;
+  const out=document.getElementById('outputValue');
+  const val=parseFloat(input);
+  if(isNaN(val)){out.textContent='유효한 숫자를 입력하세요';return;}
+  const from=document.getElementById('fromUnit').value;
+  const to=document.getElementById('toUnit').value;
+  if(from===to){out.textContent=input;return;}
+  let result;
+  if(CATS[curCat].__conv){result=convTemp(val,from,to);}
+  else{result=val*CATS[curCat][from]/CATS[curCat][to];}
+  // 표기 선택
+  let text;
+  if(Math.abs(result)>=100000||(Math.abs(result)<0.001&&result!==0))text=result.toExponential(6);
+  else text=Number(result.toPrecision(10)).toString();
+  out.textContent=text;
+  updateInfo(from,to,val,result);
+}
+function updateInfo(from,to,val,result){
+  const table=CATS[curCat],isTemp=!!table.__conv;
+  const fName=isTemp?({c:'섭씨',f:'화씨',k:'켈빈'}[from]):from;
+  const tName=isTemp?({c:'섭씨',f:'화씨',k:'켈빈'}[to]):to;
+  const info=document.getElementById('convInfo');
+  if(info)info.textContent=val+' '+fName+' = '+Number(result.toPrecision(10))+' '+tName;
+}
+function init(){
+  document.querySelectorAll('.category-btn').forEach(btn=>{
+    btn.onclick=()=>{
+      document.querySelectorAll('.category-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      setUnits(btn.dataset.category);
+    };
+  });
+  document.getElementById('inputValue').oninput=convert;
+  document.getElementById('fromUnit').onchange=convert;
+  document.getElementById('toUnit').onchange=convert;
+  document.getElementById('swapBtn').onclick=()=>{
+    const f=document.getElementById('fromUnit'),t=document.getElementById('toUnit');
+    const tmp=f.value;f.value=t.value;t.value=tmp;convert();
+  };
+  const first=document.querySelector('.category-btn.active');
+  if(first)setUnits(first.dataset.category);
+  else setUnits('length');
+}
+function copyResult(){
+  const out=document.getElementById('outputValue').textContent;
+  if(out&&out!=='유효한 숫자를 입력하세요'){
+    navigator.clipboard.writeText(out).then(()=>alert('복사 완료')).catch(()=>alert('복사 실패'));
+  }
+}
+init();
+</script>
+</body>
+</html>

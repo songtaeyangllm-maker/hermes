@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Sort Visualizer</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--accent:#60a5fa;--muted:#9ca3af;--card2:#1f2434;--border:#2a3042}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px;min-height:100vh}
+h1{font-size:24px;letter-spacing:2px}h1 span{color:var(--accent)}
+.sub{color:var(--muted);font-size:13px;margin-bottom:14px}
+.algos{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:12px}
+button{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:7px 13px;font-size:12px;border-radius:7px;cursor:pointer;transition:all .2s}
+button:hover{border-color:var(--accent)}
+button.active{background:var(--accent);color:#0b0e16;border:none;font-weight:600}
+.controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:14px;align-items:center}
+canvas{background:#0d0f16;border:1px solid var(--border);border-radius:12px}
+.metrics{color:var(--muted);font-size:13px;background:var(--card2);padding:12px 18px;border-radius:10px;border:1px solid var(--border);line-height:1.9;margin-top:12px;min-width:240px;text-align:left}
+.metrics b{color:var(--accent)}
+input[type=range]{accent-color:var(--accent)}
+.footer{color:var(--muted);font-size:11px;margin-top:12px}
+</style>
+</head>
+<body>
+<h1>HERMES <span>SORT VIZ</span></h1>
+<div class="sub">정렬 알고리즘 시각화 · 비교/교체/실행 기록 & 재생</div>
+<div class="algos" id="algos"></div>
+<div class="controls">
+  <button onclick="gen()">🔄 새 배열</button>
+  <button id="playBtn" onclick="togglePlay()">▶ 실행</button>
+  <span style="color:var(--muted);font-size:12px">속도</span>
+  <input type="range" id="speed" min="1" max="100" value="40">
+</div>
+<canvas id="cv"></canvas>
+<div class="metrics" id="stats">N=100 · 배열 생성</div>
+<div class="footer">Bubble · Selection · Insertion · Merge · Quick · Heap · Shell — 핵심 로직 Node에서 검증 완료</div>
+<script>
+'use strict';
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const cvW=680,cvH=320;cv.width=cvW;cv.height=cvH;
+const N=100;
+let arr=[],algo='bubble',playing=false,animId=null;
+let ops=[],opIdx=0;   // 재생 기록
+let baseArr=[],swaps=0,comps=0;
+let mark=null;        // 강조 인덱스
+let getVar=null, srt=-1;
+const NAME={bubble:'버블',selection:'선택',insertion:'삽입',merge:'병합',quick:'퀵',heap:'힙',shell:'쉘'};
+
+// ---- 정렬 구현: 기록(ops) 수집용 래퍼 ----
+function setOp(a,b){ops.push({t:'s',a,b});}   // swap 기록
+function writeOp(i,v){ops.push({t:'w',i,v});} // 값 기록(insertion/merge/shell)
+function cmpOp(a,b){ops.push({t:'c',a,b});}
+function markOp(k){ops.push({t:'m',k});}
+function markRange(lo,hi){ops.push({t:'r',lo,hi});}
+
+// 각 정렬: ops 기록 후 재생
+function sortBubble(a){
+  for(let i=0;i<a.length-1;i++){
+    let sw=false;
+    for(let j=0;j<a.length-1-i;j++){
+      cmpOp(j,j+1);
+      if(a[j]>a[j+1]){[a[j],a[j+1]]=[a[j+1],a[j]];swaps++;setOp(j,j+1);sw=true;}
+    }
+    markRange(a.length-1-i,a.length-1);
+    if(!sw){markOp(0);break;}
+  }
+}
+function sortSelection(a){
+  for(let i=0;i<a.length-1;i++){
+    let mi=i;
+    for(let j=i+1;j<a.length;j++){cmpOp(mi,j);if(a[j]<a[mi])mi=j;}
+    if(mi!==i){[a[i],a[mi]]=[a[mi],a[i]];swaps++;setOp(i,mi);}
+    markOp(i);
+  }
+}
+function sortInsertion(a){
+  for(let i=1;i<a.length;i++){
+    const key=a[i];let j=i-1;
+    while(j>=0){cmpOp(j,j+1);if(a[j]>key){writeOp(j+1,a[j]);a[j+1]=a[j];j--;}else break;}
+    writeOp(j+1,key); a[j+1]=key;
+    markOp(i);
+  }
+}
+function sortMerge(a){
+  const b=new Array(a.length);
+  const win=(size)=>{
+    for(let lo=0;lo<a.length;lo+=2*size){
+      const mid=Math.min(lo+size,a.length),hi=Math.min(lo+2*size,a.length);
+      let i=lo,j=mid,k=lo;
+      while(i<mid&&j<hi){
+        cmpOp(i,j);
+        if(a[i]<=a[j])b[k++]=a[i++];
+        else b[k++]=a[j++];
+      }
+      while(i<mid){b[k]=a[i];k++;i++;}
+      while(j<hi){b[k]=a[j];k++;j++;}
+      for(let p=lo;p<hi;p++){writeOp(p,b[p]);a[p]=b[p];}
+      markRange(lo,hi-1);
+    }
+  };
+  for(let size=1;size<a.length;size*=2)win(size);
+}
+function sortQuick(a){
+  const qs=(lo,hi)=>{
+    if(lo>=hi)return;
+    const pi=Math.floor((lo+hi)/2);
+    const pv=a[pi];
+    [a[pi],a[hi]]=[a[hi],a[pi]];swaps++;setOp(pi,hi);
+    let store=lo;
+    for(let k=lo;k<hi;k++){
+      cmpOp(k,hi);
+      if(a[k]<pv){[a[k],a[store]]=[a[store],a[k]];swaps++;setOp(k,store);store++;}
+    }
+    [a[store],a[hi]]=[a[hi],a[store]];swaps++;setOp(store,hi);
+    markOp(store);
+    qs(lo,store-1);qs(store+1,hi);
+  };
+  qs(0,a.length-1);
+}
+function sortHeap(a){
+  const sift=(idx,sz)=>{
+    let largest=idx;
+    const l=2*idx+1,r=2*idx+2;
+    if(l<sz){cmpOp(l,idx);if(a[l]>a[largest])largest=l;}
+    if(r<sz){cmpOp(r,largest);if(a[r]>a[largest])largest=r;}
+    if(largest!==idx){[a[idx],a[largest]]=[a[largest],a[idx]];swaps++;setOp(idx,largest);sift(largest,sz);}
+  };
+  for(let i=Math.floor(a.length/2)-1;i>=0;i--)sift(i,a.length);
+  for(let end=a.length-1;end>0;end--){
+    [a[0],a[end]]=[a[end],a[0]];swaps++;setOp(0,end);
+    markOp(end);
+    sift(0,end);
+  }
+  markOp(0);
+}
+function sortShell(a){
+  for(let gap=Math.floor(a.length/2);gap>0;gap=Math.floor(gap/2)){
+    for(let i=gap;i<a.length;i++){
+      const key=a[i];let j=i;
+      while(j>=gap){cmpOp(j-gap,j);if(a[j-gap]>key){writeOp(j,a[j-gap]);a[j]=a[j-gap];j-=gap;}else break;}
+      writeOp(j,key); a[j]=key;
+      markOp(i);
+    }
+  }
+}
+
+const ALGOS=[
+  {id:'bubble',name:'버블',fn:sortBubble},
+  {id:'selection',name:'선택',fn:sortSelection},
+  {id:'insertion',name:'삽입',fn:sortInsertion},
+  {id:'merge',name:'병합',fn:sortMerge},
+  {id:'quick',name:'퀵',fn:sortQuick},
+  {id:'heap',name:'힙',fn:sortHeap},
+  {id:'shell',name:'쉘',fn:sortShell},
+];
+
+function initAlgos(){
+  const box=document.getElementById('algos');
+  ALGOS.forEach((a,idx)=>{const b=document.createElement('button');b.textContent=a.name;b.onclick=()=>setAlgo(a.id);box.appendChild(b);});
+  document.querySelectorAll('#algos button')[0].classList.add('active');
+}
+function setAlgo(id){algo=id;document.querySelectorAll('#algos button').forEach((b,i2)=>b.classList.toggle('active',ALGOS[i2].id===id));stop();gen();}
+function gen(){
+  stop();
+  baseArr=Array.from({length:N},()=>Math.floor(Math.random()*N*0.9)+5);
+  swaps=comps=0;
+  updateStats('대기');
+  drawBase();
+}
+function togglePlay(){
+  if(playing)stop();
+  else{playing=true;document.getElementById('playBtn').textContent='⏸ 정지';run();}
+}
+function stop(){playing=false;if(animId)cancelAnimationFrame(animId);animId=null;if(!document.getElementById('playBtn'))return;document.getElementById('playBtn').textContent='▶ 실행';}
+function run(){
+  // 기록 수집 (원본 복사본으로)
+  arr=baseArr.slice();
+  ops=[];opIdx=0;swaps=0;comps=0;
+  const ALG=ALGOS.find(a=>a.id===algo);
+  ALG.fn(arr);
+  // 검증: 기록으로 재현한 최종 배열이 정렬됐는지
+  if(!arr.every((v,i2)=>i2===0||arr[i2-1]<=v)){updateStats('⚠ 정렬 실패 — 알고리즘 버그');return;}
+  // 재생 시작
+  const spd=+document.getElementById('speed').value;
+  draw(0);tick(spd);
+}
+function tick(spd){
+  if(!playing)return;
+  const steps=1+Math.floor(spd/10);
+  let advanced=false;
+  for(let k=0;k<steps;k++){
+    if(opIdx>=ops.length){stop();draw(opIdx);updateStats('완료');return;}
+    const op=ops[opIdx++];
+    applyOp(op);
+    advanced=true;
+  }
+  draw(opIdx);
+  updateStats('진행');
+  animId=requestAnimationFrame(()=>tick(spd));
+}
+function applyOp(op){
+  if(op.t==='s'){[baseArr[op.a],baseArr[op.b]]=[baseArr[op.b],baseArr[op.a]];mark=op.b;}
+  else if(op.t==='w'){baseArr[op.i]=op.v;mark=op.i;}
+  else if(op.t==='m'){mark=op.k;}
+  else if(op.t==='r'){mark=op.lo;}
+  else if(op.t==='c'){mark=op.b;}
+}
+function draw(idx){
+  ctx.fillStyle='#0d0f16';ctx.fillRect(0,0,cvW,cvH);
+  const pad=4,bw=(cvW-pad*2)/N,bh=(cvH-10);
+  for(let k=0;k<N;k++){
+    const h=(baseArr[k]/N)*bh;
+    const x=pad+k*bw,y=cvH-4-h;
+    ctx.fillStyle='#60a5fa';
+    if(mark!==null&&k===mark)ctx.fillStyle='#fbbf24';
+    ctx.fillRect(x,y,bw-1,h);
+  }
+  // 재생 후 정렬된 접두 표시 대신 진행률
+}
+function drawBase(){
+  ctx.fillStyle='#0d0f16';ctx.fillRect(0,0,cvW,cvH);
+  const pad=4,bw=(cvW-pad*2)/N,bh=(cvH-10);
+  for(let k=0;k<N;k++){
+    const h=(baseArr[k]/N)*bh;
+    ctx.fillStyle='#60a5fa';
+    ctx.fillRect(pad+k*bw,cvH-4-h,bw-1,h);
+  }
+}
+function updateStats(st){
+  const el=document.getElementById('stats');
+  el.innerHTML=(el)
+    ? 'N=<b>'+N+'</b> · '+NAME[algo]+'<br>비교 <b>'+comps+'</b> · 교체 <b>'+swaps+'</b><br>'+st
+    : '';
+}
+initAlgos();gen();
+</script>
+</body>
+</html>

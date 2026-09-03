@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Flappy Bird</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px}h1{font-size:28px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}.sub{color:var(--muted);font-size:14px;margin-bottom:24px}#gameCanvas{background:linear-gradient(180deg,#87ceeb 0%,#e0f6ff 100%);border:2px solid var(--border);border-radius:8px}#ui{margin-top:16px;display:flex;justify-content:center;gap:24px;font-size:18px}.btn{background:var(--accent);color:#0b0e16;border:none;padding:10px 20px;font-size:14px;border-radius:6px;cursor:pointer;margin-top:16px}.btn:hover{opacity:.9}.footer{margin-top:32px;color:var(--muted);font-size:12px;text-align:center}.link{color:var(--accent);text-decoration:none;font-weight:bold;font-size:13px}.link:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<h1>FLAPPY <span>BIRD</span></h1>
+<div class="sub">스페이스바/클릭/터치로 점프 — 파이프를 통과하세요</div>
+<canvas id="gameCanvas" width="400" height="600"></canvas>
+<div id="ui">
+  <div>점수: <span id="score">0</span></div>
+  <div>최고: <span id="best">0</span></div>
+</div>
+<button class="btn" id="restartBtn" style="display:none" onclick="restart()">재시작</button>
+<div class="footer">Hermes Flappy Bird | 계속 업데이트됨</div>
+
+<script>
+const canvas=document.getElementById('gameCanvas');const ctx=canvas.getContext('2d');
+const W=400,H=600;
+let bird={x:80,y:H/2,v:0,r:12,color:'#fbbf24'},gravity=0.5,jumpSpeed=-9;
+let pipes=[],pipeGap=160,pipeW=60,frame=0,score=0,best=localStorage.getItem('flappyBest')||0;
+document.getElementById('best').textContent=best;
+
+function reset(){bird.y=H/2;bird.v=0;pipes=[];frame=0;score=0;document.getElementById('score').textContent=0;document.getElementById('restartBtn').style.display='none';loop()}
+function spawnPipe(){const topH=Math.random()*(H-pipeGap-100)+50;pipes.push({x:W,topH,bottomY:topH+pipeGap,passed:false})}
+function drawBird(){ctx.save();ctx.translate(bird.x,bird.y);ctx.rotate(bird.v*0.08);ctx.beginPath();ctx.arc(0,0,bird.r,0,Math.PI*2);ctx.fillStyle=bird.color;ctx.fill();ctx.beginPath();ctx.arc(bird.r/2,-bird.r/3,bird.r/4,0,Math.PI*2);ctx.fillStyle='#000';ctx.fill();ctx.restore()}
+function drawPipes(){ctx.fillStyle='#22c55e';pipes.forEach(p=>{ctx.fillRect(p.x,0,pipeW,p.topH);ctx.fillRect(p.x,p.bottomY,pipeW,H-p.bottomY);ctx.strokeStyle='#16a34a';ctx.lineWidth=2;ctx.strokeRect(p.x,0,pipeW,p.topH);ctx.strokeRect(p.x,p.bottomY,pipeW,H-p.bottomY)})}
+function update(){bird.v+=gravity;bird.y+=bird.v;if(frame%100===0)spawnPipe();pipes.forEach(p=>{p.x-=3;if(!p.passed&&p.x+pipeW<bird.x){p.passed=true;score++;document.getElementById('score').textContent=score}});pipes=pipes.filter(p=>p.x+pipeW>0);if(bird.y-bird.r<0||bird.y+bird.r>H)gameOver();pipes.forEach(p=>{if(bird.x+bird.r>p.x&&bird.x-bird.r<p.x+pipeW){if(bird.y-bird.r<p.topH||bird.y+bird.r>p.bottomY)gameOver()}});frame++}
+function gameOver(){if(score>best){best=score;localStorage.setItem('flappyBest',best);document.getElementById('best').textContent=best}document.getElementById('restartBtn').style.display='block';cancelAnimationFrame(animId)}
+function loop(){update();draw();animId=requestAnimationFrame(loop)}
+function draw(){ctx.clearRect(0,0,W,H);drawPipes();drawBird();ctx.fillStyle='rgba(0,0,0,0.1)';ctx.fillRect(0,0,W,H)}
+function jump(){bird.v=jumpSpeed}
+window.addEventListener('keydown',e=>{if(e.code==='Space')jump()});canvas.addEventListener('click',jump);canvas.addEventListener('touchstart',jump);document.getElementById('restartBtn').onclick=reset;
+let animId;reset();
+</script>
+</body>
+</html>

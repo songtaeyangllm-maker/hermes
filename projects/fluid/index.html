@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Fluid Simulation</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--muted:#6b7686;--card:#121826;--border:#1e2840;--accent:#60a5fa;--good:#4ade80;--bad:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px}h1{font-size:28px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}.sub{color:var(--muted);font-size:14px;margin-bottom:24px}#gameCanvas{border:2px solid var(--border);border-radius:8px}#ui{margin-top:16px;display:flex;justify-content:center;gap:24px;flex-wrap:wrap}.control{background:var(--card);border:1px solid var(--border);padding:12px 20px;border-radius:8px;display:flex;gap:8px;align-items:center}.control label{color:var(--muted);font-size:13px}.control input[type="range"]{width:120px}.footer{margin-top:32px;color:var(--muted);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<h1>FLUID <span>SIMULATION</span></h1>
+<div class="sub">Navier-Stokes 기반 유체 시뮬레이션 — 마우스로 유체 추가</div>
+<canvas id="gameCanvas" width="600" height="400"></canvas>
+<div id="ui">
+  <div class="control"><label>밀도:</label><input type="range" id="density" min="0" max="200" value="100"></div>
+  <div class="control"><label>속도:</label><input type="range" id="velocity" min="0" max="50" value="10"></div>
+  <div class="control"><label>확산:</label><input type="range" id="diffusion" min="0" max="5" value="1"></div>
+  <div class="control"><label>점성:</label><input type="range" id="viscosity" min="0" max="5" value="1"></div>
+  <div class="control"><label>색상:</label><input type="color" id="color" value="#60a5fa"></div>
+</div>
+<div class="footer">Hermes Fluid Simulation | Navier-Stokes (Jos Stam's stable fluids) | 계속 업데이트됨</div>
+
+<script>
+const canvas=document.getElementById('gameCanvas');const ctx=canvas.getContext('2d');
+const W=600,H=400,N=60;const size=W/N;
+let dens=[],dens_prev=[],vel_x=[],vel_y=[],vel_x_prev=[],vel_y_prev=[];
+for(let i=0;i<N*N;i++){dens[i]=dens_prev[i]=vel_x[i]=vel_y[i]=vel_x_prev[i]=vel_y_prev[i]=0}
+let mouse={x:0,y:0,down:false,px:0,py:0};
+
+function IX(x,y){x=Math.max(0,Math.min(N-1,x));y=Math.max(0,Math.min(N-1,y));return x+y*N}
+function add_source(x,s,dt){for(let i=0;i<N*N;i++)x[i]+=dt*s[i]}
+function set_bnd(b,x){
+  for(let i=1;i<N-1;i++){
+    x[IX(0,i)]=b==1?-x[IX(1,i)]:x[IX(1,i)];
+    x[IX(N-1,i)]=b==1?-x[IX(N-2,i)]:x[IX(N-2,i)];
+    x[IX(i,0)]=b==2?-x[IX(i,1)]:x[IX(i,1)];
+    x[IX(i,N-1)]=b==2?-x[IX(i,N-2)]:x[IX(i,N-2)];
+  }
+  x[IX(0,0)]=0.5*(x[IX(1,0)]+x[IX(0,1)]);
+  x[IX(0,N-1)]=0.5*(x[IX(1,N-1)]+x[IX(0,N-2)]);
+  x[IX(N-1,0)]=0.5*(x[IX(N-2,0)]+x[IX(N-1,1)]);
+  x[IX(N-1,N-1)]=0.5*(x[IX(N-2,N-1)]+x[IX(N-1,N-2)]);
+}
+function lin_solve(b,x,x0,a,c){
+  const cRecip=1/c;for(let k=0;k<20;k++){
+    for(let j=1;j<N-1;j++){for(let i=1;i<N-1;i++){x[IX(i,j)]=(x0[IX(i,j)]+a*(x[IX(i+1,j)]+x[IX(i-1,j)]+x[IX(i,j+1)]+x[IX(i,j-1)]))*cRecip}}
+    set_bnd(b,x)
+  }
+}
+function diffuse(b,x,x0,diff,dt){const a=dt*diff*(N-2)*(N-2);lin_solve(b,x,x0,a,1+6*a)}
+function project(vel_x,vel_y,p,div){
+  for(let j=1;j<N-1;j++){for(let i=1;i<N-1;i++){
+    div[IX(i,j)]=-(vel_x[IX(i+1,j)]-vel_x[IX(i-1,j)]+vel_y[IX(i,j+1)]-vel_y[IX(i,j-1)])/N;
+    p[IX(i,j)]=0
+  }}
+  set_bnd(0,div);set_bnd(0,p);lin_solve(0,p,div,1,6);
+  for(let j=1;j<N-1;j++){for(let i=1;i<N-1;i++){
+    vel_x[IX(i,j)]-=0.5*N*(p[IX(i+1,j)]-p[IX(i-1,j)]);
+    vel_y[IX(i,j)]-=0.5*N*(p[IX(i,j+1)]-p[IX(i,j-1)]);
+  }}
+  set_bnd(1,vel_x);set_bnd(2,vel_y);
+}
+function advect(b,d,d0,vel_x,vel_y,dt){
+  const dt0=dt*(N-2);for(let j=1;j<N-1;j++){for(let i=1;i<N-1;i++){
+    let x=i-dt0*vel_x[IX(i,j)],y=j-dt0*vel_y[IX(i,j)];
+    if(x<0.5)x=0.5;if(x>N-1.5)x=N-1.5;if(y<0.5)y=0.5;if(y>N-1.5)y=N-1.5;
+    const i0=Math.floor(x),i1=i0+1,j0=Math.floor(y),j1=j0+1;
+    const s1=x-i0,s0=1-s1,t1=y-j0,t0=1-t1;
+    d[IX(i,j)]=s0*(t0*d0[IX(i0,j0)]+t1*d0[IX(i0,j1)])+s1*(t0*d0[IX(i1,j0)]+t1*d0[IX(i1,j1)]);
+  }}set_bnd(b,d);
+}
+function step(dens,vel_x,vel_y,vel_x_prev,vel_y_prev,visc,diff,dt){
+  diffuse(1,vel_x_prev,vel_x,visc,dt);diffuse(2,vel_y_prev,vel_y,visc,dt);
+  project(vel_x_prev,vel_y_prev,vel_x,vel_y);
+  advect(1,vel_x,vel_x_prev,vel_x_prev,vel_y_prev,dt);advect(2,vel_y,vel_y_prev,vel_x_prev,vel_y_prev,dt);
+  project(vel_x,vel_y,vel_x_prev,vel_y_prev);
+  diffuse(0,dens_prev,dens,diff,dt);advect(0,dens,dens_prev,vel_x,vel_y,dt);
+}
+function add_density(x,y,amount){dens[IX(Math.floor(x/size),Math.floor(y/size))]+=amount}
+function add_velocity(x,y,amountX,amountY){vel_x[IX(Math.floor(x/size),Math.floor(y/size))]+=amountX;vel_y[IX(Math.floor(x/size),Math.floor(y/size))]+=amountY}
+
+function update(){
+  const diff=parseFloat(document.getElementById('diffusion').value)*0.001;
+  const visc=parseFloat(document.getElementById('viscosity').value)*0.001;
+  const dt=0.1;
+  step(dens,vel_x,vel_y,vel_x_prev,vel_y_prev,visc,diff,dt);
+  if(mouse.down){
+    const dx=mouse.x-mouse.px,dy=mouse.y-mouse.py;
+    add_density(mouse.x,mouse.y,parseFloat(document.getElementById('density').value));
+    add_velocity(mouse.x,mouse.y,dx*parseFloat(document.getElementById('velocity').value)*0.1,dy*parseFloat(document.getElementById('velocity').value)*0.1);
+    mouse.px=mouse.x;mouse.py=mouse.y;
+  }
+}
+function draw(){ctx.clearRect(0,0,W,H);
+  const color=document.getElementById('color').value;
+  const r=parseInt(color.slice(1,3),16),g=parseInt(color.slice(3,5),16),b=parseInt(color.slice(5,7),16);
+  for(let i=0;i<N;i++){for(let j=0;j<N;j++){
+    const d=Math.min(1,dens[IX(i,j)]/100);
+    if(d>0.01){ctx.fillStyle=`rgba(${r},${g},${b},${d})`;ctx.fillRect(i*size,j*size,size,size)}
+  }}
+}
+function loop(){update();draw();requestAnimationFrame(loop)}
+
+canvas.addEventListener('mousedown',e=>{mouse.down=true;mouse.x=e.offsetX;mouse.y=e.offsetY;mouse.px=mouse.x;mouse.py=mouse.y});
+canvas.addEventListener('mousemove',e=>{mouse.x=e.offsetX;mouse.y=e.offsetY});
+canvas.addEventListener('mouseup',()=>mouse.down=false);
+canvas.addEventListener('mouseleave',()=>mouse.down=false);
+canvas.addEventListener('touchstart',e=>{const t=e.touches[0];mouse.down=true;mouse.x=t.clientX-canvas.offsetLeft;mouse.y=t.clientY-canvas.offsetTop;mouse.px=mouse.x;mouse.py=mouse.y;e.preventDefault()},{passive:false});
+canvas.addEventListener('touchmove',e=>{const t=e.touches[0];mouse.x=t.clientX-canvas.offsetLeft;mouse.y=t.clientY-canvas.offsetTop;e.preventDefault()},{passive:false});
+canvas.addEventListener('touchend',()=>mouse.down=false);
+loop();
+</script>
+</body>
+</html>

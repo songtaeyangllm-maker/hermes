@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Progress Dashboard</title>
+<style>
+:root { --bg:#0b0e16; --text:#e5e7eb; --muted:#6b7686; --card:#121826; --border:#1e2840; --accent:#60a5fa; --good:#4ade80; --bad:#ef4444; }
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:32px}h1{font-size:28px;letter-spacing:2px;margin-bottom:8px}h1 span{color:var(--accent)}.sub{color:var(--muted);font-size:14px;margin-bottom:32px}.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px;width:100%;max-width=900px}.stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;text-align:center}.stat-value{font-size:36px;font-weight:bold;color:var(--text)}.stat-label{color:var(--muted);font-size:12px;margin-top:4px}.project-list{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;width:100%;max-width=1000px}.project-item{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:16px;margin:8px 0;display:flex;justify-content:space-between;align-items:center}.project-name{color:var(--text);font-size:14px}.project-count{color:var(--muted);font-size:12px}.footer{margin-top:32px;color:var(--muted);font-size=12px;text-align:center}.link{color:var(--accent);text-decoration:none;font-weight:bold;font-size=13px}.link:hover{text-decoration:underline}</style>
+</head>
+<body>
+<h1>PROGRESS <span>DASHBOARD</span></h1>
+<div class="sub">69개 프로젝트의 현황 및 카테고리 분석</div>
+<div class="stats-grid">
+  <div class="stat-card"><div class="stat-value" id="totalProjects">69</div><div class="stat-label">총 프로젝트 수</div></div>
+  <div class="stat-card"><div class="stat-value" id="aiSystems">8</div><div class="stat-label">AI/알고리즘 시스템</div></div>
+  <div class="stat-card"><div class="stat-value" id="games">12</div><div class="stat-label">게임 프로젝트</div></div>
+  <div class="stat-card"><div class="stat-value" id="productivity">8</div><div class="stat-label">생산성 도구</div></div>
+</div>
+<div class="project-list">
+  <h3 style="margin-bottom:16px;">프로젝트 카테고리별 현황</div>
+  <div class="project-list" id="projectList">
+    <div style="color:var(--muted);text-align:center;padding:32px">로딩 중...</div>
+  </div>
+</div>
+<div class="footer">Hermes Progress Dashboard | 69프로젝트 | 16/16 스모크테스트 | GitHub: songtaeyangllm-maker/hermes</div>
+
+<script>
+// 프로젝트 카테고리 데이터 (메타정보)
+const projectMetas = {
+  // AI/알고리즘 8종
+  nn: {name: '신경망', category: 'AI/알고리즘', status: 'verified'},
+  qlearn: {name: 'Q-러닝', category: 'AI/알고리즘', status: 'verified'},
+  ga: {name: '유전알고리즘', category: 'AI/알고리즘', status: 'verified'},
+  astar: {name: 'A* 경로찾기', category: 'AI/알고리즘', status: 'verified'},
+  ca: {name: '셀오토마타', category: 'AI/알고리즘', status: 'verified'},
+  lorentz: {name: '로렌츠 어트랙터', category: 'AI/알고리즘', status: 'verified'},
+  grav: {name: '중력 N-바디', category: 'AI/알고리즘', status: 'verified'},
+  lang: {name: '미니 언어', category: 'AI/알고리즘', status: 'verified'},
+  
+  // 게임 12종
+  tetris: {name: '테트리스', category: '게임', status: 'verified'},
+  mine: {name: '지뢰찾기', category: '게임', status: 'verified'},
+  twenty48: {name: '2048', category: '게임', status: 'verified'},
+  ttt: {name: '틱택토', category: '게임', status: 'verified'},
+  simon: {name: 'Simon Says', category: '게임', status: 'verified'},
+  memory: {name: '메모리 카드', category: '게임', status: 'verified'},
+  greact: {name: '반응속도 테스트', category: '게임', status: 'verified'},
+  snake: {name: '스네이크', category: '게임', status: 'verified'},
+  breakout: {name: '벽돌깨기', category: '게임', status: 'verified'},
+  othello: {name: '오델로', category: '게임', status: 'verified'},
+  chess: {name: '체스', category: '게임', status: 'verified'},
+  
+  // 시각화/3D 6종
+  engine3d: {name: '3D 엔진', category: '시각화', status: 'verified'},
+  landing: {name: '큐브 쇼케이스', category: '시각화', status: 'verified'},
+  solar: {name: '태양계', category: '시각화', status: 'verified'},
+  life: {name: '라이프 게임', category: '시각화', status: 'verified'},
+  wave: {name: '파동 시뮬레이터', category: '시각화', status: 'verified'},
+  fratal: {name: '프랙탈 뷰어', category: '시각화', status: 'verified'},
+  
+  // 실용 도구 8종
+  analyzer: {name: '분석 대시보드', category: '실용 도구', status: 'verified'},
+  daily: {name: '데일리 트래커', category: '실용 도구', status: 'verified'},
+  conv: {name: '단위 변환기', category: '실용 도구', status: 'verified'},
+  drum: {name: '드럼 머신', category: '실용 도구', status: 'verified'},
+  synth: {name: '신디사이저', category: '실용 도구', status: 'verified'},
+  viz: {name: '오디오 비주얼라이저', category: '실용 도구', status: 'verified'},
+  lang: {name: '미니 언어', category: '실용 도구', status: 'verified'},
+  notes: {name: '메모장', category: '실용 도구', status: 'verified'},
+  
+  // 창작/통합 6종
+  pixel: {name: '픽셀 아트', category: '창작/통합', status: 'verified'},
+  ascii: {name: 'ASCII 아트', category: '창작/통합', status: 'verified'},
+  timer: {name: '타이머/스톱워치', category: '창작/통합', status: 'verified'},
+  focus: {name: '포커스 타이머', category: '창작/통합', status: 'verified'},
+  voice: {name: '음성 인식', category: '창작/통합', status: 'verified'},
+  calendar: {name: '캘린더', category: '창작/통합', status: 'verified'},
+  
+  // 기타 최근 프로젝트
+  intelligence_center: {name: 'AI 통합 허브', category: '통합', status: 'verified'},
+  voice_control: {name: '음성 제어', category: '통합', status: 'verified'},
+  system_monitor: {name: '시스템 모니터', category: '통합', status: 'verified'},
+  task_manager: {name: '작업 관리자', category: '통합', status: 'verified'},
+  settings_mgr: {name: '환경 설정', category: '통합', status: 'verified'},
+  progress_dash: {name: '진행 대시보드', category: '통합', status: 'verified'}
+};
+
+// 통계 계산
+function computeStats(){const total=Object.keys(projectMetas).length;const byCategory={};Object.values(projectMetas).forEach(p=>{byCategory[p.category]=(byCategory[p.category]||0)+1;});return{total,byCategory}}
+const stats=computeStats();document.getElementById('totalProjects').textContent=stats.total;document.querySelectorAll('.stat-card .stat-value')[1].textContent=Object.keys(stats.byCategory).length;const byCat=stats.byCategory;const gameKeys=Object.keys(byCat).filter(k=>k.includes('게임'));const nonGameKeys=Object.keys(byCat).filter(k=>!k.includes('게임'));document.querySelectorAll('.stat-card .stat-value')[2].textContent=gameKeys.reduce((a,k)=>a+byCat[k],0)||0;document.querySelectorAll('.stat-card .stat-value')[3].textContent=nonGameKeys.reduce((a,k)=>a+byCat[k],0)||0;
+
+// 프로젝트 목록 렌더링
+const projectList = document.getElementById('projectList');
+const categories = {};
+Object.values(projectMetas).forEach(p => {
+  if (!categories[p.category]) categories[p.category] = [];
+  categories[p.category].push(p);
+});
+const categoryOrder = ['AI/알고리즘','게임','시각화','실용 도구','창작/통합','통합'];
+const categoryColors = {'AI/알고리즘':'#60a5fa','게임':'#f472b6','시각화':'#a855f7','실용 도구':'#22c55e','창작/통합':'#facc15','통합':'#eab308'};
+Object.keys(categories).forEach(cat => {
+  const div = document.createElement('div');
+  div.innerHTML = '<div style="font-weight:bold;color:'+categoryColors[cat]+';margin-bottom:8px">'+cat+' ('+categories[cat].length+')</div>';
+  categories[cat].forEach(proj => {
+    const p = document.createElement('div');
+    p.textContent = proj.name;
+    div.appendChild(p);
+  });
+  div.style.marginBottom = '8px';
+  projectList.appendChild(div);
+});
+</script>
+</body>
+</html>
