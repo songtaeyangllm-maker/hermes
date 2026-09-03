@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Monte Carlo</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--accent:#60a5fa;--muted:#9ca3af;--card2:#1f2434;--border:#2a3042;--green:#22c55e;--yellow:#fbbf24;--pink:#f472b6}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px;min-height:100vh}
+h1{font-size:24px;letter-spacing:2px}h1 span{color:var(--accent)}
+.sub{color:var(--muted);font-size:13px;margin-bottom:14px}
+.controls{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;justify-content:center;align-items:center}
+button{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:7px 13px;font-size:12px;border-radius:7px;cursor:pointer;transition:all .2s}
+button:hover{border-color:var(--accent)}
+button.acc{background:var(--accent);color:#0b0e16;border:none;font-weight:600}
+canvas{background:#0d0f16;border:1px solid var(--border);border-radius:12px}
+.metrics{color:var(--muted);font-size:13px;background:var(--card2);padding:12px 18px;border-radius:10px;border:1px solid var(--border);margin-top:12px;text-align:center;min-width:340px}
+.metrics b{color:var(--text)}
+select{background:var(--card2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px}
+</style>
+</head>
+<body>
+<h1>HERMES <span>MONTE CARLO</span></h1>
+<div class="sub">대수의 법칙 · π 추정 · 주사위 분포</div>
+<div class="controls">
+  <button class="acc" onclick="mode='pi';resetMC()">🎯 π 추정</button>
+  <button class="acc" onclick="mode='dice';resetMC()">🎲 주사위</button>
+  <button class="acc" onclick="mode='coins';resetMC()">🪙 동전</button>
+  <button onclick="step100()">⚡ +100</button>
+  <button onclick="stepAll()">⚡⚡ +5000</button>
+  <button onclick="resetMC()" style="background:var(--pink);color:#fff;border:none">⟳ 리셋</button>
+</div>
+<canvas id="cv" style="width:680px;height:360px"></canvas>
+<div class="metrics" id="stats"></div>
+<script>
+'use strict';
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const W=680,H=360;cv.width=W;cv.height=H;
+let mode='pi';
+let points=[],inside=0,total=0;
+
+function rand(){return Math.random();}
+function resetMC(){
+  points=[];inside=0;total=0;
+  if(mode==='pi'){primeMC();}
+  draw();
+}
+// 사전 생성: 다트 미리
+let preDarts=[],maxDraw=0;
+function primeMC(){
+  preDarts=[];maxDraw=0;
+}
+function dartOne(){
+  if(mode==='pi'){const x=rand(),y=rand();points.push([x,y]);if(x*x+y*y<=1)inside++;total++;}
+  else if(mode==='dice'){
+    const v=1+Math.floor(rand()*6);points.push([v-1,1]);total++;
+    if(v===6)inside++;
+  }
+  else{ // coins - 앞면 횟수, 10개 던지기
+    const h=(Math.random()+Math.random()+Math.random()+Math.random()+Math.random()+Math.random()+Math.random()+Math.random()+Math.random()+Math.random()>=5)?1:0;
+    points.push([h,1]);total++; if(h)inside++;
+  }
+}
+function step100(){for(let i=0;i<100;i++)dartOne();draw();}
+function stepAll(){for(let i=0;i<5000;i++)dartOne();draw();}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#0d0f16';ctx.fillRect(0,0,W,H);
+  if(mode==='pi'&&total<20000){
+    // 사분원
+    ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(0,0,1,0,Math.PI/2);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(0,1);ctx.lineTo(0,0);ctx.lineTo(1,0);ctx.stroke();
+    const mc=Math.floor(Math.sqrt(total))+1;
+    for(const [x,y] of points){
+      // 점을 그리되 최근 것만 (성능)
+      ctx.fillStyle=(x*x+y*y<=1)?'rgba(34,197,94,0.6)':'rgba(244,114,182,0.6)';
+      ctx.fillRect(x*W-W*0.06,y*H-H*0.06,1.4,1.4);
+    }
+  }else if(mode==='pi'){
+    // 이미 충분 — π 근사 및 분포
+    ctx.font='24px monospace';ctx.fillStyle='#60a5fa';ctx.textAlign='center';
+    ctx.fillText('π ≈ '+piVal().toFixed(6),W/2,H/2);
+    ctx.font='13px sans-serif';ctx.fillStyle='#9ca3af';
+    ctx.fillText('(실제 π = 3.14159265...)',W/2,H/2+26);
+  }else if(mode==='dice'){
+    // 주사위 히스토그램
+    const hist=[0,0,0,0,0,0];
+    for(const [v] of points)hist[v]++;
+    const maxH=Math.max(1,...hist);
+    for(let i=0;i<6;i++){
+      const bh=hist[i]/maxH*(H-90);
+      ctx.fillStyle='#60a5fa';
+      ctx.fillRect(40+i*(W-80)/6+8,H-40-bh,(W-80)/6-16,bh);
+      ctx.fillStyle='#9ca3af';ctx.font='12px sans-serif';ctx.textAlign='center';
+      ctx.fillText(i+1,40+i*(W-80)/6+(W-80)/12,H-26);
+      ctx.fillText(hist[i],40+i*(W-80)/6+(W-80)/12,H-40-bh-8);
+    }
+    // 기대 균등 (1/6)
+    ctx.strokeStyle='rgba(251,191,36,0.5)';ctx.setLineDash([5,4]);ctx.lineWidth=1.5;
+    const ey=H-40-(total/6)/(maxH)*(H-90);
+    ctx.beginPath();ctx.moveTo(40,ey);ctx.lineTo(W-40,ey);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='var(--yellow)';ctx.font='11px sans-serif';ctx.textAlign='left';
+    ctx.fillText('기대 1/6',W-90,ey-6);
+  }else{
+    // 동전 앞면 비율 추정 (π 대신 p=0.5)
+    ctx.font='24px monospace';ctx.fillStyle='#60a5fa';ctx.textAlign='center';
+    ctx.fillText('앞면 비율 = '+ (total? (inside/total).toFixed(4):'0') +' (기대 0.5)',W/2,H/2);
+    ctx.font='13px sans-serif';ctx.fillStyle='#9ca3af';
+    ctx.fillText('대수의 법칙: 시행이 많아질수록 0.5로 수렴',W/2,H/2+26);
+  }
+
+  // 통계
+  const err=piVal();
+  document.getElementById('stats').innerHTML=
+    mode==='pi'
+    ? '시행 <b>'+total+'</b> · π 추정 <b style="color:'+(Math.abs(err-Math.PI)<0.01?'var(--green)':Math.abs(err-Math.PI)<0.05?'var(--yellow)':'var(--pink)')+'">'+err.toFixed(5)+'</b> · 오차 <b>'+(Math.abs(err-Math.PI)).toExponential(2)+'</b>'
+    : mode==='dice'
+    ? '던짐 <b>'+total+'</b> · 실제 π 보이는대로 · 균등분포로 수렴'
+    : '던짐 <b>'+total+'</b> · 앞면 <b>'+inside+'</b> (비율 '+(total?(inside/total).toFixed(4):'0')+')';
+}
+function piVal(){return 4*inside/total;}
+resetMC();
+</script>
+</body>
+</html>

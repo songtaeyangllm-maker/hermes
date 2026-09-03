@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Magic Square</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--accent:#60a5fa;--muted:#9ca3af;--card2:#1f2434;--border:#2a3042;--green:#22c55e}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px;min-height:100vh}
+h1{font-size:24px;letter-spacing:2px}h1 span{color:var(--accent)}
+.sub{color:var(--muted);font-size:13px;margin-bottom:14px}
+.controls{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;justify-content:center;align-items:center}
+button{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:7px 13px;font-size:12px;border-radius:7px;cursor:pointer;transition:all .2s}
+button:hover{border-color:var(--accent)}
+button.acc{background:var(--accent);color:#0b0e16;border:none;font-weight:600}
+.grid{display:grid;gap:4px;background:var(--card2);padding:8px;border-radius:12px;border:1px solid var(--border)}
+.cell{width:48px;height:48px;display:flex;align-items:center;justify-content:center;font-size:15px;border-radius:6px;background:#151a28;font-weight:600}
+.cell.magic{background:var(--green);color:#0b0e16}
+.metrics{color:var(--muted);font-size:13px;background:var(--card2);padding:12px 18px;border-radius:10px;border:1px solid var(--border);margin-top:16px;text-align:center}
+.metrics b{color:var(--green)}
+</style>
+</head>
+<body>
+<h1>HERMES <span>MAGIC SQUARE</span></h1>
+<div class="sub">마방진 · 시아메세(Siamese) 방법 · 모든 행/열/대각선 합 = 상수</div>
+<div class="controls">
+  <button class="acc" onclick="gen(3)">3×3</button>
+  <button class="acc" onclick="gen(5)">5×5</button>
+  <button class="acc" onclick="gen(7)">7×7</button>
+  <button onclick="rotate()">⟳ 회전</button>
+  <button onclick="flipH()">⇅ 상하반전</button>
+</div>
+<div class="grid" id="grid"></div>
+<div class="metrics" id="stats"></div>
+<script>
+'use strict';
+const gridEl=document.getElementById('grid');
+let square=[],N=5;
+
+// 시아메세 방법 (홀수차 마방진): 1을 맨 윗줄 중앙, 이후 오른쪽 위 대각선
+function siamese(n){
+  const s=Array.from({length:n},()=>new Array(n).fill(0));
+  let x=n>>1,y=0;
+  for(let k=1;k<=n*n;k++){
+    s[y][x]=k;
+    let ny=(y-1+n)%n, nx=(x+1)%n;
+    if(s[ny][nx]!==0){ny=(y+1)%n;nx=x;}
+    y=ny;x=nx;
+  }
+  return s;
+}
+function magicConst(n){return n*(n*n+1)/2;}
+function render(){
+  gridEl.style.gridTemplateColumns=`repeat(${N},48px)`;
+  gridEl.innerHTML='';
+  const M=magicConst(N);
+  for(let r=0;r<N;r++)for(let c=0;c<N;c++){
+    const d=document.createElement('div');
+    d.className='cell';
+    d.textContent=square[r][c];
+    // 대각선 강조
+    if(r===c||r+c===N-1)d.classList.add('magic');
+    gridEl.appendChild(d);
+  }
+  document.getElementById('stats').innerHTML=
+    '<b>'+N+'×'+N+'</b> 마방진 · 마방상수 M=<b>'+M+'</b> = n(n²+1)/2'+
+    '<br>숫자 1..<b>'+(N*N)+'</b> · 모든 행/열/대각선 합 = '+M;
+}
+function gen(n){N=n;square=siamese(n);render();}
+function rotate(){
+  const s=Array.from({length:N},(_,r)=>square.map(row=>row[r]).reverse());
+  square=s;render();
+}
+function flipH(){
+  const s=square.slice().reverse();
+  square=s;render();
+}
+gen(5);
+</script>
+</body>
+</html>
