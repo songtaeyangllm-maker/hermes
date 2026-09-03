@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes Prime Spiral</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--accent:#fbbf24;--muted:#9ca3af;--card2:#1f2434;--border:#2a3042}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px;min-height:100vh}
+h1{font-size:24px;letter-spacing:2px}h1 span{color:var(--accent)}
+.sub{color:var(--muted);font-size:13px;margin-bottom:12px}
+.controls{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;justify-content:center;align-items:center}
+button{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:7px 13px;font-size:12px;border-radius:7px;cursor:pointer;transition:all .2s}
+button:hover{border-color:var(--accent)}
+button.acc{background:var(--accent);color:#0b0e16;border:none;font-weight:600}
+canvas{background:#07080d;border:1px solid var(--border);border-radius:12px}
+.metrics{color:var(--muted);font-size:13px;background:var(--card2);padding:12px 18px;border-radius:10px;border:1px solid var(--border);margin-top:12px;text-align:center}
+.metrics b{color:var(--accent)}
+input[type=range]{accent-color:var(--accent)}
+</style>
+</head>
+<body>
+<h1>HERMES <span>PRIME SPRIRAL</span></h1>
+<div class="sub">울람 나선 · 소수 밀도 시각화</div>
+<div class="controls">
+  <label style="font-size:12px;color:var(--muted)">반경 <input type="range" id="rad" min="10" max="160" value="80"></label>
+  <button class="acc" onclick="draw()">▶ 그리기</button>
+  <label style="font-size:12px;color:var(--muted)">원시근/대각선 <select id="mode"><option value="prime">소수</option><option value="sq">완전제곱</option><option value="tri">삼각수</option></select></label>
+</div>
+<canvas id="cv"></canvas>
+<div class="metrics" id="stats"></div>
+<script>
+'use strict';
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const W=600,H=600;cv.width=W;cv.height=H;
+
+function isPrime(n){
+  if(n<2)return false;
+  if(n<4)return true;
+  if(n%2===0)return false;
+  for(let i=3;i*i<=n;i+=2)if(n%i===0)return false;
+  return true;
+}
+function isSquare(n){const r=Math.round(Math.sqrt(n));return r*r===n;}
+function isTriangular(n){const r=Math.round((-1+Math.sqrt(1+8*n))/2);return r*(r+1)/2===n;}
+
+// 울람 나선: 1을 중심으로 시계방향. 좌표→숫자 사전을 나선 경로로 미리 생성.
+const SPIRAL_MAX=170; // 최대 반경
+const spiralMap=new Map(); // "x,y" -> n
+(function buildSpiral(){
+  let x=0,y=0,n=1,dx=1,dy=0,len=1,step=0;
+  spiralMap.set('0,0',1);
+  const maxN=(2*SPIRAL_MAX+1)*(2*SPIRAL_MAX+1);
+  while(n<maxN){
+    for(let i=0;i<len;i++){
+      x+=dx;y+=dy;n++;
+      spiralMap.set(x+','+y,n);
+    }
+    if(dx===1){dx=0;dy=1;}else if(dy===1){dx=-1;dy=0;}
+    else if(dx===-1){dx=0;dy=-1;}else{dx=1;dy=0;}
+    step++;
+    if(step%2===0)len++;
+  }
+})();
+function uvToNumber(x,y){
+  // 링 계산으로 맵 범위 확인
+  const v=spiralMap.get(x+','+y);
+  if(v===undefined)return -1;
+  return v;
+}
+function RtoN(r){return (2*r+1)*(2*r+1);}
+function draw(){
+  const R=+document.getElementById('rad').value;
+  const mode=document.getElementById('mode').value;
+  ctx.fillStyle='#07080d';ctx.fillRect(0,0,W,H);
+  const cell=2; // 한 셀
+  const cx=Math.floor(W/2),cy=Math.floor(H/2);
+  const testFn=mode==='prime'?isPrime:mode==='sq'?isSquare:isTriangular;
+  let count=0;
+  for(let dx=-R;dx<=R;dx++){
+    for(let dy=-R;dy<=R;dy++){
+      const v=uvToNumber(dx,dy);
+      if(testFn(v)){
+        ctx.fillStyle=mode==='prime'?'#fbbf24':'#60a5fa';
+        ctx.fillRect(cx+dx*cell,cy+dy*cell,cell,cell);
+        count++;
+      }
+    }
+  }
+  // 대각선 표시 (n=링, 대각 성분)
+  ctx.strokeStyle='rgba(60,60,80,0.5)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(cx-R*cell,cy-R*cell);ctx.lineTo(cx+R*cell,cy+R*cell);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx-R*cell,cy+R*cell);ctx.lineTo(cx+R*cell,cy-R*cell);ctx.stroke();
+
+  if(mode==='prime'){
+    const total=(2*R+1)*(2*R+1);
+    const density=count/total;
+    // pi(x) 근사 동치: 밀도 ≈ 1/ln(total)
+    const approx=1/Math.log(total);
+    document.getElementById('stats').innerHTML=
+      '반경 <b>'+R+'</b> · 소수 <b>'+count+'</b>개 · 밀도 <b>'+(density*100).toFixed(1)+'%</b>'+
+      ' · 1/ln(N) 근사 <b>'+(approx*100).toFixed(1)+'%</b>'+
+      '<br>오차 (표본분포비) <b style="color:'+(Math.abs(density-approx)/approx<0.3?'var(--green)':'var(--yellow)')+'">'+(Math.abs(density-approx)/approx*100).toFixed(1)+'%</b>';
+  }else{
+    document.getElementById('stats').innerHTML='특징 수열 표시 · 대각선 패턴 관찰';
+  }
+}
+draw();
+</script>
+</body>
+</html>

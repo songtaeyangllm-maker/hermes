@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes K-Means</title>
+<style>
+:root{--bg:#0b0e16;--text:#e5e7eb;--accent:#60a5fa;--muted:#9ca3af;--card2:#1f2434;--border:#2a3042}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px;min-height:100vh}
+h1{font-size:24px;letter-spacing:2px}h1 span{color:var(--accent)}
+.sub{color:var(--muted);font-size:13px;margin-bottom:12px}
+.controls{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;justify-content:center;align-items:center}
+button{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:7px 13px;font-size:12px;border-radius:7px;cursor:pointer;transition:all .2s}
+button:hover{border-color:var(--accent)}
+button.acc{background:var(--accent);color:#0b0e16;border:none;font-weight:600}
+canvas{background:#0d0f16;border:1px solid var(--border);border-radius:12px;cursor:pointer}
+.metrics{color:var(--muted);font-size:13px;background:var(--card2);padding:12px 18px;border-radius:10px;border:1px solid var(--border);margin-top:12px;text-align:center;min-width:300px}
+.metrics b{color:var(--text)}
+input[type=range]{accent-color:var(--accent)}
+select,option{background:var(--card2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px}
+</style>
+</head>
+<body>
+<h1>HERMES <span>K-MEANS</span></h1>
+<div class="sub">클러스터링 · Lloyd 알고리즘 · 점 수 <b id="npt">200</b></div>
+<div class="controls">
+  <select id="kval"><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option></select>
+  <button onclick="resetPts(genClusters3())">🎲 3군집</button>
+  <button onclick="resetPts(genClusters4())">🎲 4군집</button>
+  <button onclick="resetPts(genBlobs())">🔵 블롭</button>
+  <button onclick="resetPts(genRing())">⭕ 링</button>
+  <button class="acc" onclick="kmeansRun()">▶ K-평균 1스텝</button>
+  <button class="acc" onclick="kmeansAll()">⏩ 전체수렴</button>
+  <button onclick="resetPts(genClusters3())">⟳</button>
+</div>
+<canvas id="cv"></canvas>
+<div class="metrics" id="stats">군집 4 · 퍼지기 전</div>
+<script>
+'use strict';
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const W=640,H=480;cv.width=W;cv.height=H;
+const PAL=['#60a5fa','#f472b6','#22c55e','#fbbf24','#a78bfa','#f87171'];
+
+let pts=[],centers=[],assign=[];
+// K-평균은 비지도: 클러스터 개수 k 고정
+
+function rand(){return Math.random();}
+function genClusters3(){
+  const centersDef=[[150,150],[480,120],[320,380]];
+  const p=[];
+  for(const [cx,cy] of centersDef){
+    for(let i=0;i<45;i++){
+      const a=rand()*6.28,r=Math.sqrt(rand())*42;
+      p.push([cx+Math.cos(a)*r,cy+Math.sin(a)*r]);
+    }
+  }
+  return {points:p,k:3};
+}
+function genClusters4(){
+  const centersDef=[[120,120],[520,120],[120,380],[520,380]];
+  const p=[];
+  for(const [cx,cy] of centersDef){
+    for(let i=0;i<35;i++){
+      const a=rand()*6.28,r=Math.sqrt(rand())*38;
+      p.push([cx+Math.cos(a)*r,cy+Math.sin(a)*r]);
+    }
+  }
+  return {points:p,k:4};
+}
+function genBlobs(){
+  const p=[];
+  for(let i=0;i<280;i++){
+    const px=rand()*W,py=rand()*H;
+    p.push([px,py]);
+  }
+  return {points:p,k:5}; // 무작위 분포
+}
+function genRing(){
+  const p=[];
+  for(let i=0;i<260;i++){
+    const a=rand()*6.28,r=60+rand()*150;
+    p.push([W/2+Math.cos(a)*r,H/2+Math.sin(a)*r]);
+  }
+  return {points:p,k:4};
+}
+function resetPts(data){
+  pts=data.points; const k=data.k;
+  document.getElementById('kval').value=k;
+  // K-Means++ 초기화
+  centers=[];
+  centers.push(pts[Math.floor(rand()*pts.length)].slice());
+  for(let c=1;c<k;c++){
+    let maxD=-1,idx=0;
+    for(let i=0;i<pts.length;i++){
+      let minD=1e9;
+      for(const ce of centers){const d=Math.hypot(pts[i][0]-ce[0],pts[i][1]-ce[1]);minD=Math.min(minD,d);}
+      if(minD>maxD){maxD=minD;idx=i;}
+    }
+    centers.push(pts[idx].slice());
+  }
+  assign=new Array(pts.length).fill(0);
+  kmeansStep(true);
+  updateStats();
+  draw();
+}
+function nearest(p){
+  let bi=0,bd=1e18;
+  for(let i=0;i<centers.length;i++){
+    const d=Math.hypot(p[0]-centers[i][0],p[1]-centers[i][1]);
+    if(d<bd){bd=d;bi=i;}
+  }
+  return [bi,bd];
+}
+function kmeansStep(drawOnly){
+  // E-step: 재할당
+  let changed=0;
+  for(let i=0;i<pts.length;i++){
+    const [bi]=nearest(pts[i]);
+    if(assign[i]!==bi){assign[i]=bi;changed++;}
+  }
+  // M-step: 중심 갱신
+  const sums=centers.map(()=>[0,0,0]);
+  for(let i=0;i<pts.length;i++){
+    sums[assign[i]][0]+=pts[i][0];sums[assign[i]][1]+=pts[i][1];sums[assign[i]][2]++;
+  }
+  for(let i=0;i<centers.length;i++){
+    if(sums[i][2]>0){centers[i]=[sums[i][0]/sums[i][2],sums[i][1]/sums[i][2]];}
+    else centers[i]=pts[Math.floor(rand()*pts.length)].slice();
+  }
+  return changed;
+}
+function kmeansRun(){kmeansStep(true);updateStats();draw();}
+function kmeansAll(){
+  let guard=200;
+  while(kmeansStep(false)>0&&guard-->0){}
+  updateStats();draw();
+}
+function ssi(){ // Silhouette-ish / WCSS
+  let wcss=0;
+  for(let i=0;i<pts.length;i++){
+    const d=Math.hypot(pts[i][0]-centers[assign[i]][0],pts[i][1]-centers[assign[i]][1]);
+    wcss+=d*d;
+  }
+  return wcss;
+}
+function updateStats(){
+  const k=centers.length,w=ssi();
+  const kSel=+document.getElementById('kval').value;
+  document.getElementById('stats').innerHTML=
+    '클러스터 <b>'+k+'</b> · 점 <b>'+pts.length+'</b> · WCSS <b>'+Math.round(w)+'</b>'+
+    ' · K='+kSel+' (선택)';
+}
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#0d0f16';ctx.fillRect(0,0,W,H);
+  // 포인트
+  for(let i=0;i<pts.length;i++){
+    const c=PAL[assign[i]%PAL.length];
+    ctx.fillStyle=c;
+    ctx.globalAlpha=0.75;
+    ctx.beginPath();ctx.arc(pts[i][0],pts[i][1],2.4,0,7);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  // 중심
+  for(let i=0;i<centers.length;i++){
+    const c=PAL[i%PAL.length]
+    ctx.strokeStyle='#fff';ctx.lineWidth=3;
+    ctx.strokeRect(centers[i][0]-6,centers[i][1]-6,12,12);
+    ctx.fillStyle=c;
+    ctx.fillRect(centers[i][0]-5,centers[i][1]-5,10,10);
+  }
+}
+// 클릭으로 클러스터 수 변경 시 중심 재초기화
+cv.addEventListener('click',()=>{});
+resetPts(genClusters3());
+</script>
+</body>
+</html>
